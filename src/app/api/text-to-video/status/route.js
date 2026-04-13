@@ -33,7 +33,7 @@ const MODEL_CONFIGS = {
       const ai = new GoogleGenAI({ apiKey });
       const operation = await ai.operations.getVideosOperation({ name: videoId });
       
-      const status = operation.done ? "completed" : "processing";
+      let status = operation.done ? "completed" : "processing";
       let video_url = null;
       let thumbnail_url = null;
       let error = null;
