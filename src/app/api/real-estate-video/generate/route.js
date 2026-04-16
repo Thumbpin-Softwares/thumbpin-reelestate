@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-config";
 import Video from "@/models/Video";
-import dbConnect from "@/lib/db";
+import dbConnect from "@/lib/mongodb";
 
 /**
  * POST /api/real-estate-video/generate

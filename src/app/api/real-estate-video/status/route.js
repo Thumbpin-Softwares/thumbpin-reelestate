@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-config";
 import Video from "@/models/Video";
 import Asset from "@/models/Asset";
-import dbConnect from "@/lib/db";
+import dbConnect from "@/lib/mongodb";
 
 /**
  * GET /api/real-estate-video/status?video_id=...
