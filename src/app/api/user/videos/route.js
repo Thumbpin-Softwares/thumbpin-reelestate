@@ -25,12 +25,12 @@ export async function GET(request) {
     const skip = (page - 1) * limit;
 
     const [videos, total] = await Promise.all([
-      Asset.find({ userId, type: { $in: ["video", "clip"] } })
+      Asset.find({ userId, type: { $in: ["video", "clip", "composite"] } })
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
-      Asset.countDocuments({ userId, type: { $in: ["video", "clip"] } }),
+      Asset.countDocuments({ userId, type: { $in: ["video", "clip", "composite"] } }),
     ]);
 
     return NextResponse.json({

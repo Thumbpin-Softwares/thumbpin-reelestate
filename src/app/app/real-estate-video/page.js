@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -48,6 +49,41 @@ const ASPECT_RATIOS = [
   { value: "9:16", label: "9:16 — Portrait (Reels / Shorts)" },
   { value: "1:1", label: "1:1 — Square (Instagram)" },
 ];
+
+const LANGUAGES = [
+  { id: "english", label: "English" },
+  { id: "hindi", label: "Hindi" },
+  { id: "hinglish", label: "Hinglish" },
+];
+
+const TONES = [
+  { id: "professional", label: "Professional" },
+  { id: "friendly", label: "Friendly" },
+  { id: "luxury", label: "Luxury" },
+  { id: "energetic", label: "Energetic" },
+  { id: "warm", label: "Warm" },
+];
+
+const STORAGE_KEY = "realEstateVideoState";
+
+function dataUrlToFile(dataUrl, filename) {
+  const arr = dataUrl.split(",");
+  const mime = arr[0].match(/:(.*?);/)?.[1] || "image/png";
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) u8arr[n] = bstr.charCodeAt(n);
+  return new File([u8arr], filename, { type: mime });
+}
+
+async function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 function RealEstateVideoContent() {
   const [step, setStep] = useState(0);
@@ -100,6 +136,20 @@ function RealEstateVideoContent() {
 
   // Script & voice state
   const [script, setScript] = useState("");
+  const [scriptLanguage, setScriptLanguage] = useState("english");
+  const [scriptTone, setScriptTone] = useState("professional");
+  const [allowEmotionTags, setAllowEmotionTags] = useState(true);
+  const [generatingScript, setGeneratingScript] = useState(false);
+  const [propertyBrief, setPropertyBrief] = useState({
+    location: "",
+    propertyType: "",
+    price: "",
+    bedrooms: "",
+    bathrooms: "",
+    area: "",
+    keyFeatures: "",
+    amenities: "",
+  });
   const [selectedVoiceId, setSelectedVoiceId] = useState(null);
   const [voiceSearch, setVoiceSearch] = useState("");
   const [aspectRatio, setAspectRatio] = useState("16:9");
@@ -112,6 +162,7 @@ function RealEstateVideoContent() {
   const [thumbnailUrl, setThumbnailUrl] = useState(null);
   const [polling, setPolling] = useState(false);
   const [error, setError] = useState(null);
+  const [isRestored, setIsRestored] = useState(false);
 
   const searchParams = useSearchParams();
   const initialAvatarId = searchParams.get("avatarId");
@@ -125,6 +176,107 @@ function RealEstateVideoContent() {
       }
     }
   }, [initialAvatarId, initialMode]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) { setIsRestored(true); return; }
+      const saved = JSON.parse(raw);
+
+      if (saved.step !== undefined) setStep(saved.step);
+      if (saved.avatarMode) setAvatarMode(saved.avatarMode);
+      if (saved.selectedAvatarId) setSelectedAvatarId(saved.selectedAvatarId);
+      if (saved.selectedAvatarName) setSelectedAvatarName(saved.selectedAvatarName);
+      if (saved.twinAvatarId) setTwinAvatarId(saved.twinAvatarId);
+      if (saved.photoAvatarId) setPhotoAvatarId(saved.photoAvatarId);
+
+      if (saved.bgPreview) setBgPreview(saved.bgPreview);
+      if (saved.bgFile) setBgFile(dataUrlToFile(saved.bgFile, "property.png"));
+      if (saved.bgAssetId) setBgAssetId(saved.bgAssetId);
+
+      if (saved.script) setScript(saved.script);
+      if (saved.scriptLanguage) setScriptLanguage(saved.scriptLanguage);
+      if (saved.scriptTone) setScriptTone(saved.scriptTone);
+      if (typeof saved.allowEmotionTags === "boolean") setAllowEmotionTags(saved.allowEmotionTags);
+      if (saved.propertyBrief) setPropertyBrief(saved.propertyBrief);
+
+      if (saved.selectedVoiceId) setSelectedVoiceId(saved.selectedVoiceId);
+      if (saved.aspectRatio) setAspectRatio(saved.aspectRatio);
+
+      if (saved.videoId) setVideoId(saved.videoId);
+      if (saved.videoStatus) setVideoStatus(saved.videoStatus);
+      if (saved.videoUrl) setVideoUrl(saved.videoUrl);
+      if (saved.thumbnailUrl) setThumbnailUrl(saved.thumbnailUrl);
+    } catch (err) {
+      console.error("Failed to restore real estate state:", err);
+    } finally {
+      setIsRestored(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isRestored) return;
+    let cancelled = false;
+
+    async function saveState() {
+      try {
+        const bgFileData = bgFile instanceof File ? await fileToDataUrl(bgFile) : null;
+        const payload = {
+          step,
+          avatarMode,
+          selectedAvatarId,
+          selectedAvatarName,
+          twinAvatarId,
+          photoAvatarId,
+          bgPreview,
+          bgFile: bgFileData,
+          bgAssetId,
+          script,
+          scriptLanguage,
+          scriptTone,
+          allowEmotionTags,
+          propertyBrief,
+          selectedVoiceId,
+          aspectRatio,
+          videoId,
+          videoStatus,
+          videoUrl,
+          thumbnailUrl,
+        };
+
+        if (!cancelled) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+        }
+      } catch (err) {
+        console.error("Failed to persist real estate state:", err);
+      }
+    }
+
+    saveState();
+    return () => { cancelled = true; };
+  }, [
+    isRestored,
+    step,
+    avatarMode,
+    selectedAvatarId,
+    selectedAvatarName,
+    twinAvatarId,
+    photoAvatarId,
+    bgPreview,
+    bgFile,
+    bgAssetId,
+    script,
+    scriptLanguage,
+    scriptTone,
+    allowEmotionTags,
+    propertyBrief,
+    selectedVoiceId,
+    aspectRatio,
+    videoId,
+    videoStatus,
+    videoUrl,
+    thumbnailUrl,
+  ]);
 
   const { avatars, photoAvatars, voices, loading: heygenLoading } = useHeygen();
 
@@ -287,6 +439,29 @@ function RealEstateVideoContent() {
     return () => clearInterval(interval);
   }, [videoId, videoStatus]);
 
+  useEffect(() => {
+    if (!isRestored || videoUrl) return;
+    let active = true;
+
+    async function loadRecentVideo() {
+      try {
+        const res = await fetch("/api/assets?type=clip");
+        const data = await res.json();
+        if (!res.ok) return;
+        const recent = (data.assets || []).find((a) => a?.metadata?.context === "real-estate-video");
+        if (active && recent?.url) {
+          setVideoUrl(recent.url);
+          setVideoStatus("completed");
+        }
+      } catch (err) {
+        console.error("Failed to load recent real estate video:", err);
+      }
+    }
+
+    loadRecentVideo();
+    return () => { active = false; };
+  }, [isRestored, videoUrl]);
+
   // --- Handlers ---
 
   async function handleTwinUpload(e) {
@@ -374,6 +549,12 @@ function RealEstateVideoContent() {
     setBgUploading(true);
 
     try {
+      const assetForm = new FormData();
+      assetForm.append("file", file);
+      assetForm.append("type", "property");
+      assetForm.append("name", "Property Photo");
+      fetch("/api/assets/upload", { method: "POST", body: assetForm }).catch(() => {});
+
       const formData = new FormData();
       formData.append("file", file);
 
@@ -431,6 +612,35 @@ function RealEstateVideoContent() {
       toast.error("Generation failed", { description: err.message });
     } finally {
       setGenerating(false);
+    }
+  }
+
+  async function handleGenerateScript() {
+    setGeneratingScript(true);
+    try {
+      const fd = new FormData();
+      if (bgFile) fd.append("propertyImage", bgFile);
+      fd.append("language", scriptLanguage);
+      fd.append("tone", scriptTone);
+      fd.append("allowEmotionTags", allowEmotionTags ? "true" : "false");
+
+      Object.entries(propertyBrief).forEach(([key, value]) => {
+        if (value) fd.append(key, value);
+      });
+
+      const res = await fetch("/api/real-estate-video/generate-script", {
+        method: "POST",
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Script generation failed");
+      if (data.script) setScript(data.script);
+      if (data.scripts?.length) setScript(data.scripts[0]);
+      toast.success("Script generated!");
+    } catch (err) {
+      toast.error("Script generation failed", { description: err.message });
+    } finally {
+      setGeneratingScript(false);
     }
   }
 
@@ -556,7 +766,7 @@ function RealEstateVideoContent() {
                     {[...Array(8)].map((_, i) => (
                       <Card key={i} className="border-border/50 overflow-hidden">
                         <CardContent className="p-0">
-                          <Skeleton className="aspect-[3/4] w-full" />
+                          <Skeleton className="aspect-3/4 w-full" />
                           <div className="p-2 space-y-1">
                             <Skeleton className="h-3 w-3/4" />
                           </div>
@@ -565,7 +775,7 @@ function RealEstateVideoContent() {
                     ))}
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[460px] overflow-y-auto pr-1">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-115 overflow-y-auto pr-1">
                     {filteredAvatars.map((avatar, i) => (
                       <Card
                         key={`${avatar.avatar_id}-${i}`}
@@ -580,7 +790,7 @@ function RealEstateVideoContent() {
                         }`}
                       >
                         <CardContent className="p-0">
-                          <div className="aspect-[3/4] relative bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center overflow-hidden">
+                          <div className="aspect-3/4 relative bg-linear-to-br from-primary/10 to-accent/10 flex items-center justify-center overflow-hidden">
                             {avatar.preview_image_url ? (
                               <img
                                 src={avatar.preview_image_url}
@@ -855,7 +1065,7 @@ function RealEstateVideoContent() {
                         value={photoForm.appearance}
                         onChange={(e) => setPhotoForm((f) => ({ ...f, appearance: e.target.value }))}
                         placeholder="A professional real estate agent in a navy blazer, standing confidently in a modern office..."
-                        className="min-h-[80px] resize-none text-sm"
+                        className="min-h-20 resize-none text-sm"
                         maxLength={1000}
                       />
                       <p className="text-[10px] text-muted-foreground text-right">{photoForm.appearance.length}/1000</p>
@@ -1168,7 +1378,7 @@ function RealEstateVideoContent() {
                         <p className="text-sm text-muted-foreground">No custom avatars found. Generate one first!</p>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-2 gap-3 max-h-[400px] overflow-y-auto p-1">
+                      <div className="grid grid-cols-2 gap-3 max-h-100 overflow-y-auto p-1">
                         {photoAvatars.map((group, i) => (
                           <button
                             key={`${group.group_id}-${i}`}
@@ -1189,7 +1399,7 @@ function RealEstateVideoContent() {
                               alt={group.name}
                               className="w-full h-full object-cover transition-transform group-hover:scale-105"
                             />
-                            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2">
+                            <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/80 to-transparent p-2">
                               <p className="text-[10px] font-medium text-white truncate">{group.name || "Untitled"}</p>
                             </div>
                             {selectedAvatarId === (group.avatar_id || group.avatar_list?.[0]?.avatar_id) && (
@@ -1336,6 +1546,99 @@ function RealEstateVideoContent() {
             </p>
           </div>
 
+          {/* Property brief / questionnaire */}
+          <div className="rounded-xl border border-border/50 p-4 bg-card/50 space-y-3">
+            <h3 className="text-sm font-semibold">Property Brief (for AI script)</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Input
+                placeholder="Location (e.g., Gurgaon Sector 49)"
+                value={propertyBrief.location}
+                onChange={(e) => setPropertyBrief((p) => ({ ...p, location: e.target.value }))}
+              />
+              <Input
+                placeholder="Property type (e.g., 3BHK apartment)"
+                value={propertyBrief.propertyType}
+                onChange={(e) => setPropertyBrief((p) => ({ ...p, propertyType: e.target.value }))}
+              />
+              <Input
+                placeholder="Price (e.g., ₹1.2 Cr)"
+                value={propertyBrief.price}
+                onChange={(e) => setPropertyBrief((p) => ({ ...p, price: e.target.value }))}
+              />
+              <Input
+                placeholder="Bedrooms (e.g., 3)"
+                value={propertyBrief.bedrooms}
+                onChange={(e) => setPropertyBrief((p) => ({ ...p, bedrooms: e.target.value }))}
+              />
+              <Input
+                placeholder="Bathrooms (e.g., 2)"
+                value={propertyBrief.bathrooms}
+                onChange={(e) => setPropertyBrief((p) => ({ ...p, bathrooms: e.target.value }))}
+              />
+              <Input
+                placeholder="Area/size (e.g., 1650 sq ft)"
+                value={propertyBrief.area}
+                onChange={(e) => setPropertyBrief((p) => ({ ...p, area: e.target.value }))}
+              />
+            </div>
+            <Textarea
+              placeholder="Key features (e.g., floor-to-ceiling windows, park view, modular kitchen)"
+              className="min-h-20 resize-none text-sm"
+              value={propertyBrief.keyFeatures}
+              onChange={(e) => setPropertyBrief((p) => ({ ...p, keyFeatures: e.target.value }))}
+            />
+            <Textarea
+              placeholder="Amenities (e.g., gym, pool, clubhouse, parking)"
+              className="min-h-20 resize-none text-sm"
+              value={propertyBrief.amenities}
+              onChange={(e) => setPropertyBrief((p) => ({ ...p, amenities: e.target.value }))}
+            />
+
+            <div className="flex gap-2 flex-wrap">
+              {LANGUAGES.map((l) => (
+                <button
+                  key={l.id}
+                  onClick={() => setScriptLanguage(l.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                    scriptLanguage === l.id ? "gradient-bg text-white" : "border border-border text-muted-foreground hover:border-primary/40"
+                  }`}
+                >
+                  {l.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex gap-2 flex-wrap">
+              {TONES.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setScriptTone(t.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                    scriptTone === t.id ? "gradient-bg text-white" : "border border-border text-muted-foreground hover:border-primary/40"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Switch checked={allowEmotionTags} onCheckedChange={setAllowEmotionTags} />
+              <span className="text-xs text-muted-foreground">Allow emotion tags like {{happy}} or {{sad}}</span>
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleGenerateScript}
+              disabled={generatingScript}
+              className="cursor-pointer text-xs w-full"
+            >
+              {generatingScript ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}
+              ✨ AI Generate Script
+            </Button>
+          </div>
+
           {/* Script */}
           <div className="space-y-2">
             <label className="text-sm font-medium flex items-center gap-2">
@@ -1344,7 +1647,7 @@ function RealEstateVideoContent() {
             </label>
             <Textarea
               placeholder="Welcome to this stunning 3BHK apartment in the heart of South Delhi. With floor-to-ceiling windows and premium fittings, this is luxury living redefined..."
-              className="min-h-[140px] resize-none text-sm"
+              className="min-h-35 resize-none text-sm"
               value={script}
               onChange={(e) => setScript(e.target.value)}
               maxLength={3000}
@@ -1381,7 +1684,7 @@ function RealEstateVideoContent() {
                   placeholder={voiceSearch ? `${filteredVoices.length} voices found...` : "Pick a voice..."}
                 />
               </SelectTrigger>
-              <SelectContent className="max-h-[350px]">
+              <SelectContent className="max-h-87.5">
                 <div className="p-2 text-[10px] text-muted-foreground border-b">
                   {voiceSearch ? `Search results: ${filteredVoices.length}` : `All voices (${voices.length})`}
                 </div>
@@ -1601,7 +1904,7 @@ function RealEstateVideoContent() {
 export default function RealEstateVideoPage() {
   return (
     <Suspense fallback={
-      <div className="max-w-4xl mx-auto py-8 px-4 flex items-center justify-center min-h-[400px]">
+      <div className="max-w-4xl mx-auto py-8 px-4 flex items-center justify-center min-h-100">
         <div className="flex flex-col items-center gap-2">
           <Loader2 className="w-8 h-8 text-primary animate-spin" />
           <p className="text-sm text-muted-foreground font-medium">Loading Real Estate Video Tool...</p>

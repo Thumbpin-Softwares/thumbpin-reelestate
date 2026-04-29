@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import {
   ShoppingBag,
@@ -43,6 +44,14 @@ const LANGUAGES = [
   { id: "english", label: "English" },
   { id: "hindi", label: "Hindi" },
   { id: "hinglish", label: "Hinglish" },
+];
+
+const TONES = [
+  { id: "friendly", label: "Friendly" },
+  { id: "energetic", label: "Energetic" },
+  { id: "professional", label: "Professional" },
+  { id: "playful", label: "Playful" },
+  { id: "luxury", label: "Luxury" },
 ];
 
 async function compressImage(file, maxDimension = 1200, quality = 0.7) {
@@ -83,6 +92,22 @@ function dataUrlToFile(dataUrl, filename) {
   const u8arr = new Uint8Array(n);
   while (n--) u8arr[n] = bstr.charCodeAt(n);
   return new File([u8arr], filename, { type: mime });
+}
+
+async function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function ensureFileFromImage(image, filename) {
+  if (!image) return null;
+  if (image instanceof File) return image;
+  if (typeof image === "string") return dataUrlToFile(image, filename);
+  return null;
 }
 
 // ─── Reusable image upload box ───────────────────────────────────────────────
@@ -167,7 +192,7 @@ function VideoCard({ status, video, index = 0, title }) {
       </div>
       {isReady && video?.videoUrl && (
         <div className="px-3 pb-3">
-          <div className="rounded-xl overflow-hidden bg-black aspect-[9/16] max-h-80 mx-auto relative">
+          <div className="rounded-xl overflow-hidden bg-black aspect-9/16 max-h-80 mx-auto relative">
             <video src={video.videoUrl} controls className="w-full h-full object-contain" autoPlay={false} />
           </div>
           <div className="flex justify-end mt-2">
@@ -184,6 +209,7 @@ function VideoCard({ status, video, index = 0, title }) {
 
 // ─── Main page content ───────────────────────────────────────────────────────
 const STEPS = ["Product", "Avatar", "Composite", "Script", "Voice", "Generate"];
+const STORAGE_KEY = "productToVideoState";
 
 function ProductToVideoContent() {
   const searchParams = useSearchParams();
@@ -200,6 +226,17 @@ function ProductToVideoContent() {
   const [uploadedAvatarFile, setUploadedAvatarFile] = useState(null);
   // Generate mode
   const [avatarPrompt, setAvatarPrompt] = useState("");
+  const [avatarGender, setAvatarGender] = useState("");
+  const [avatarAge, setAvatarAge] = useState("");
+  const [avatarSkinTone, setAvatarSkinTone] = useState("");
+  const [avatarEthnicity, setAvatarEthnicity] = useState("");
+  const [avatarHair, setAvatarHair] = useState("");
+  const [avatarBodyType, setAvatarBodyType] = useState("");
+  const [avatarOutfit, setAvatarOutfit] = useState("");
+  const [avatarDressStyle, setAvatarDressStyle] = useState("");
+  const [avatarAccessories, setAvatarAccessories] = useState("");
+  const [avatarLocation, setAvatarLocation] = useState("");
+  const [avatarStyleNotes, setAvatarStyleNotes] = useState("");
   const [avatarVariantCount, setAvatarVariantCount] = useState(1);
   const [generatedAvatars, setGeneratedAvatars] = useState([]); // [{ url }]
   const [generatingAvatar, setGeneratingAvatar] = useState(false);
@@ -216,6 +253,8 @@ function ProductToVideoContent() {
   // Step 4: Script — supports batch
   const [scripts, setScripts] = useState([]); // array of strings, one per active composite
   const [language, setLanguage] = useState("english");
+  const [scriptTone, setScriptTone] = useState("friendly");
+  const [allowEmotionTags, setAllowEmotionTags] = useState(true);
   const [generatingScript, setGeneratingScript] = useState(false);
 
   // Step 5: Voice prompt (shared across all variants since same person)
@@ -227,10 +266,232 @@ function ProductToVideoContent() {
   const [videoStatuses, setVideoStatuses] = useState([]); // ["pending"|"generating"|"ready"|"error"]  
   const [videoResults, setVideoResults] = useState([]); // [{ videoUrl }]
   const [done, setDone] = useState(false);
+  const [isRestored, setIsRestored] = useState(false);
 
   useEffect(() => {
     if (initialScript) { setScripts([initialScript]); setStep(3); }
   }, [initialScript]);
+
+  async function uploadAsset(file, type, name) {
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("type", type);
+      if (name) fd.append("name", name);
+      await fetch("/api/assets/upload", { method: "POST", body: fd });
+    } catch (err) {
+      console.error("Asset upload failed:", err);
+    }
+  }
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) { setIsRestored(true); return; }
+      const saved = JSON.parse(raw);
+
+      if (saved.step !== undefined) setStep(saved.step);
+      if (saved.productImage) setProductImage(saved.productImage);
+      if (saved.avatarMode) setAvatarMode(saved.avatarMode);
+      if (saved.uploadedAvatarFile) setUploadedAvatarFile(saved.uploadedAvatarFile);
+
+      if (saved.selectedAvatar) {
+        const restored = { ...saved.selectedAvatar };
+        if (restored.fileDataUrl) {
+          restored.url = restored.fileDataUrl;
+          restored.file = dataUrlToFile(restored.fileDataUrl, "avatar.png");
+        }
+        setSelectedAvatar(restored);
+      } else if (saved.uploadedAvatarFile && saved.avatarMode === "upload") {
+        // Reconstruct selectedAvatar from uploadedAvatarFile data URL
+        const file = dataUrlToFile(saved.uploadedAvatarFile, "avatar.png");
+        setSelectedAvatar({ url: saved.uploadedAvatarFile, file, name: "Custom" });
+      }
+
+      if (saved.avatarPrompt) setAvatarPrompt(saved.avatarPrompt);
+      if (saved.avatarGender) setAvatarGender(saved.avatarGender);
+      if (saved.avatarAge) setAvatarAge(saved.avatarAge);
+      if (saved.avatarSkinTone) setAvatarSkinTone(saved.avatarSkinTone);
+      if (saved.avatarEthnicity) setAvatarEthnicity(saved.avatarEthnicity);
+      if (saved.avatarHair) setAvatarHair(saved.avatarHair);
+      if (saved.avatarBodyType) setAvatarBodyType(saved.avatarBodyType);
+      if (saved.avatarOutfit) setAvatarOutfit(saved.avatarOutfit);
+      if (saved.avatarDressStyle) setAvatarDressStyle(saved.avatarDressStyle);
+      if (saved.avatarAccessories) setAvatarAccessories(saved.avatarAccessories);
+      if (saved.avatarLocation) setAvatarLocation(saved.avatarLocation);
+      if (saved.avatarStyleNotes) setAvatarStyleNotes(saved.avatarStyleNotes);
+      if (saved.avatarVariantCount) setAvatarVariantCount(saved.avatarVariantCount);
+      if (saved.generatedAvatars) setGeneratedAvatars(saved.generatedAvatars);
+
+      if (saved.compositeVariantCount) setCompositeVariantCount(saved.compositeVariantCount);
+      if (saved.compositeDirections) setCompositeDirections(saved.compositeDirections);
+      if (saved.composites) {
+        setComposites(
+          saved.composites.map((c) => ({
+            ...c,
+            file: c.url?.startsWith("data:") ? dataUrlToFile(c.url, "composite.png") : null,
+          }))
+        );
+      }
+      if (saved.compositeMode) setCompositeMode(saved.compositeMode);
+      if (saved.selectedCompositeIndex !== undefined) setSelectedCompositeIndex(saved.selectedCompositeIndex);
+
+      if (saved.scripts) setScripts(saved.scripts);
+      if (saved.language) setLanguage(saved.language);
+      if (saved.scriptTone) setScriptTone(saved.scriptTone);
+      if (typeof saved.allowEmotionTags === "boolean") setAllowEmotionTags(saved.allowEmotionTags);
+      if (saved.voicePrompt) setVoicePrompt(saved.voicePrompt);
+
+      if (saved.videoStatuses) setVideoStatuses(saved.videoStatuses);
+      if (saved.videoResults) setVideoResults(saved.videoResults);
+      if (saved.done) setDone(saved.done);
+    } catch (err) {
+      console.error("Failed to restore product-to-video state:", err);
+    } finally {
+      setIsRestored(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isRestored) return;
+    let cancelled = false;
+
+    async function saveState() {
+      try {
+        const productImageData = productImage instanceof File
+          ? await fileToDataUrl(productImage)
+          : productImage || null;
+
+        const uploadedAvatarData = uploadedAvatarFile instanceof File
+          ? await fileToDataUrl(uploadedAvatarFile)
+          : uploadedAvatarFile || null;
+
+        let selectedAvatarPayload = null;
+        if (selectedAvatar) {
+          let fileDataUrl = null;
+          if (selectedAvatar.file instanceof File) {
+            fileDataUrl = await fileToDataUrl(selectedAvatar.file);
+          }
+          selectedAvatarPayload = {
+            url: selectedAvatar.url,
+            name: selectedAvatar.name,
+            fileDataUrl,
+          };
+        }
+
+        const compositePayload = (composites || []).map((c) => ({
+          url: c.url,
+          title: c.title,
+          direction: c.direction,
+        }));
+
+        const payload = {
+          step,
+          productImage: productImageData,
+          avatarMode,
+          uploadedAvatarFile: uploadedAvatarData,
+          selectedAvatar: selectedAvatarPayload,
+          avatarPrompt,
+          avatarGender,
+          avatarAge,
+          avatarSkinTone,
+          avatarEthnicity,
+          avatarHair,
+          avatarBodyType,
+          avatarOutfit,
+          avatarDressStyle,
+          avatarAccessories,
+          avatarLocation,
+          avatarStyleNotes,
+          avatarVariantCount,
+          generatedAvatars,
+          compositeVariantCount,
+          compositeDirections,
+          composites: compositePayload,
+          compositeMode,
+          selectedCompositeIndex,
+          scripts,
+          language,
+          scriptTone,
+          allowEmotionTags,
+          voicePrompt,
+          videoStatuses,
+          videoResults,
+          done,
+        };
+
+        if (!cancelled) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+        }
+      } catch (err) {
+        console.error("Failed to persist product-to-video state:", err);
+      }
+    }
+
+    saveState();
+    return () => { cancelled = true; };
+  }, [
+    isRestored,
+    step,
+    productImage,
+    avatarMode,
+    uploadedAvatarFile,
+    selectedAvatar,
+    avatarPrompt,
+    avatarGender,
+    avatarAge,
+    avatarSkinTone,
+    avatarEthnicity,
+    avatarHair,
+    avatarBodyType,
+    avatarOutfit,
+    avatarDressStyle,
+    avatarAccessories,
+    avatarLocation,
+    avatarStyleNotes,
+    avatarVariantCount,
+    generatedAvatars,
+    compositeVariantCount,
+    compositeDirections,
+    composites,
+    compositeMode,
+    selectedCompositeIndex,
+    scripts,
+    language,
+    scriptTone,
+    allowEmotionTags,
+    voicePrompt,
+    videoStatuses,
+    videoResults,
+    done,
+  ]);
+
+  useEffect(() => {
+    if (!isRestored || videoResults.length > 0) return;
+    let active = true;
+
+    async function loadRecentVideos() {
+      try {
+        const res = await fetch("/api/assets?type=clip");
+        const data = await res.json();
+        if (!res.ok) return;
+        const items = (data.assets || [])
+          .filter((a) => a?.metadata?.context === "product-video")
+          .slice(0, 3)
+          .map((a) => ({ videoUrl: a.url }));
+        if (active && items.length) {
+          setVideoResults(items);
+          setVideoStatuses(items.map(() => "ready"));
+          setDone(true);
+        }
+      } catch (err) {
+        console.error("Failed to load recent product videos:", err);
+      }
+    }
+
+    loadRecentVideos();
+    return () => { active = false; };
+  }, [isRestored, videoResults.length]);
 
   // Active composites = if single mode, just the selected one; if all mode, all of them
   const activeComposites = compositeMode === "single" && selectedCompositeIndex !== null
@@ -253,10 +514,28 @@ function ProductToVideoContent() {
     setGeneratingAvatar(true);
     setGeneratedAvatars([]);
     try {
+      const customization = [
+        avatarGender && `Gender: ${avatarGender}`,
+        avatarAge && `Age range: ${avatarAge}`,
+        avatarEthnicity && `Ethnicity/nationality: ${avatarEthnicity}`,
+        avatarSkinTone && `Skin tone: ${avatarSkinTone}`,
+        avatarHair && `Hair: ${avatarHair}`,
+        avatarBodyType && `Body type: ${avatarBodyType}`,
+        avatarOutfit && `Outfit: ${avatarOutfit}`,
+        avatarDressStyle && `Dressing style: ${avatarDressStyle}`,
+        avatarAccessories && `Accessories: ${avatarAccessories}`,
+        avatarLocation && `Setting/background: ${avatarLocation}`,
+        avatarStyleNotes && `Style notes: ${avatarStyleNotes}`,
+      ].filter(Boolean).join(". ");
+
+      const finalPrompt = customization
+        ? `${avatarPrompt.trim()}. ${customization}`
+        : avatarPrompt.trim();
+
       const res = await fetch("/api/product-video/generate-avatar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: avatarPrompt.trim(), variants: avatarVariantCount }),
+        body: JSON.stringify({ prompt: finalPrompt, variants: avatarVariantCount }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to generate avatars");
@@ -281,12 +560,15 @@ function ProductToVideoContent() {
       let avatarFile;
       if (selectedAvatar.file) {
         avatarFile = await compressImage(selectedAvatar.file);
+      } else if (selectedAvatar.url?.startsWith("data:")) {
+        avatarFile = await compressImage(dataUrlToFile(selectedAvatar.url, "avatar.png"));
       } else {
         const res = await fetch(selectedAvatar.url);
         const blob = await res.blob();
         avatarFile = await compressImage(new File([blob], "avatar.png", { type: blob.type }));
       }
-      const compressedProduct = await compressImage(productImage);
+      const productFile = await ensureFileFromImage(productImage, "product.png");
+      const compressedProduct = await compressImage(productFile);
 
       const fd = new FormData();
       fd.append("avatarImage", avatarFile);
@@ -352,7 +634,8 @@ function ProductToVideoContent() {
     if (activeComposites.length === 0 || !productImage) return;
     setGeneratingScript(true);
     try {
-      const compressedProduct = await compressImage(productImage);
+      const productFile = await ensureFileFromImage(productImage, "product.png");
+      const compressedProduct = await compressImage(productFile);
 
       if (activeComposites.length === 1) {
         // Single mode
@@ -360,7 +643,8 @@ function ProductToVideoContent() {
         fd.append("compositeImage", activeComposites[0].file);
         fd.append("productImage", compressedProduct);
         fd.append("language", language);
-        fd.append("tone", "friendly");
+        fd.append("tone", scriptTone);
+        fd.append("allowEmotionTags", allowEmotionTags ? "true" : "false");
 
         const res = await fetch("/api/product-video/generate-script", { method: "POST", body: fd });
         const data = await res.json();
@@ -373,7 +657,8 @@ function ProductToVideoContent() {
         fd.append("productImage", compressedProduct);
         fd.append("compositeCount", activeComposites.length.toString());
         fd.append("language", language);
-        fd.append("tone", "friendly");
+        fd.append("tone", scriptTone);
+        fd.append("allowEmotionTags", allowEmotionTags ? "true" : "false");
         activeComposites.forEach((c, i) => fd.append(`compositeImage_${i}`, c.file));
 
         const res = await fetch("/api/product-video/generate-script", { method: "POST", body: fd });
@@ -396,9 +681,11 @@ function ProductToVideoContent() {
     try {
       const fd = new FormData();
       fd.append("compositeImage", activeComposites[index].file);
-      fd.append("productImage", await compressImage(productImage));
+      const productFile = await ensureFileFromImage(productImage, "product.png");
+      fd.append("productImage", await compressImage(productFile));
       fd.append("language", language);
-      fd.append("tone", "friendly");
+      fd.append("tone", scriptTone);
+      fd.append("allowEmotionTags", allowEmotionTags ? "true" : "false");
 
       const res = await fetch("/api/product-video/generate-script", { method: "POST", body: fd });
       const data = await res.json();
@@ -423,6 +710,7 @@ function ProductToVideoContent() {
       const fd = new FormData();
       fd.append("compositeImage", activeComposites[0].file); // Use first composite for voice analysis
       fd.append("script", scripts[0].trim());
+      fd.append("allowEmotionTags", allowEmotionTags ? "true" : "false");
 
       const res = await fetch("/api/product-video/generate-voice-prompt", { method: "POST", body: fd });
       const data = await res.json();
@@ -580,7 +868,10 @@ function ProductToVideoContent() {
             label="Product Photo"
             icon={ShoppingBag}
             image={productImage}
-            onAdd={setProductImage}
+            onAdd={async (file) => {
+              setProductImage(file);
+              await uploadAsset(file, "products", "Product Photo");
+            }}
             onRemove={() => setProductImage(null)}
             type="products"
             hint="Upload a clear photo of just the product (no faces). This will be the product shown in the video."
@@ -645,20 +936,30 @@ function ProductToVideoContent() {
             </div>
           )}
 
-          {/* Upload avatar */}
           {avatarMode === "upload" && (
-            <ImageUploadBox
-              label="Your Photo"
-              icon={User}
-              image={uploadedAvatarFile}
-              onAdd={(file) => {
-                setUploadedAvatarFile(file);
-                setSelectedAvatar({ url: URL.createObjectURL(file), file, name: "Custom" });
-              }}
-              onRemove={() => { setUploadedAvatarFile(null); setSelectedAvatar(null); }}
-              type="avatars"
-              hint="Upload a clear photo of yourself or anyone you want as the presenter."
-            />
+            <div className="space-y-3">
+              <ImageUploadBox
+                label="Your Photo"
+                icon={User}
+                image={uploadedAvatarFile}
+                onAdd={async (file) => {
+                  setUploadedAvatarFile(file);
+                  // Use a data URL so it persists after navigation (blob URLs expire)
+                  const dataUrl = await fileToDataUrl(file);
+                  setSelectedAvatar({ url: dataUrl, file, name: "Custom" });
+                  uploadAsset(file, "avatars", "Custom Avatar");
+                }}
+                onRemove={() => { setUploadedAvatarFile(null); setSelectedAvatar(null); }}
+                type="avatars"
+                hint="Upload a clear photo of yourself or anyone you want as the presenter."
+              />
+              {selectedAvatar && avatarMode === "upload" && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/5 border border-primary/20">
+                  <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
+                  <span className="text-xs text-primary font-medium">Avatar selected and ready to use</span>
+                </div>
+              )}
+            </div>
           )}
 
           {/* Generate avatar */}
@@ -670,10 +971,58 @@ function ProductToVideoContent() {
                   value={avatarPrompt}
                   onChange={(e) => setAvatarPrompt(e.target.value)}
                   placeholder="e.g., A young Indian woman in her late 20s with short wavy hair, wearing a simple white cotton t-shirt, warm smile..."
-                  className="min-h-[80px] resize-none text-sm"
+                  className="min-h-20 resize-none text-sm"
                   maxLength={500}
                 />
               </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Gender</Label>
+                  <Input value={avatarGender} onChange={(e) => setAvatarGender(e.target.value)} placeholder="e.g., Female" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Age range</Label>
+                  <Input value={avatarAge} onChange={(e) => setAvatarAge(e.target.value)} placeholder="e.g., Late 20s" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Ethnicity / Nationality</Label>
+                  <Input value={avatarEthnicity} onChange={(e) => setAvatarEthnicity(e.target.value)} placeholder="e.g., South Indian, Bengali, North Indian" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Skin tone</Label>
+                  <Input value={avatarSkinTone} onChange={(e) => setAvatarSkinTone(e.target.value)} placeholder="e.g., Fair, Wheatish, Dark" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Hair (color &amp; style)</Label>
+                  <Input value={avatarHair} onChange={(e) => setAvatarHair(e.target.value)} placeholder="e.g., Long black wavy hair" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Body type</Label>
+                  <Input value={avatarBodyType} onChange={(e) => setAvatarBodyType(e.target.value)} placeholder="e.g., Slim, Athletic, Curvy" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Outfit</Label>
+                  <Input value={avatarOutfit} onChange={(e) => setAvatarOutfit(e.target.value)} placeholder="e.g., White cotton tee and jeans" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Dressing style</Label>
+                  <Input value={avatarDressStyle} onChange={(e) => setAvatarDressStyle(e.target.value)} placeholder="e.g., Casual, Formal, Ethnic, Street" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Accessories</Label>
+                  <Input value={avatarAccessories} onChange={(e) => setAvatarAccessories(e.target.value)} placeholder="e.g., Gold earrings, glasses, watch" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Place / background</Label>
+                  <Input value={avatarLocation} onChange={(e) => setAvatarLocation(e.target.value)} placeholder="e.g., Cozy living room" />
+                </div>
+                <div className="space-y-1 sm:col-span-2">
+                  <Label className="text-xs">Extra style notes (makeup, expression, mood)</Label>
+                  <Input value={avatarStyleNotes} onChange={(e) => setAvatarStyleNotes(e.target.value)} placeholder="e.g., Minimal makeup, warm smile, confident" />
+                </div>
+              </div>
+
               <div className="flex items-center gap-4">
                 <div className="space-y-1">
                   <Label className="text-xs">Variants</Label>
@@ -912,6 +1261,26 @@ function ProductToVideoContent() {
             ))}
           </div>
 
+          {/* Tone selector */}
+          <div className="flex gap-2 flex-wrap">
+            {TONES.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setScriptTone(t.id)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                  scriptTone === t.id ? "gradient-bg text-white" : "border border-border text-muted-foreground hover:border-primary/40"
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Switch checked={allowEmotionTags} onCheckedChange={setAllowEmotionTags} />
+            <Label className="text-xs text-muted-foreground">Allow emotion tags like {{happy}} or {{sad}}</Label>
+          </div>
+
           {/* Batch "Fill All" button */}
           {activeComposites.length > 1 && (
             <Button
@@ -956,7 +1325,7 @@ function ProductToVideoContent() {
                   setScripts(newScripts);
                 }}
                 placeholder="Write what the presenter should say about the product (8 seconds)..."
-                className="min-h-[80px] resize-none text-sm"
+                className="min-h-20 resize-none text-sm"
                 maxLength={MAX_SCRIPT}
               />
               <div className="flex items-center gap-2">
@@ -1005,7 +1374,7 @@ function ProductToVideoContent() {
               value={voicePrompt}
               onChange={(e) => setVoicePrompt(e.target.value)}
               placeholder="AI will generate a detailed voice description here..."
-              className="min-h-[120px] resize-none text-sm"
+              className="min-h-30 resize-none text-sm"
             />
           )}
 
@@ -1108,7 +1477,7 @@ function ProductToVideoContent() {
 
 export default function ProductToVideoPage() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>}>
+    <Suspense fallback={<div className="flex items-center justify-center min-h-100"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>}>
       <ProductToVideoContent />
     </Suspense>
   );

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-config";
 import { consumeCreditsForAction, refundCreditsForAction } from "@/lib/credit-system";
+import dbConnect from "@/lib/mongodb";
+import Asset from "@/models/Asset";
 
 /**
  * Image Generation API
@@ -122,6 +124,24 @@ export async function POST(request) {
           provider: "pollinations",
         },
       });
+    }
+
+    try {
+      await dbConnect();
+      await Asset.insertMany(
+        images.map((img, index) => ({
+          userId,
+          name: `Generated image ${index + 1}`,
+          type: "image",
+          url: img.url,
+          metadata: {
+            context: "gemini-image",
+            source: img.source || source,
+          },
+        }))
+      );
+    } catch (assetErr) {
+      console.error("[GeminiImg] Asset save failed:", assetErr);
     }
 
     return NextResponse.json({

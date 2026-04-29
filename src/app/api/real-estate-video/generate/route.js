@@ -296,6 +296,8 @@ async function generateVoicePromptInternal(ai, compositeInlineData, script) {
 
 Look at this image of a person presenting a property. They will speak: "${script}"
 
+The script may include inline emotion tags like {{happy}}, {{sad}}, {{excited}}, {{calm}}. Use these tags to shape delivery, but do NOT speak the tags aloud.
+
 Generate a DETAILED voice description. The voice must sound like a CONFIDENT REAL ESTATE PROFESSIONAL — warm, authoritative, aspirational.
 
 Return a single paragraph with ALL attributes comma-separated:

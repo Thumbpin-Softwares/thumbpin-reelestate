@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-config";
+import dbConnect from "@/lib/mongodb";
+import Asset from "@/models/Asset";
 
 /**
  * POST /api/product-video/composite
@@ -86,9 +88,26 @@ Style: This should look EXACTLY like a selfie screenshot from an Instagram Reel 
     // Extract the generated image
     for (const part of response.candidates[0].content.parts) {
       if (part.inlineData) {
+        const compositeUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+        try {
+          await dbConnect();
+          await Asset.create({
+            userId: session.user.id,
+            name: "Product composite",
+            type: "composite",
+            url: compositeUrl,
+            metadata: {
+              context: "product-video",
+              source: "gemini",
+            },
+          });
+        } catch (assetErr) {
+          console.error("[ProductVideo] Composite asset save failed:", assetErr);
+        }
+
         return NextResponse.json({
           success: true,
-          compositeUrl: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`,
+          compositeUrl,
         });
       }
     }

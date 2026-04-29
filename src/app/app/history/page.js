@@ -20,13 +20,21 @@ import {
   ChevronRight,
   Video,
   ExternalLink,
+  Eye,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function HistoryPage() {
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
   const [view, setView] = useState("table");
+  const [previewVideo, setPreviewVideo] = useState(null);
 
   async function fetchVideos(page = 1) {
     setLoading(true);
@@ -123,7 +131,7 @@ export default function HistoryPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <p className="text-sm font-medium truncate max-w-[250px]">{video.name}</p>
+                      <p className="text-sm font-medium truncate max-w-62.5">{video.name}</p>
                     </TableCell>
                     <TableCell>
                       <Badge variant="secondary" className="text-xs capitalize">
@@ -141,6 +149,14 @@ export default function HistoryPage() {
                       <div className="flex items-center justify-end gap-1">
                         {video.url && (
                           <>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 cursor-pointer"
+                              onClick={() => setPreviewVideo(video)}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
                             <a href={video.url} target="_blank" rel="noopener noreferrer">
                               <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer">
                                 <ExternalLink className="w-4 h-4" />
@@ -169,7 +185,7 @@ export default function HistoryPage() {
           {videos.map((video) => (
             <Card key={video.id} className="group border border-border/50 hover:shadow-md transition-all overflow-hidden">
               <CardContent className="p-0">
-                <div className="aspect-video bg-gradient-to-br from-primary/5 to-primary/10 relative flex items-center justify-center">
+                <div className="aspect-video bg-linear-to-br from-primary/5 to-primary/10 relative flex items-center justify-center">
                   {video.url ? (
                     <video
                       src={video.url}
@@ -178,6 +194,14 @@ export default function HistoryPage() {
                     />
                   ) : (
                     <Play className="w-8 h-8 text-muted-foreground/30" />
+                  )}
+                  {video.url && (
+                    <button
+                      onClick={() => setPreviewVideo(video)}
+                      className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Eye className="w-4 h-4 text-white" />
+                    </button>
                   )}
                 </div>
                 <div className="p-3 space-y-1.5">
@@ -200,6 +224,21 @@ export default function HistoryPage() {
           ))}
         </div>
       )}
+
+      <Dialog open={!!previewVideo} onOpenChange={() => setPreviewVideo(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Video Preview</DialogTitle>
+          </DialogHeader>
+          {previewVideo?.url ? (
+            <div className="w-full rounded-xl overflow-hidden bg-black">
+              <video src={previewVideo.url} controls className="w-full h-full" />
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No preview available.</p>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Pagination */}
       {!loading && pagination.totalPages > 1 && (

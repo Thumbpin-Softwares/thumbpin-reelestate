@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-config";
 import { consumeCreditsForAction, refundCreditsForAction } from "@/lib/credit-system";
+import dbConnect from "@/lib/mongodb";
+import Asset from "@/models/Asset";
 
 /**
  * Image Generation API — Multi-model support
@@ -233,6 +235,25 @@ export async function POST(request) {
         message: "No images returned. Using demo placeholders.",
         images: getDemoImages(prompt, settings.variants || 2),
       });
+    }
+
+    try {
+      await dbConnect();
+      await Asset.insertMany(
+        images.map((img, index) => ({
+          userId,
+          name: `Generated image ${index + 1}`,
+          type: "image",
+          url: img.url,
+          metadata: {
+            context: "image-gen",
+            model: config.name,
+            source: "generator",
+          },
+        }))
+      );
+    } catch (assetErr) {
+      console.error("[ImageGen] Asset save failed:", assetErr);
     }
 
     return NextResponse.json({

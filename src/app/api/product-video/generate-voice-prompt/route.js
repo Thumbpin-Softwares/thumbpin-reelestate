@@ -25,6 +25,7 @@ export async function POST(request) {
     const formData = await request.formData();
     const compositeFile = formData.get("compositeImage");
     const script = formData.get("script");
+    const allowEmotionTags = formData.get("allowEmotionTags") === "true";
 
     if (!compositeFile || !script) {
       return NextResponse.json({ error: "compositeImage and script are required" }, { status: 400 });
@@ -41,11 +42,17 @@ export async function POST(request) {
 
     const compositeData = await fileToBase64(compositeFile);
 
+    const emotionNote = allowEmotionTags
+      ? "The script may include inline emotion tags like {{happy}}, {{sad}}, {{excited}}, {{calm}}. Use these tags to shape delivery, but do NOT speak the tags aloud."
+      : "Do not assume any special tags in the script.";
+
     const prompt = `You are an expert voice casting director specializing in UGC (User Generated Content) and social media creator videos.
 
 Look at this image of a person presenting a product. They will speak the following script in a short product video:
 
 SCRIPT: "${script}"
+
+${emotionNote}
 
 Based on:
 1. The person's apparent gender, age, ethnicity, and overall vibe from the image

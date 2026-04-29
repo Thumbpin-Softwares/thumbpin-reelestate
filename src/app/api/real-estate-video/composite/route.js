@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-config";
+import dbConnect from "@/lib/mongodb";
+import Asset from "@/models/Asset";
 
 /**
  * POST /api/real-estate-video/composite
@@ -54,6 +56,12 @@ PERSON (Reference 1): Use this person's EXACT appearance — face, skin tone, ha
 
 PROPERTY (Reference 2): Use this EXACT property/room as the BACKGROUND SETTING. The person should be STANDING INSIDE this space — it's the actual location they are presenting.
 
+CRITICAL PROPERTY GUARDRAILS:
+- The property image must remain EXACTLY the same: same layout, furniture, wall colors, lighting, windows, floor, decor.
+- Do NOT add, remove, move, or modify ANY property elements.
+- Do NOT change the camera angle, lens perspective, or crop of the property image.
+- The ONLY change allowed is placing the person in the scene with realistic occlusion and shadows.
+
 SCENE DIRECTION:
 ${sceneDirection}
 
@@ -85,9 +93,26 @@ Style: This should look EXACTLY like a screenshot from a professional real estat
 
     for (const part of response.candidates[0].content.parts) {
       if (part.inlineData) {
+        const compositeUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+        try {
+          await dbConnect();
+          await Asset.create({
+            userId: session.user.id,
+            name: "Real estate composite",
+            type: "composite",
+            url: compositeUrl,
+            metadata: {
+              context: "real-estate-video",
+              source: "gemini",
+            },
+          });
+        } catch (assetErr) {
+          console.error("[RealEstateVideo] Composite asset save failed:", assetErr);
+        }
+
         return NextResponse.json({
           success: true,
-          compositeUrl: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`,
+          compositeUrl,
         });
       }
     }

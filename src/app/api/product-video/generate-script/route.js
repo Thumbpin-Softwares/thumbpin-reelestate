@@ -32,6 +32,7 @@ export async function POST(request) {
     const productFile = formData.get("productImage");
     const language = formData.get("language") || "english";
     const tone = formData.get("tone") || "friendly";
+    const allowEmotionTags = formData.get("allowEmotionTags") === "true";
     const compositeCount = parseInt(formData.get("compositeCount")) || 0;
 
     if (!productFile) {
@@ -72,6 +73,10 @@ export async function POST(request) {
       const compositeDataArr = await Promise.all(compositeFiles.map(fileToBase64));
 
       // Build batch prompt — Gemini sees all composites + product at once
+      const emotionTagInstruction = allowEmotionTags
+        ? "You may insert emotion tags like {{happy}}, {{sad}}, {{excited}}, {{calm}} inline before the phrase they affect. Keep tags exactly as written."
+        : "Do NOT include any emotion tags or special markup.";
+
       const batchPrompt = `You are an expert UGC (User Generated Content) script writer.
 
 You are given ${compositeDataArr.length} different composite images — each shows the SAME person presenting the SAME product but in DIFFERENT poses, actions, or camera angles. You also have a close-up of the product itself.
@@ -88,7 +93,9 @@ REQUIREMENTS FOR EACH SCRIPT:
 - Tone: ${tone}
 - ${langInstruction}
 - Natural UGC creator language — like talking to their phone camera
-- Do NOT include stage directions, emojis, or formatting
+- Natural UGC creator language — like talking to their phone camera
+- ${emotionTagInstruction}
+- Do NOT include stage directions, emojis, or any other formatting
 
 Return your response as valid JSON ONLY — an array of strings, one per composite in order:
 ["script for image 1", "script for image 2", ...]
@@ -131,6 +138,10 @@ Return ONLY the JSON array, nothing else.`;
 
     const compositeData = await fileToBase64(compositeFile);
 
+    const emotionTagInstruction = allowEmotionTags
+      ? "You may insert emotion tags like {{happy}}, {{sad}}, {{excited}}, {{calm}} inline before the phrase they affect. Keep tags exactly as written."
+      : "Do NOT include any emotion tags or special markup.";
+
     const prompt = `You are an expert UGC (User Generated Content) script writer.
 
 Look at these two images:
@@ -147,7 +158,9 @@ REQUIREMENTS:
 - Tone: ${tone}
 - ${langInstruction}
 - Make it sound natural — like a real person talking to their phone camera, NOT scripted or salesy
-- Do NOT include stage directions, emojis, or any formatting — just the spoken words
+- Make it sound natural — like a real person talking to their phone camera, NOT scripted or salesy
+- ${emotionTagInstruction}
+- Do NOT include stage directions, emojis, or any other formatting — just the spoken words
 
 Return ONLY the script text, nothing else.`;
 

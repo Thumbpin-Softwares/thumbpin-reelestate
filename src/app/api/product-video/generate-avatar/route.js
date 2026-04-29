@@ -3,6 +3,8 @@ import { GoogleGenAI } from "@google/genai";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-config";
 import { consumeCreditsForAction, refundCreditsForAction } from "@/lib/credit-system";
+import dbConnect from "@/lib/mongodb";
+import Asset from "@/models/Asset";
 
 /**
  * POST /api/product-video/generate-avatar
@@ -95,6 +97,24 @@ export async function POST(request) {
       });
 
       return NextResponse.json({ error: "Failed to generate any avatar images. Please try again." }, { status: 502 });
+    }
+
+    try {
+      await dbConnect();
+      await Asset.insertMany(
+        images.map((img, index) => ({
+          userId,
+          name: `Generated avatar ${index + 1}`,
+          type: "avatar",
+          url: img.url,
+          metadata: {
+            context: "product-video-avatar",
+            source: "gemini",
+          },
+        }))
+      );
+    } catch (assetErr) {
+      console.error("[ProductVideo] Avatar asset save failed:", assetErr);
     }
 
     return NextResponse.json({ success: true, images });

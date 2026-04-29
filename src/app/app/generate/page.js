@@ -71,6 +71,8 @@ const HEAD_MOTION_LEVELS = [
   { id: "dynamic", label: "Dynamic" },
 ];
 
+const STORAGE_KEY = "generatePageState";
+
 export default function GeneratePage() {
   const { credits, profile, user } = useUser();
   const demoBugs = process.env.NEXT_PUBLIC_DEMO_BUGS === "true";
@@ -91,6 +93,9 @@ export default function GeneratePage() {
   const [generating, setGenerating] = useState(false);
   const [videoId, setVideoId] = useState(null);
   const [error, setError] = useState(null);
+  const [isRestored, setIsRestored] = useState(false);
+  const [restoredAvatarId, setRestoredAvatarId] = useState(null);
+  const [restoredAvatarUrl, setRestoredAvatarUrl] = useState(null);
 
   // Gesture & Expression state
   const [expression, setExpression] = useState("friendly");
@@ -109,6 +114,44 @@ export default function GeneratePage() {
 
   // Realtime tracking of video status
   const { video: realtimeVideo } = useRealtimeVideo(videoId);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) { setIsRestored(true); return; }
+      const saved = JSON.parse(raw);
+
+      if (saved.script) setScript(saved.script);
+      if (saved.selectedVoice) setSelectedVoice(saved.selectedVoice);
+      if (typeof saved.musicEnabled === "boolean") setMusicEnabled(saved.musicEnabled);
+      if (saved.expression) setExpression(saved.expression);
+      if (saved.gestureIntensity) setGestureIntensity(saved.gestureIntensity);
+      if (saved.headMotion) setHeadMotion(saved.headMotion);
+
+      if (saved.videoId) {
+        setVideoId(saved.videoId);
+        setGenerating(true);
+      }
+
+      if (saved.selectedAvatarId) setRestoredAvatarId(saved.selectedAvatarId);
+      if (saved.selectedAvatarUrl) setRestoredAvatarUrl(saved.selectedAvatarUrl);
+    } catch (err) {
+      console.error("Failed to restore generate state:", err);
+    } finally {
+      setIsRestored(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!restoredAvatarId && !restoredAvatarUrl) return;
+    const all = [...(avatars || []), ...(customAvatars || []), ...(libraryAvatars || [])];
+    const match = all.find((a) => a.id === restoredAvatarId || a.image_url === restoredAvatarUrl);
+    if (match) {
+      setSelectedAvatar(match);
+      setRestoredAvatarId(null);
+      setRestoredAvatarUrl(null);
+    }
+  }, [avatars, customAvatars, libraryAvatars, restoredAvatarId, restoredAvatarUrl]);
 
   const canGenerate =
     script.trim().length > 10 &&
@@ -153,6 +196,36 @@ export default function GeneratePage() {
       });
     }
   }, [realtimeVideo?.status]);
+
+  useEffect(() => {
+    if (!isRestored) return;
+    try {
+      const payload = {
+        script,
+        selectedVoice,
+        musicEnabled,
+        expression,
+        gestureIntensity,
+        headMotion,
+        videoId,
+        selectedAvatarId: selectedAvatar?.id || null,
+        selectedAvatarUrl: selectedAvatar?.image_url || null,
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    } catch (err) {
+      console.error("Failed to persist generate state:", err);
+    }
+  }, [
+    isRestored,
+    script,
+    selectedVoice,
+    musicEnabled,
+    expression,
+    gestureIntensity,
+    headMotion,
+    videoId,
+    selectedAvatar,
+  ]);
 
   // Template prefill from sessionStorage
   useEffect(() => {
@@ -327,7 +400,7 @@ export default function GeneratePage() {
             <CardContent>
               <Textarea
                 placeholder="Write your ad script here... e.g., 'Try our new vitamin C serum – glowing skin in just 7 days! Click the link in bio to shop now. Limited offer for first 100 customers! Use code GLOW20 for 20% off.'"
-                className="min-h-[140px] resize-none"
+                className="min-h-35 resize-none"
                 value={script}
                 onChange={(e) => setScript(e.target.value)}
                 maxLength={500}
@@ -385,7 +458,7 @@ export default function GeneratePage() {
                             : "border-primary/30 hover:border-primary/50"
                         } ${generating ? "opacity-50 cursor-not-allowed" : ""}`}
                       >
-                        <div className="w-full h-full bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center overflow-hidden">
+                        <div className="w-full h-full bg-linear-to-br from-primary/10 to-accent/10 flex items-center justify-center overflow-hidden">
                           {avatar.image_url?.startsWith("http") ? (
                             <img
                               src={avatar.image_url}
@@ -667,7 +740,7 @@ export default function GeneratePage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Preview Panel */}
-              <div className="aspect-[9/16] rounded-xl bg-gradient-to-b from-primary/10 to-accent/10 flex items-center justify-center border border-border/50 overflow-hidden relative">
+              <div className="aspect-9/16 rounded-xl bg-linear-to-b from-primary/10 to-accent/10 flex items-center justify-center border border-border/50 overflow-hidden relative">
                 {isReady && videoUrl ? (
                   <video
                     src={videoUrl}
@@ -683,7 +756,7 @@ export default function GeneratePage() {
                     <p className="text-sm font-semibold text-destructive">
                       Generation Failed
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1 max-w-[200px]">
+                    <p className="text-xs text-muted-foreground mt-1 max-w-50">
                       {error || "An error occurred"}
                     </p>
                     <p className="text-xs text-green-600 mt-2">
@@ -868,7 +941,7 @@ export default function GeneratePage() {
               <Label>Product Description *</Label>
               <Textarea
                 placeholder="Describe your product, its benefits, target audience, and any offers/discounts..."
-                className="min-h-[80px] resize-none"
+                className="min-h-20 resize-none"
                 value={aiProductDesc}
                 onChange={(e) => setAiProductDesc(e.target.value)}
                 maxLength={500}

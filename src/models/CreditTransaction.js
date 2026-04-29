@@ -20,6 +20,7 @@ const CreditTransactionSchema = new mongoose.Schema(
         "credits_debited",
         "credits_refunded",
         "credits_added",
+        "credits_set",
         "subscription_recharge",
         "admin_adjustment",
       ],
@@ -27,7 +28,7 @@ const CreditTransactionSchema = new mongoose.Schema(
     },
     mode: {
       type: String,
-      enum: ["free_quota", "paid_credits", "system"],
+      enum: ["free_quota", "paid_credits", "system", "admin"],
       required: true,
     },
     creditsDelta: {

@@ -26,6 +26,15 @@ export async function POST(request) {
     const formData = await request.formData();
     const language = formData.get("language") || "english";
     const tone = formData.get("tone") || "professional";
+    const allowEmotionTags = formData.get("allowEmotionTags") === "true";
+    const location = formData.get("location") || "";
+    const propertyType = formData.get("propertyType") || "";
+    const price = formData.get("price") || "";
+    const bedrooms = formData.get("bedrooms") || "";
+    const bathrooms = formData.get("bathrooms") || "";
+    const area = formData.get("area") || "";
+    const keyFeatures = formData.get("keyFeatures") || "";
+    const amenities = formData.get("amenities") || "";
     const compositeCount = parseInt(formData.get("compositeCount")) || 0;
 
     async function fileToBase64(file) {
@@ -45,6 +54,22 @@ export async function POST(request) {
       hinglish: "Write the script in Hinglish — a natural mix of Hindi and English words as spoken casually in urban India. Use Roman script.",
     };
     const langInstruction = languageInstructions[language] || languageInstructions.english;
+
+    const emotionTagInstruction = allowEmotionTags
+      ? "You may insert emotion tags like {{happy}}, {{sad}}, {{excited}}, {{calm}} inline before the phrase they affect. Keep tags exactly as written."
+      : "Do NOT include any emotion tags or special markup.";
+
+    const briefLines = [
+      location && `Location: ${location}`,
+      propertyType && `Property type: ${propertyType}`,
+      price && `Price: ${price}`,
+      bedrooms && `Bedrooms: ${bedrooms}`,
+      bathrooms && `Bathrooms: ${bathrooms}`,
+      area && `Area/size: ${area}`,
+      keyFeatures && `Key features: ${keyFeatures}`,
+      amenities && `Amenities: ${amenities}`,
+    ].filter(Boolean);
+    const briefBlock = briefLines.length ? `\n\nPROPERTY BRIEF:\n${briefLines.join("\n")}` : "";
 
     const RE_SCRIPT_PROMPT_BASE = `You are an expert real estate video script writer who creates VIRAL property showcase scripts for Instagram Reels and YouTube Shorts.
 
@@ -67,7 +92,9 @@ REQUIREMENTS:
 - Tone: ${tone} — confident, aspirational, but genuine
 - ${langInstruction}
 - Sound like a REAL real estate creator, NOT a formal listing description
-- Do NOT include stage directions, emojis, or formatting — just spoken words
+- ${emotionTagInstruction}
+- Do NOT include stage directions, emojis, or any other formatting — just spoken words
+${briefBlock}
 
 Return ONLY the script text, nothing else.`;
 
@@ -131,12 +158,23 @@ Return your response as valid JSON ONLY — an array of strings:
     // ── SINGLE MODE ─────────────────────────────────────────────────────────
     const compositeFile = formData.get("compositeImage");
     const propertyFile = formData.get("propertyImage");
-    if (!compositeFile) {
-      return NextResponse.json({ error: "compositeImage is required" }, { status: 400 });
+    const hasBrief = !!(location || propertyType || price || bedrooms || bathrooms || area || keyFeatures || amenities);
+
+    if (!compositeFile && !propertyFile && !hasBrief) {
+      return NextResponse.json(
+        { error: "Provide a compositeImage, propertyImage, or property brief fields" },
+        { status: 400 }
+      );
     }
 
-    const compositeData = await fileToBase64(compositeFile);
-    const parts = [{ text: RE_SCRIPT_PROMPT_BASE + "\n\nLook at the composite image (person in property) and the property image. Write one 8-second script." }, { inlineData: compositeData }];
+    const parts = [{
+      text: RE_SCRIPT_PROMPT_BASE + "\n\nIf provided, use the images and property brief to write one 8-second script."
+    }];
+
+    if (compositeFile) {
+      const compositeData = await fileToBase64(compositeFile);
+      parts.push({ inlineData: compositeData });
+    }
     if (propertyFile) parts.push({ inlineData: await fileToBase64(propertyFile) });
 
     const response = await ai.models.generateContent({
