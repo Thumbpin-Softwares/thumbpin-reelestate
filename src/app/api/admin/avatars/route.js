@@ -64,15 +64,23 @@ export async function DELETE(request) {
   const targetDir = type === "real-estate" ? RE_AVATARS_DIR : PRODUCT_AVATARS_DIR;
   const filePath = path.join(targetDir, safeName);
 
-  // Ensure it's within allowed dirs
-  if (!filePath.startsWith(PRODUCT_AVATARS_DIR)) {
+  // Ensure it's within allowed dirs (normalize paths to prevent traversal)
+  const normalizedPath = path.resolve(filePath);
+  const normalizedProductDir = path.resolve(PRODUCT_AVATARS_DIR);
+  const normalizedReDir = path.resolve(RE_AVATARS_DIR);
+  
+  const isInProductDir = normalizedPath.startsWith(normalizedProductDir);
+  const isInReDir = normalizedPath.startsWith(normalizedReDir);
+
+  if (!isInProductDir && !isInReDir) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   try {
-    await fs.unlink(filePath);
+    await fs.unlink(normalizedPath);
     return NextResponse.json({ success: true });
-  } catch {
-    return NextResponse.json({ error: "File not found" }, { status: 404 });
+  } catch (err) {
+    console.error("Delete avatar error:", err);
+    return NextResponse.json({ error: "File not found or cannot delete" }, { status: 404 });
   }
 }
