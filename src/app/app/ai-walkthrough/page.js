@@ -37,11 +37,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 
 const MAX_SCRIPT = 200;
 
-const RE_AVATARS = Array.from({ length: 14 }, (_, i) => ({
-  id: `re-${i + 1}`,
-  name: `RE Agent ${i + 1}`,
-  url: `/avatars/re/realestate${i + 1}.png`,
-}));
+// RE_AVATARS is now fetched dynamically from /api/avatars/re (Cloudflare R2)
 
 const LANGUAGES = [
   { id: "english", label: "English" },
@@ -259,6 +255,11 @@ function RealEstateVideoContent() {
   const [generatedAvatars, setGeneratedAvatars] = useState([]);
   const [generatingAvatar, setGeneratingAvatar] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState(null); // avatar expand lightbox
+
+  // ── R2 Real-estate avatars (fetched live, reflects admin deletes in real-time) ──
+  const [reAvatars, setReAvatars] = useState([]);
+  const [reAvatarsLoading, setReAvatarsLoading] = useState(false);
+  const [reAvatarsError, setReAvatarsError] = useState(null);
   const [propertyDrawerOpen, setPropertyDrawerOpen] = useState(false);
 
   // Step 1: Composites (multi-select)
@@ -312,6 +313,34 @@ function RealEstateVideoContent() {
     } catch {}
     if (initialScript) { setScript(initialScript); setStep(2); }
   }, [initialScript]);
+
+  // ── Fetch RE avatars from R2 on mount (and when avatarMode switches to prebuilt) ──
+  useEffect(() => {
+    if (avatarMode !== "prebuilt") return;
+    let cancelled = false;
+    setReAvatarsLoading(true);
+    setReAvatarsError(null);
+    fetch("/api/avatars/re")
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        setReAvatars(data.avatars ?? []);
+        // If the previously selected avatar is no longer in R2, deselect it
+        if (selectedAvatar) {
+          const stillExists = (data.avatars ?? []).some((a) => a.url === selectedAvatar.url);
+          if (!stillExists) setSelectedAvatar(null);
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error("[RE Avatars] fetch error:", err);
+        setReAvatarsError("Failed to load avatars");
+      })
+      .finally(() => { if (!cancelled) setReAvatarsLoading(false); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [avatarMode]);
+
 
   // ── Persist state to localStorage on change ───────────────────────────────
   useEffect(() => {
@@ -743,38 +772,82 @@ function RealEstateVideoContent() {
             </div>
 
             {avatarMode === "prebuilt" && (
-              <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-                {RE_AVATARS.map((av) => (
-                  <div
-                    key={av.id}
-                    className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all group ${
-                      selectedAvatar?.url === av.url ? "border-primary ring-2 ring-primary/30 scale-105" : "border-border/50 hover:border-primary/50"
-                    }`}
-                  >
-                    <img
-                      src={av.url}
-                      alt={av.name}
-                      className="w-full h-full object-cover cursor-pointer"
-                      onClick={() => setSelectedAvatar({ url: av.url, file: null, name: av.name })}
-                    />
-                    {/* Expand button */}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setLightboxUrl(av.url); }}
-                      className="absolute top-1 right-1 w-5 h-5 bg-black/60 rounded-full items-center justify-center hidden group-hover:flex transition-all cursor-pointer"
-                      title="Expand"
-                    >
-                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
-                    </button>
-                    {selectedAvatar?.url === av.url && (
-                      <div className="absolute top-1 left-1 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
-                        <CheckCircle2 className="w-3 h-3 text-white" />
-                      </div>
-                    )}
-                    <div className="absolute bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm px-1 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <p className="text-[10px] text-white text-center truncate">{av.name}</p>
-                    </div>
+              <div>
+                {/* Loading skeleton */}
+                {reAvatarsLoading && (
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <div key={i} className="aspect-square rounded-xl bg-muted/60 animate-pulse" />
+                    ))}
                   </div>
-                ))}
+                )}
+
+                {/* Error state */}
+                {!reAvatarsLoading && reAvatarsError && (
+                  <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 flex flex-col items-center gap-2">
+                    <p className="text-xs text-destructive">{reAvatarsError}</p>
+                    <button
+                      onClick={() => setAvatarMode("prebuilt")}
+                      className="text-xs text-primary underline cursor-pointer"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                )}
+
+                {/* Empty state */}
+                {!reAvatarsLoading && !reAvatarsError && reAvatars.length === 0 && (
+                  <div className="rounded-xl border border-border/40 bg-muted/30 p-6 flex flex-col items-center gap-2">
+                    <PersonStanding className="w-6 h-6 text-muted-foreground" />
+                    <p className="text-xs text-muted-foreground text-center">
+                      No RE avatars available yet. Ask your admin to upload some.
+                    </p>
+                  </div>
+                )}
+
+                {/* Avatar grid — live from R2 */}
+                {!reAvatarsLoading && !reAvatarsError && reAvatars.length > 0 && (
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+                    {reAvatars.map((av) => (
+                      <div
+                        key={av.id}
+                        className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all group ${
+                          selectedAvatar?.key === av.key
+                            ? "border-primary ring-2 ring-primary/30 scale-105"
+                            : "border-border/50 hover:border-primary/50"
+                        }`}
+                      >
+                        <img
+                          src={av.url}
+                          alt={av.name}
+                          className="w-full h-full object-cover cursor-pointer"
+                          onClick={() =>
+                            setSelectedAvatar({ url: av.url, key: av.key, file: null, name: av.name })
+                          }
+                        />
+                        {/* Expand button */}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setLightboxUrl(av.url); }}
+                          className="absolute top-1 right-1 w-5 h-5 bg-black/60 rounded-full items-center justify-center hidden group-hover:flex transition-all cursor-pointer"
+                          title="Expand"
+                        >
+                          <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                              d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                          </svg>
+                        </button>
+                        {selectedAvatar?.key === av.key && (
+                          <div className="absolute top-1 left-1 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                            <CheckCircle2 className="w-3 h-3 text-white" />
+                          </div>
+                        )}
+                        <div className="absolute bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm px-1 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <p className="text-[10px] text-white text-center truncate">{av.name}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 

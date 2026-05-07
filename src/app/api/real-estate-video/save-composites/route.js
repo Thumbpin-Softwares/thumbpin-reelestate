@@ -3,12 +3,11 @@ import dbConnect from "@/lib/mongodb";
 import Asset from "@/models/Asset";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth-config";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
+import { uploadToR2, buildUserKey } from "@/lib/r2-upload";
 
 /**
  * POST /api/real-estate-video/save-composites
- * Saves composite data-URLs as local files + creates Asset records.
+ * Saves composite data-URLs to R2 + creates Asset records in MongoDB.
  * Input: JSON { composites: [{ dataUrl, name }], selectedIndex }
  * Saves all EXCEPT the selected one (that one goes through the pipeline).
  */
@@ -26,45 +25,41 @@ export async function POST(request) {
     }
 
     await dbConnect();
-    const outputDir = path.join(process.cwd(), "public", "composites");
-    await mkdir(outputDir, { recursive: true });
-
     const saved = [];
 
     for (let i = 0; i < composites.length; i++) {
-      // Skip the selected one — it's being used in the pipeline
+      // Skip the selected one — it's being piped into the video pipeline
       if (i === selectedIndex) continue;
 
       const { dataUrl, name } = composites[i];
       if (!dataUrl) continue;
 
-      // Extract base64 from data URL
+      // ── Decode data-URL ───────────────────────────────────────────────────
       const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
       if (!matches) continue;
 
       const mimeType = matches[1];
-      const base64Data = matches[2];
-      const ext = mimeType.includes("png") ? "png" : "jpeg";
-      const timestamp = Date.now();
-      const fileName = `composite-${timestamp}-${i}.${ext}`;
-      const filePath = path.join(outputDir, fileName);
+      const buffer = Buffer.from(matches[2], "base64");
+      const ext = mimeType.includes("png") ? "png" : "jpg";
 
-      await writeFile(filePath, Buffer.from(base64Data, "base64"));
+      // ── Upload to R2 ──────────────────────────────────────────────────────
+      const key = buildUserKey(session.user.id, "composites", ext, "composite");
+      const url = await uploadToR2(buffer, key, mimeType);
 
-      const localUrl = `/composites/${fileName}`;
-
+      // ── Save metadata in MongoDB ──────────────────────────────────────────
       const asset = await Asset.create({
         userId: session.user.id,
         name: name || `RE Composite ${i + 1}`,
-        url: localUrl,
+        url,
         type: "composite",
         metadata: {
+          r2Key: key,
           source: "real-estate-pipeline",
           originalIndex: i,
         },
       });
 
-      saved.push({ id: asset._id, url: localUrl, name: asset.name });
+      saved.push({ id: asset._id, url, name: asset.name });
     }
 
     return NextResponse.json({

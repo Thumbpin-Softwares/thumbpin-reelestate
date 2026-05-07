@@ -1,54 +1,88 @@
+/**
+ * Admin Avatar Upload — POST /api/admin/avatars/upload
+ *
+ * Accepts multipart form with:
+ *   file   — image file (PNG, JPG, WEBP)
+ *   type   — "product" | "real-estate"
+ *   name   — optional custom filename (without extension)
+ *
+ * Uploads directly to Cloudflare R2:
+ *   product      → Avatars/<filename>
+ *   real-estate  → Avatars/RE/<filename>
+ */
+
+import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { NextResponse } from "next/server";
 import { verifyAdminSession } from "@/app/api/admin/auth/me/route";
-import fs from "fs/promises";
+import { s3, BUCKET } from "@/lib/r2";
 import path from "path";
-import { writeFile } from "fs/promises";
 
-const PRODUCT_AVATARS_DIR = path.join(process.cwd(), "Avatars");
-const RE_AVATARS_DIR = path.join(process.cwd(), "Avatars", "RE");
+const ALLOWED_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/jpg"]);
 
-// POST /api/admin/avatars/upload
 export async function POST(request) {
   const session = await verifyAdminSession();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const formData = await request.formData();
-  const file = formData.get("file");
-  const type = formData.get("type"); // "product" | "real-estate"
-  const customName = formData.get("name"); // optional
+  try {
+    const formData = await request.formData();
+    const file = formData.get("file");
+    const type = formData.get("type");       // "product" | "real-estate"
+    const customName = formData.get("name"); // optional
 
-  if (!file || !type) {
-    return NextResponse.json({ error: "file and type are required" }, { status: 400 });
+    if (!file || !type) {
+      return NextResponse.json(
+        { error: "file and type are required" },
+        { status: 400 }
+      );
+    }
+
+    if (!["product", "real-estate"].includes(type)) {
+      return NextResponse.json(
+        { error: "type must be 'product' or 'real-estate'" },
+        { status: 400 }
+      );
+    }
+
+    if (!ALLOWED_TYPES.has(file.type)) {
+      return NextResponse.json(
+        { error: "Only PNG, JPG, WEBP images are allowed" },
+        { status: 400 }
+      );
+    }
+
+    // Build a safe filename
+    const ext = path.extname(file.name) || ".png";
+    const baseName = customName
+      ? `${customName.replace(/[^a-zA-Z0-9_-]/g, "_")}${ext}`
+      : file.name.replace(/[^a-zA-Z0-9_.\-]/g, "_");
+    const safeName = path.basename(baseName);
+
+    // R2 key
+    const key =
+      type === "real-estate" ? `Avatars/RE/${safeName}` : `Avatars/${safeName}`;
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: BUCKET,
+        Key: key,
+        Body: buffer,
+        ContentType: file.type,
+      })
+    );
+
+    return NextResponse.json({
+      success: true,
+      filename: safeName,
+      key,
+      type,
+      url: `/api/admin/r2?key=${encodeURIComponent(key)}`,
+    });
+  } catch (err) {
+    console.error("[Avatar Upload] R2 error:", err);
+    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
   }
-
-  if (!["product", "real-estate"].includes(type)) {
-    return NextResponse.json({ error: "type must be 'product' or 'real-estate'" }, { status: 400 });
-  }
-
-  const allowedTypes = ["image/png", "image/jpeg", "image/webp", "image/jpg"];
-  if (!allowedTypes.includes(file.type)) {
-    return NextResponse.json({ error: "Only PNG, JPG, WEBP images are allowed" }, { status: 400 });
-  }
-
-  const targetDir = type === "real-estate" ? RE_AVATARS_DIR : PRODUCT_AVATARS_DIR;
-
-  // Build filename
-  const ext = path.extname(file.name) || ".png";
-  const baseName = customName
-    ? customName.replace(/[^a-zA-Z0-9_-]/g, "_") + ext
-    : file.name.replace(/[^a-zA-Z0-9_.\-]/g, "_");
-  const finalName = path.basename(baseName);
-  const filePath = path.join(targetDir, finalName);
-
-  const buffer = Buffer.from(await file.arrayBuffer());
-  await writeFile(filePath, buffer);
-
-  return NextResponse.json({
-    success: true,
-    filename: finalName,
-    type,
-    url: `/api/admin/avatars/file?type=${type}&name=${encodeURIComponent(finalName)}`,
-  });
 }

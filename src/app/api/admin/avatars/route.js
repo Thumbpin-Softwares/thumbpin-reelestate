@@ -1,86 +1,139 @@
+/**
+ * Admin Avatars API — /api/admin/avatars
+ *
+ * GET    → list all avatar objects from R2 (Avatars/ prefix, split into product & real-estate)
+ * DELETE → delete an avatar from R2
+ *
+ * R2 folder structure:
+ *   Avatars/          → product avatars
+ *   Avatars/RE/       → real-estate avatars
+ */
+
+import {
+  ListObjectsV2Command,
+  DeleteObjectCommand,
+} from "@aws-sdk/client-s3";
 import { NextResponse } from "next/server";
 import { verifyAdminSession } from "@/app/api/admin/auth/me/route";
-import fs from "fs/promises";
-import path from "path";
+import { s3, BUCKET } from "@/lib/r2";
 
-const PRODUCT_AVATARS_DIR = path.join(process.cwd(), "Avatars");
-const RE_AVATARS_DIR = path.join(process.cwd(), "Avatars", "RE");
+const IMAGE_EXTS = new Set([".png", ".jpg", ".jpeg", ".webp"]);
 
-async function getAvatarsFromDir(dir, type) {
-  try {
-    const files = await fs.readdir(dir);
-    const images = files.filter((f) =>
-      [".png", ".jpg", ".jpeg", ".webp"].includes(path.extname(f).toLowerCase())
-    );
-    return images.map((filename, i) => ({
-      id: `${type}-${filename}`,
-      filename,
-      type,
-      url: type === "real-estate"
-        ? `/api/admin/avatars/file?type=real-estate&name=${encodeURIComponent(filename)}`
-        : `/api/admin/avatars/file?type=product&name=${encodeURIComponent(filename)}`,
-      displayName: filename.replace(/\.[^/.]+$/, ""),
-      index: i + 1,
-    }));
-  } catch {
-    return [];
-  }
+function isImage(key) {
+  const ext = key.slice(key.lastIndexOf(".")).toLowerCase();
+  return IMAGE_EXTS.has(ext);
 }
 
-// GET /api/admin/avatars — list all avatars from both directories
+function keyToAvatarObj(key, type) {
+  const filename = key.split("/").pop();
+  return {
+    id: `${type}-${filename}`,
+    filename,
+    key,  // full R2 key
+    type,
+    url: `/api/admin/r2?key=${encodeURIComponent(key)}`,
+    displayName: filename.replace(/\.[^/.]+$/, ""),
+  };
+}
+
+async function listPrefix(prefix) {
+  const items = [];
+  let continuationToken;
+
+  do {
+    const resp = await s3.send(
+      new ListObjectsV2Command({
+        Bucket: BUCKET,
+        Prefix: prefix,
+        ContinuationToken: continuationToken,
+      })
+    );
+
+    for (const obj of resp.Contents ?? []) {
+      if (isImage(obj.Key)) {
+        items.push(obj.Key);
+      }
+    }
+
+    continuationToken = resp.IsTruncated ? resp.NextContinuationToken : null;
+  } while (continuationToken);
+
+  return items;
+}
+
+// ─── GET /api/admin/avatars ───────────────────────────────────────────────────
+
 export async function GET() {
   const session = await verifyAdminSession();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const [productAvatars, realEstateAvatars] = await Promise.all([
-    getAvatarsFromDir(PRODUCT_AVATARS_DIR, "product"),
-    getAvatarsFromDir(RE_AVATARS_DIR, "real-estate"),
-  ]);
+  try {
+    // List both prefixes in parallel
+    const [allKeys, reKeys] = await Promise.all([
+      listPrefix("Avatars/"),
+      listPrefix("Avatars/RE/"),
+    ]);
 
-  return NextResponse.json({
-    product: productAvatars,
-    realEstate: realEstateAvatars,
-    total: productAvatars.length + realEstateAvatars.length,
-  });
+    // RE keys are a subset of allKeys, so separate them
+    const reKeySet = new Set(reKeys);
+
+    const realEstateAvatars = reKeys.map((k) => keyToAvatarObj(k, "real-estate"));
+
+    // Product avatars = Avatars/ keys that are NOT inside Avatars/RE/
+    const productAvatars = allKeys
+      .filter((k) => !reKeySet.has(k))
+      .map((k) => keyToAvatarObj(k, "product"));
+
+    return NextResponse.json({
+      product: productAvatars,
+      realEstate: realEstateAvatars,
+      total: productAvatars.length + realEstateAvatars.length,
+    });
+  } catch (err) {
+    console.error("[Avatars GET] R2 error:", err);
+    return NextResponse.json({ error: "Failed to list avatars" }, { status: 500 });
+  }
 }
 
-// DELETE /api/admin/avatars — delete an avatar file
+// ─── DELETE /api/admin/avatars ────────────────────────────────────────────────
+
 export async function DELETE(request) {
   const session = await verifyAdminSession();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { type, filename } = await request.json();
-
-  if (!type || !filename) {
-    return NextResponse.json({ error: "type and filename required" }, { status: 400 });
-  }
-
-  // Security: no path traversal
-  const safeName = path.basename(filename);
-  const targetDir = type === "real-estate" ? RE_AVATARS_DIR : PRODUCT_AVATARS_DIR;
-  const filePath = path.join(targetDir, safeName);
-
-  // Ensure it's within allowed dirs (normalize paths to prevent traversal)
-  const normalizedPath = path.resolve(filePath);
-  const normalizedProductDir = path.resolve(PRODUCT_AVATARS_DIR);
-  const normalizedReDir = path.resolve(RE_AVATARS_DIR);
-  
-  const isInProductDir = normalizedPath.startsWith(normalizedProductDir);
-  const isInReDir = normalizedPath.startsWith(normalizedReDir);
-
-  if (!isInProductDir && !isInReDir) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
   try {
-    await fs.unlink(normalizedPath);
-    return NextResponse.json({ success: true });
+    const body = await request.json();
+
+    // Accept either { key } (full R2 key) or legacy { type, filename }
+    let key = body.key;
+    if (!key && body.type && body.filename) {
+      const safeName = body.filename.replace(/[/\\]/g, "");
+      key =
+        body.type === "real-estate"
+          ? `Avatars/RE/${safeName}`
+          : `Avatars/${safeName}`;
+    }
+
+    if (!key) {
+      return NextResponse.json(
+        { error: "key (or type + filename) required" },
+        { status: 400 }
+      );
+    }
+
+    // Security: key must stay inside Avatars/
+    if (!key.startsWith("Avatars/")) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
+    return NextResponse.json({ success: true, deleted: key });
   } catch (err) {
-    console.error("Delete avatar error:", err);
-    return NextResponse.json({ error: "File not found or cannot delete" }, { status: 404 });
+    console.error("[Avatars DELETE] R2 error:", err);
+    return NextResponse.json({ error: "Delete failed" }, { status: 500 });
   }
 }

@@ -4,8 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-config";
 import Asset from "@/models/Asset";
 import dbConnect from "@/lib/mongodb";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
+import { uploadToR2, buildUserKey } from "@/lib/r2-upload";
 import { consumeCreditsForAction, refundCreditsForAction } from "@/lib/credit-system";
 
 /**
@@ -162,14 +161,14 @@ export async function POST(request) {
           const fileId = fileName.split(":")[0].split("?")[0];
           const proxyUrl = `/api/ai-walkthrough/video-proxy?fileId=${fileId}`;
 
-          // ── Save video locally to /public/generated-videos/ ──────────────
+          // ── Upload video to R2 ────────────────────────────────────────────
           let localVideoUrl = proxyUrl;
           try {
             send({
               type: "progress",
               videoIndex: 0,
               status: "saving",
-              message: "💾 Saving video locally...",
+              message: "☁️ Saving video to cloud storage...",
             });
 
             // Download the video bytes from Gemini
@@ -178,19 +177,11 @@ export async function POST(request) {
             if (!videoResponse.ok) throw new Error(`Download failed: ${videoResponse.status}`);
             const videoBytes = Buffer.from(await videoResponse.arrayBuffer());
 
-            // Save to /public/generated-videos/
-            const timestamp = Date.now();
-            const localFileName = `product-video-${timestamp}.mp4`;
-            const outputDir = path.join(process.cwd(), "public", "generated-videos");
-            await mkdir(outputDir, { recursive: true });
-            const outputPath = path.join(outputDir, localFileName);
-            await writeFile(outputPath, videoBytes);
-
-            localVideoUrl = `/generated-videos/${localFileName}`;
-            console.log(`[ProductVideo] Video saved locally: ${outputPath} (${(videoBytes.length / 1024 / 1024).toFixed(1)} MB)`);
+            const key = buildUserKey(userId, "videos", "mp4", "product");
+            localVideoUrl = await uploadToR2(videoBytes, key, "video/mp4");
+            console.log(`[ProductVideo] Uploaded to R2: ${key} (${(videoBytes.length / 1024 / 1024).toFixed(1)} MB)`);
           } catch (saveErr) {
-            console.error("[ProductVideo] Local save failed, using proxy URL:", saveErr.message);
-            // Fall back to proxy URL — video is still accessible
+            console.error("[ProductVideo] R2 upload failed, using proxy URL:", saveErr.message);
           }
 
           send({
@@ -210,7 +201,6 @@ export async function POST(request) {
               type: "clip",
               metadata: {
                 fileId,
-                localPath: localVideoUrl,
                 source: "veo",
                 context: "product-video",
               },

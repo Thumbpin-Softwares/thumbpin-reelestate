@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth-config";
 import Asset from "@/models/Asset";
 import dbConnect from "@/lib/mongodb";
 import { consumeCreditsForAction, refundCreditsForAction } from "@/lib/credit-system";
+import { uploadToR2, buildUserKey } from "@/lib/r2-upload";
 
 /**
  * POST /api/ai-walkthrough/generate
@@ -193,10 +194,25 @@ export async function POST(request) {
           const fileId = fileName.split(":")[0].split("?")[0];
           const videoUrl = `/api/ai-walkthrough/video-proxy?fileId=${fileId}`;
 
+          // ── Download from Gemini & upload to R2 ────────────────────────────
+          let persistedVideoUrl = videoUrl; // fallback: ephemeral proxy
+          try {
+            const downloadUrl = `https://generativelanguage.googleapis.com/v1beta/files/${fileId}:download?key=${apiKey}&alt=media`;
+            const videoResp = await fetch(downloadUrl);
+            if (videoResp.ok) {
+              const videoBytes = Buffer.from(await videoResp.arrayBuffer());
+              const key = buildUserKey(userId, "videos", "mp4", "ai-walkthrough");
+              persistedVideoUrl = await uploadToR2(videoBytes, key, "video/mp4");
+              console.log(`[AI Walkthrough] Uploaded to R2: ${key} (${(videoBytes.length / 1024 / 1024).toFixed(1)} MB)`);
+            }
+          } catch (uploadErr) {
+            console.error("[AI Walkthrough] R2 upload failed, using proxy URL:", uploadErr.message);
+          }
+
           send({
             type: "video_ready",
             videoIndex: 0,
-            videoUrl,
+            videoUrl: persistedVideoUrl,
             isLast: true,
           });
 
@@ -206,7 +222,7 @@ export async function POST(request) {
             await Asset.create({
               userId: session.user.id,
               name: `AI Walkthrough - ${new Date().toLocaleDateString()}`,
-              url: videoUrl, // Note: This is an internal proxy URL
+              url: persistedVideoUrl,
               type: "clip",
               metadata: {
                 fileId,

@@ -1,13 +1,20 @@
+/**
+ * Admin Avatar File Serve — GET /api/admin/avatars/file?type=product&name=foo.png
+ *
+ * Legacy endpoint kept for backward compatibility — redirects to /api/admin/r2?key=...
+ * which streams the object directly from Cloudflare R2.
+ *
+ * Query params:
+ *   type  — "product" | "real-estate"
+ *   name  — filename (without path)
+ */
+
 import { NextResponse } from "next/server";
+import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { verifyAdminSession } from "@/app/api/admin/auth/me/route";
-import fs from "fs/promises";
+import { s3, BUCKET } from "@/lib/r2";
 import path from "path";
 
-const PRODUCT_AVATARS_DIR = path.join(process.cwd(), "Avatars");
-const RE_AVATARS_DIR = path.join(process.cwd(), "Avatars", "RE");
-
-// GET /api/admin/avatars/file?type=product&name=1.png
-// Serves avatar images directly (bypasses the public dir restriction)
 export async function GET(request) {
   const session = await verifyAdminSession();
   if (!session) {
@@ -22,33 +29,25 @@ export async function GET(request) {
     return new NextResponse("Missing params", { status: 400 });
   }
 
-  const safeName = path.basename(name);
-  const targetDir = type === "real-estate" ? RE_AVATARS_DIR : PRODUCT_AVATARS_DIR;
-  const filePath = path.join(targetDir, safeName);
-
-  // Guard: ensure within allowed dirs
-  if (!filePath.startsWith(PRODUCT_AVATARS_DIR)) {
-    return new NextResponse("Forbidden", { status: 403 });
-  }
+  // Build R2 key from legacy params
+  const safeName = path.basename(name); // prevent traversal
+  const key =
+    type === "real-estate" ? `Avatars/RE/${safeName}` : `Avatars/${safeName}`;
 
   try {
-    const buffer = await fs.readFile(filePath);
-    const ext = path.extname(safeName).toLowerCase();
-    const mimeMap = {
-      ".png": "image/png",
-      ".jpg": "image/jpeg",
-      ".jpeg": "image/jpeg",
-      ".webp": "image/webp",
-    };
-    const mime = mimeMap[ext] || "image/png";
+    const resp = await s3.send(
+      new GetObjectCommand({ Bucket: BUCKET, Key: key })
+    );
+    const body = await resp.Body.transformToByteArray();
 
-    return new NextResponse(buffer, {
+    return new NextResponse(body, {
       headers: {
-        "Content-Type": mime,
-        "Cache-Control": "public, max-age=3600",
+        "Content-Type": resp.ContentType ?? "image/png",
+        "Cache-Control": "public, max-age=31536000, immutable",
       },
     });
-  } catch {
+  } catch (err) {
+    console.error("[Avatar File] R2 error:", err);
     return new NextResponse("Not found", { status: 404 });
   }
 }
