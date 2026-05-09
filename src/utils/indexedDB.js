@@ -571,3 +571,236 @@ export const autoSaveProgress = (sessionId, getCurrentState, onSaveComplete) => 
     }
   }, 2000);
 };
+
+// Clear session data after video generation
+export const clearSessionAfterGeneration = async (sessionId, options = {}) => {
+  const {
+    keepSession = false,     // Keep session metadata but clear generation data
+    keepPropertyImages = false, // Keep property images
+    keepAvatars = false,     // Keep avatar data
+  } = options;
+  
+  const db = await openDB();
+  
+  try {
+    // Clear composites (always clear after generation)
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORES.COMPOSITES], 'readwrite');
+      const store = transaction.objectStore(STORES.COMPOSITES);
+      const index = store.index('sessionId');
+      const request = index.getAll(sessionId);
+      
+      request.onsuccess = () => {
+        const composites = request.result;
+        let deleteCount = 0;
+        
+        if (composites.length === 0) {
+          resolve();
+          return;
+        }
+        
+        composites.forEach(composite => {
+          const deleteRequest = store.delete(composite.id);
+          deleteRequest.onsuccess = () => {
+            deleteCount++;
+            if (deleteCount === composites.length) {
+              console.log(`Cleared ${deleteCount} composites`);
+              resolve();
+            }
+          };
+          deleteRequest.onerror = () => reject(deleteRequest.error);
+        });
+      };
+      request.onerror = () => reject(request.error);
+      transaction.onerror = () => reject(transaction.error);
+    });
+    
+    // Clear scripts
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORES.SCRIPTS], 'readwrite');
+      const store = transaction.objectStore(STORES.SCRIPTS);
+      const index = store.index('sessionId');
+      const request = index.getAll(sessionId);
+      
+      request.onsuccess = () => {
+        const scripts = request.result;
+        let deleteCount = 0;
+        
+        if (scripts.length === 0) {
+          resolve();
+          return;
+        }
+        
+        scripts.forEach(script => {
+          const deleteRequest = store.delete(script.id);
+          deleteRequest.onsuccess = () => {
+            deleteCount++;
+            if (deleteCount === scripts.length) {
+              console.log(`Cleared ${deleteCount} scripts`);
+              resolve();
+            }
+          };
+          deleteRequest.onerror = () => reject(deleteRequest.error);
+        });
+      };
+      request.onerror = () => reject(request.error);
+      transaction.onerror = () => reject(transaction.error);
+    });
+    
+    // Clear property images if not keeping them
+    if (!keepPropertyImages) {
+      await new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORES.IMAGES], 'readwrite');
+        const store = transaction.objectStore(STORES.IMAGES);
+        const index = store.index('sessionId');
+        const request = index.getAll(sessionId);
+        
+        request.onsuccess = () => {
+          const images = request.result;
+          let deleteCount = 0;
+          
+          if (images.length === 0) {
+            resolve();
+            return;
+          }
+          
+          images.forEach(image => {
+            const deleteRequest = store.delete(image.id);
+            deleteRequest.onsuccess = () => {
+              deleteCount++;
+              if (deleteCount === images.length) {
+                console.log(`Cleared ${deleteCount} images`);
+                resolve();
+              }
+            };
+            deleteRequest.onerror = () => reject(deleteRequest.error);
+          });
+        };
+        request.onerror = () => reject(request.error);
+        transaction.onerror = () => reject(transaction.error);
+      });
+    }
+    
+    // Clear avatar data if not keeping
+    if (!keepAvatars) {
+      await new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORES.AVATAR_DATA], 'readwrite');
+        const store = transaction.objectStore(STORES.AVATAR_DATA);
+        const request = store.delete(sessionId);
+        request.onsuccess = () => {
+          console.log('Cleared avatar data');
+          resolve();
+        };
+        request.onerror = () => reject(request.error);
+        transaction.onerror = () => reject(transaction.error);
+      });
+    }
+    
+    // Clear property brief data
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORES.PROPERTY_DATA], 'readwrite');
+      const store = transaction.objectStore(STORES.PROPERTY_DATA);
+      const request = store.delete(sessionId);
+      request.onsuccess = () => {
+        console.log('Cleared property data');
+        resolve();
+      };
+      request.onerror = () => reject(request.error);
+      transaction.onerror = () => reject(transaction.error);
+    });
+    
+    // Update session metadata to mark as generated
+    if (keepSession) {
+      await new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORES.SESSIONS], 'readwrite');
+        const store = transaction.objectStore(STORES.SESSIONS);
+        const request = store.get(sessionId);
+        
+        request.onsuccess = () => {
+          const session = request.result;
+          if (session) {
+            session.videosGenerated = true;
+            session.generatedAt = Date.now();
+            session.isActive = false;
+            session.lastActive = Date.now();
+            
+            const updateRequest = store.put(session);
+            updateRequest.onsuccess = () => resolve();
+            updateRequest.onerror = () => reject(updateRequest.error);
+          } else {
+            resolve();
+          }
+        };
+        request.onerror = () => reject(request.error);
+        transaction.onerror = () => reject(transaction.error);
+      });
+    } else {
+      // Delete session completely
+      await new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORES.SESSIONS], 'readwrite');
+        const store = transaction.objectStore(STORES.SESSIONS);
+        const request = store.delete(sessionId);
+        request.onsuccess = () => {
+          console.log('Cleared session');
+          resolve();
+        };
+        request.onerror = () => reject(request.error);
+        transaction.onerror = () => reject(transaction.error);
+      });
+    }
+    
+    console.log(`Session ${sessionId} cleaned up successfully`);
+    return { success: true, sessionId };
+    
+  } catch (error) {
+    console.error('Error clearing session:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Clear old sessions (older than specified days)
+export const clearOldSessions = async (daysOld = 7) => {
+  const db = await openDB();
+  const cutoffTime = Date.now() - (daysOld * 24 * 60 * 60 * 1000);
+  
+  try {
+    // Get sessions older than cutoff
+    const sessions = await new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORES.SESSIONS], 'readonly');
+      const store = transaction.objectStore(STORES.SESSIONS);
+      const index = store.index('timestamp');
+      const request = index.getAll();
+      
+      request.onsuccess = () => {
+        const allSessions = request.result;
+        const oldSessions = allSessions.filter(s => s.timestamp < cutoffTime);
+        resolve(oldSessions);
+      };
+      request.onerror = () => reject(request.error);
+      transaction.onerror = () => reject(transaction.error);
+    });
+    
+    // Delete each old session
+    const results = [];
+    for (const session of sessions) {
+      const result = await clearSessionAfterGeneration(session.sessionId, { keepSession: false });
+      results.push(result);
+    }
+    
+    console.log(`Cleared ${results.length} old sessions`);
+    return { success: true, clearedCount: results.length };
+    
+  } catch (error) {
+    console.error('Error clearing old sessions:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Clear all data for a specific session after video generation
+export const resetSessionData = async (sessionId, preserveUserPreferences = true) => {
+  return await clearSessionAfterGeneration(sessionId, {
+    keepSession: true,
+    keepPropertyImages: preserveUserPreferences,
+    keepAvatars: preserveUserPreferences
+  });
+};

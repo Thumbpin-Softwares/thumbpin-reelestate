@@ -1,6 +1,6 @@
 // components/real-estate-video/components/VideoResults.js
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, Loader2, RotateCcw, Merge, Download, Film } from "lucide-react";
+import { CheckCircle2, Loader2, RotateCcw, Merge, Download, Film, Trash2 } from "lucide-react";
 import VideoCard from "@/modules/ai-walkthrough/components/VideoCard";
 
 export const VideoResults = ({ videoHook, compositesHook, onReset }) => {
@@ -24,6 +24,12 @@ export const VideoResults = ({ videoHook, compositesHook, onReset }) => {
   const hasErrors = videoStatuses.some((s) => s === "error");
   const allReady = videoStatuses.every((s) => s === "ready");
   const showCombine = videoStatuses.length > 1 && readyCount >= 2;
+  const handleManualCleanup = async () => {
+  if (videoHook.manualCleanup) {
+    await videoHook.manualCleanup(true, true);
+    toast.success("Session data cleared!");
+  }
+};
 
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -150,6 +156,10 @@ export const VideoResults = ({ videoHook, compositesHook, onReset }) => {
               </div>
             </div>
           )}
+
+          <Button onClick={handleManualCleanup} variant="outline" size="sm">
+  <Trash2 className="w-4 h-4 mr-1" /> Clear Session Data
+</Button>
         </div>
       )}
     </div>

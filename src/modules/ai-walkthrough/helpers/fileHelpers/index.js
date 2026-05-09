@@ -1,4 +1,3 @@
-// utils/fileHelpers.js
 export const dataURLToBlob = (dataURL) => {
   const arr = dataURL.split(',');
   const mime = arr[0].match(/:(.*?);/)[1];

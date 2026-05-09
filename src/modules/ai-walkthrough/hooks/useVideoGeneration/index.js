@@ -2,15 +2,17 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { combineVideos, uploadCombinedVideo } from '@/lib/video-combiner';
 import { dataURLToBlob } from '../../helpers/fileHelpers';
+import { clearSessionAfterGeneration } from '@/utils/indexedDB';
 
 const MAX_RETRY_ATTEMPTS = 3;
 
-export const useVideoGeneration = (selectedCompositeArray, scriptHook) => {
+export const useVideoGeneration = (selectedCompositeArray, scriptHook, sessionId) => {
   const [generating, setGenerating] = useState(false);
   const [videoStatuses, setVideoStatuses] = useState([]);
   const [videoResults, setVideoResults] = useState([]);
   const [retryingVideos, setRetryingVideos] = useState(new Set());
   const [videoRetryAttempts, setVideoRetryAttempts] = useState({});
+  const [sessionCleaned, setSessionCleaned] = useState(false);
   
   // Combine state
   const [combining, setCombining] = useState(false);
@@ -18,6 +20,23 @@ export const useVideoGeneration = (selectedCompositeArray, scriptHook) => {
   const [combinedVideo, setCombinedVideo] = useState(null);
 
   const { script, structuredScripts, sharedVoicePrompt, setSharedVoicePrompt, isBatchMode } = scriptHook;
+
+  // Cleanup function after successful generation
+  const cleanupSessionData = async (keepPropertyImages = true, keepAvatars = true) => {
+    if (!sessionId || sessionCleaned) return;
+    
+    try {
+      await clearSessionAfterGeneration(sessionId, {
+        keepSession: true,
+        keepPropertyImages: keepPropertyImages,
+        keepAvatars: keepAvatars
+      });
+      setSessionCleaned(true);
+      console.log("Session data cleaned up after video generation");
+    } catch (error) {
+      console.error("Failed to cleanup session:", error);
+    }
+  };
 
   const generateSingleVideo = async (composite, scriptText, videoIndex, providedVoicePrompt) => {
     let compositeFile;
@@ -97,19 +116,34 @@ export const useVideoGeneration = (selectedCompositeArray, scriptHook) => {
     setSharedVoicePrompt("");
     setVideoStatuses(comps.map(() => "generating"));
     setVideoResults(comps.map(() => null));
+    setSessionCleaned(false);
 
     let capturedVoice = "";
+    let allVideosSuccessful = true;
+    let successCount = 0;
+    
     for (let i = 0; i < comps.length; i++) {
       try {
         const returned = await generateSingleVideo(comps[i], scripts[i], i, i > 0 ? capturedVoice : undefined);
         if (i === 0 && returned) capturedVoice = returned;
+        successCount++;
       } catch (err) {
         console.error(`Video ${i + 1} error:`, err);
         setVideoStatuses((prev) => { const n = [...prev]; n[i] = "error"; return n; });
         toast.error(`Video ${i + 1} failed`, { description: err.message });
+        allVideosSuccessful = false;
       }
     }
     setGenerating(false);
+
+    // Cleanup session after successful video generation
+    if (allVideosSuccessful && successCount === comps.length) {
+      await cleanupSessionData(true, true);
+      toast.success("Session data saved and cleaned up!");
+    } else if (successCount > 0) {
+      // Partial success - still clean up but warn
+      toast.warning(`${successCount}/${comps.length} videos generated successfully`);
+    }
   };
 
   const retryVideoGeneration = async (videoIndex) => {
@@ -291,6 +325,11 @@ export const useVideoGeneration = (selectedCompositeArray, scriptHook) => {
     }
   };
 
+  // Manual cleanup function for parent components
+  const manualCleanup = async (keepPropertyImages = true, keepAvatars = true) => {
+    await cleanupSessionData(keepPropertyImages, keepAvatars);
+  };
+
   return {
     generating,
     videoStatuses,
@@ -303,9 +342,11 @@ export const useVideoGeneration = (selectedCompositeArray, scriptHook) => {
     combining,
     combineProgress,
     combinedVideo,
+    sessionCleaned,
     handleGenerateVideo,
     retryVideoGeneration,
     retryAllFailedVideos,
     handleCombineVideos,
+    manualCleanup, // Expose manual cleanup if needed
   };
 };

@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { FileText, Loader2, PenLine, Sparkles, RotateCcw } from "lucide-react";
+import { FileText, Loader2, PenLine, Sparkles, RotateCcw, Clock, Video } from "lucide-react";
 import { LANGUAGES, TONES, MAX_SCRIPT } from "@/utils/constants";
 
 export const Step2Script = ({ compositesHook, scriptHook, videoHook, onBack, onGenerate, isValid }) => {
@@ -22,39 +22,45 @@ export const Step2Script = ({ compositesHook, scriptHook, videoHook, onBack, onG
     allowEmotionTags,
     setAllowEmotionTags,
     generatingScript,
-    structuredScripts,
+    structuredScripts, // Now contains 2 scripts (short + long)
     setStructuredScripts,
     setBatchScripts,
     sharedVoicePrompt,
     handleGenerateScript,
     retryScriptGeneration,
+    regenerateSingleScript, // New function for regenerating individual script
   } = scriptHook;
 
   const { generating } = videoHook;
+
+  // Get the two script types
+  const shortScript = structuredScripts?.find(s => s?.type === "short_form");
+  const longScript = structuredScripts?.find(s => s?.type === "long_form");
 
   return (
     <div className="space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
       <div className="flex items-center gap-2">
         <FileText className="w-4 h-4 text-primary" />
         <span className="text-sm font-semibold">Script & Generate</span>
-        {isBatchMode && (
-          <Badge className="gradient-bg text-white border-0 text-[10px]">
-            Batch · {batchSize} videos
-          </Badge>
-        )}
+        <Badge className="gradient-bg text-white border-0 text-[10px]">
+          {selectedCompositeArray.length} Reference Angles
+        </Badge>
       </div>
 
       {/* Selected composites preview strip */}
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {selectedCompositeArray.map((comp, i) => (
-          <div key={i} className="flex items-center gap-2 rounded-xl border border-border/50 p-1.5 bg-card/50 shrink-0">
-            <img src={comp.url} alt={comp.title} className="w-10 h-14 rounded-lg object-cover border border-border" />
-            <div>
-              <p className="text-[10px] font-semibold">{comp.title}</p>
-              <p className="text-[9px] text-muted-foreground">{isBatchMode ? `Video ${i + 1}` : "Selected"}</p>
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">Reference Material ({selectedCompositeArray.length} composites)</Label>
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {selectedCompositeArray.map((comp, i) => (
+            <div key={i} className="flex items-center gap-2 rounded-xl border border-border/50 p-1.5 bg-card/50 shrink-0">
+              <img src={comp.url} alt={comp.title} className="w-10 h-14 rounded-lg object-cover border border-border" />
+              <div>
+                <p className="text-[10px] font-semibold">{comp.title}</p>
+                <p className="text-[9px] text-muted-foreground">{comp.avatarAngle || `Angle ${i + 1}`}</p>
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
       {/* Language */}
@@ -107,118 +113,136 @@ export const Step2Script = ({ compositesHook, scriptHook, videoHook, onBack, onG
         </span>
       </div>
 
-      {/* Script(s) — Batch vs Single */}
-      {isBatchMode ? (
-        <div className="space-y-3">
-          <div className="flex justify-between items-center">
-            <Label className="text-xs">
-              UGC Scripts · {batchSize} clips · 8s each
-              {sharedVoicePrompt && <span className="ml-2 text-[10px] text-emerald-500 font-medium">🎙️ Shared voice active</span>}
-            </Label>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleGenerateScript} 
-              disabled={generatingScript} 
-              className="cursor-pointer text-xs"
+      {/* User Intent Input (Optional) */}
+      <div className="space-y-2">
+        <Label className="text-xs">
+          Anything specific you want in the scripts? <span className="text-muted-foreground font-normal">(optional)</span>
+        </Label>
+        <Textarea
+          value={script}
+          onChange={(e) => setScript(e.target.value.slice(0, MAX_SCRIPT))}
+          placeholder="e.g. 'mention the terrace view' or 'highlight the modern kitchen' — AI will incorporate this into both scripts"
+          className="min-h-[80px] resize-none text-sm"
+          maxLength={MAX_SCRIPT}
+        />
+      </div>
+
+      {/* Generate Scripts Button */}
+      <Button 
+        variant="outline" 
+        size="sm" 
+        onClick={handleGenerateScript} 
+        disabled={generatingScript} 
+        className="w-full cursor-pointer text-sm"
+      >
+        {generatingScript ? (
+          <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating Short & Long Scripts...</>
+        ) : (
+          <><PenLine className="w-4 h-4 mr-2" /> ✨ Generate 2 Scripts (Short + Long)</>
+        )}
+      </Button>
+
+      {/* Generated Scripts Display */}
+      {generatingScript && structuredScripts.length === 0 && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground px-3 py-6 rounded-lg border border-dashed border-border/50">
+          <Loader2 className="w-4 h-4 animate-spin text-primary" />
+          Crafting your scripts using {selectedCompositeArray.length} reference angles...
+        </div>
+      )}
+
+      {/* Short Script (8-10 seconds) */}
+      {shortScript && shortScript.fullScript && (
+        <div className="rounded-xl border border-primary/20 bg-primary/5 overflow-hidden">
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-primary/20 bg-primary/10">
+            <Clock className="w-3.5 h-3.5 text-primary" />
+            <Badge className="bg-primary text-white border-0 text-[10px]">8-10 Seconds</Badge>
+            <span className="text-xs font-semibold">Short Script</span>
+            <span className="text-[10px] text-muted-foreground ml-auto">
+              {shortScript.wordCount || shortScript.fullScript.split(/\s+/).length} words
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => regenerateSingleScript?.(0, "short_form")}
+              disabled={generatingScript}
+              className="h-6 px-2 text-[10px] cursor-pointer"
             >
-              {generatingScript ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <PenLine className="w-3 h-3 mr-1" />}
-              ✨ {generatingScript ? "Generating…" : "AI Write All"}
+              <RotateCcw className="w-3 h-3 mr-1" /> Regenerate
             </Button>
           </div>
-
-          {generatingScript && structuredScripts.length === 0 && (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground px-3 py-4 rounded-lg border border-dashed border-border/50">
-              <Loader2 className="w-4 h-4 animate-spin text-primary" />
-              Crafting your {batchSize}-clip walkthrough…
-            </div>
-          )}
-
-          {selectedCompositeArray.map((comp, i) => {
-            const ss = structuredScripts[i] || {};
-            const label = i === 0 ? "Opening" : i === batchSize - 1 ? "Closing" : `Clip ${i + 1}`;
-            return (
-              <div key={i} className="rounded-xl border border-border/50 bg-card/40 overflow-hidden">
-                <div className="flex items-center gap-2 px-3 py-2 border-b border-border/30 bg-card/60">
-                  <Badge variant="outline" className="text-[9px]">{label}</Badge>
-                  <img src={comp.url} alt={comp.title} className="w-5 h-7 rounded object-cover border border-border/50" />
-                  <span className="text-[10px] text-muted-foreground truncate">{comp.title}</span>
-                  <span className="text-[9px] font-mono ml-auto text-muted-foreground">8s clip</span>
-                </div>
-                <div className="p-3 space-y-2.5">
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">
-                      Anything specific to say? <span className="font-normal normal-case">(optional)</span>
-                    </label>
-                    <Textarea
-                      value={ss._userIntent || ""}
-                      onChange={(e) => {
-                        setStructuredScripts((prev) => {
-                          const n = [...prev];
-                          n[i] = { ...(n[i] || {}), _userIntent: e.target.value };
-                          return n;
-                        });
-                      }}
-                      placeholder={`e.g. "mention the floor-to-ceiling windows" or "say it's move-in ready"`}
-                      className="min-h-[44px] resize-none text-xs"
-                    />
-                  </div>
-                  {ss.fullScript ? (
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-purple-500">🎬 AI Cinematic Prompt</span>
-                        <span className="text-[9px] text-muted-foreground">sent to Veo — edit if needed</span>
-                      </div>
-                      <Textarea
-                        value={ss.fullScript}
-                        onChange={(e) => {
-                          setStructuredScripts((prev) => {
-                            const n = [...prev];
-                            n[i] = { ...(n[i] || {}), fullScript: e.target.value };
-                            setBatchScripts((bs) => { const b = [...bs]; b[i] = e.target.value; return b; });
-                            return n;
-                          });
-                        }}
-                        className="min-h-[72px] resize-none text-xs text-muted-foreground"
-                      />
-                    </div>
-                  ) : generatingScript ? (
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
-                      <Loader2 className="w-3 h-3 animate-spin" /> Generating cinematic prompt…
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="space-y-2">
-          <div className="flex justify-between">
-            <Label className="text-xs">
-              Anything specific you want the presenter to say? <span className="text-muted-foreground font-normal">(optional)</span>
-            </Label>
-            <span className={`text-xs font-mono ${script.length > MAX_SCRIPT ? "text-destructive font-bold" : "text-muted-foreground"}`}>
-              {script.length}/{MAX_SCRIPT}
-            </span>
+          <div className="p-3">
+            <Textarea
+              value={shortScript.fullScript}
+              onChange={(e) => {
+                setStructuredScripts((prev) => {
+                  const updated = [...prev];
+                  const index = updated.findIndex(s => s?.type === "short_form");
+                  if (index >= 0) {
+                    updated[index] = { ...updated[index], fullScript: e.target.value };
+                  }
+                  return updated;
+                });
+                setBatchScripts((bs) => {
+                  const b = [...bs];
+                  b[0] = e.target.value;
+                  return b;
+                });
+              }}
+              className="min-h-[100px] resize-none text-sm bg-background"
+              placeholder="Short script (8-10 seconds)"
+            />
+            <p className="text-[10px] text-muted-foreground mt-2">
+              ⚡ Fast-paced, hook-heavy script for short-form video
+            </p>
           </div>
-          <Textarea
-            value={script}
-            onChange={(e) => setScript(e.target.value.slice(0, MAX_SCRIPT))}
-            placeholder="Optional · e.g. 'mention the terrace view' or 'say it's move-in ready' — AI builds the full cinematic ad prompt around this"
-            className="min-h-[100px] resize-none text-sm"
-            maxLength={MAX_SCRIPT}
-          />
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleGenerateScript} 
-            disabled={generatingScript} 
-            className="cursor-pointer text-xs"
-          >
-            {generatingScript ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <PenLine className="w-3 h-3 mr-1" />}
-            ✨ Generate Ad Prompt
-          </Button>
+        </div>
+      )}
+
+      {/* Long Script (45-60 seconds) */}
+      {longScript && longScript.fullScript && (
+        <div className="rounded-xl border border-border/50 bg-card/40 overflow-hidden">
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-border/30 bg-card/60">
+            <Video className="w-3.5 h-3.5 text-primary" />
+            <Badge variant="outline" className="text-[10px]">45-60 Seconds</Badge>
+            <span className="text-xs font-semibold">Full Script</span>
+            <span className="text-[10px] text-muted-foreground ml-auto">
+              {longScript.wordCount || longScript.fullScript.split(/\s+/).length} words
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => regenerateSingleScript?.(1, "long_form")}
+              disabled={generatingScript}
+              className="h-6 px-2 text-[10px] cursor-pointer"
+            >
+              <RotateCcw className="w-3 h-3 mr-1" /> Regenerate
+            </Button>
+          </div>
+          <div className="p-3">
+            <Textarea
+              value={longScript.fullScript}
+              onChange={(e) => {
+                setStructuredScripts((prev) => {
+                  const updated = [...prev];
+                  const index = updated.findIndex(s => s?.type === "long_form");
+                  if (index >= 0) {
+                    updated[index] = { ...updated[index], fullScript: e.target.value };
+                  }
+                  return updated;
+                });
+                setBatchScripts((bs) => {
+                  const b = [...bs];
+                  b[1] = e.target.value;
+                  return b;
+                });
+              }}
+              className="min-h-[150px] resize-none text-sm bg-background"
+              placeholder="Full script (45-60 seconds)"
+            />
+            <p className="text-[10px] text-muted-foreground mt-2">
+              📝 Narrative script that references different angles naturally
+            </p>
+          </div>
         </div>
       )}
 
@@ -235,7 +259,7 @@ export const Step2Script = ({ compositesHook, scriptHook, videoHook, onBack, onG
             className="cursor-pointer text-xs gap-1"
             disabled={generatingScript}
           >
-            <RotateCcw className="w-3 h-3" /> Regenerate Script{isBatchMode ? 's' : ''}
+            <RotateCcw className="w-3 h-3" /> Regenerate Both
           </Button>
           <Button 
             onClick={onGenerate} 
@@ -243,9 +267,9 @@ export const Step2Script = ({ compositesHook, scriptHook, videoHook, onBack, onG
             className="gradient-bg text-white shadow-md cursor-pointer px-8"
           >
             {generating ? (
-              <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating...</>
+              <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating 2 Videos...</>
             ) : (
-              <><Sparkles className="w-4 h-4 mr-2" /> {isBatchMode ? `Generate ${batchSize} Videos` : "Generate Video"}</>
+              <><Sparkles className="w-4 h-4 mr-2" /> Generate 2 Videos</>
             )}
           </Button>
         </div>

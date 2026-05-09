@@ -4,10 +4,10 @@ import { dataUrlToFile } from '../../helpers/fileHelpers';
 
 export const useAvatars = () => {
   const [avatarMode, setAvatarMode] = useState("prebuilt");
-  const [selectedAvatar, setSelectedAvatar] = useState(null);
+  const [selectedAvatars, setSelectedAvatars] = useState([]);
   const [uploadedAvatarFile, setUploadedAvatarFile] = useState(null);
   const [avatarPrompt, setAvatarPrompt] = useState("");
-  const [avatarVariantCount, setAvatarVariantCount] = useState(1);
+  const [avatarVariantCount, setAvatarVariantCount] = useState(3); // Changed default to 3
   const [generatedAvatars, setGeneratedAvatars] = useState([]);
   const [generatingAvatar, setGeneratingAvatar] = useState(false);
   const [reAvatars, setReAvatars] = useState([]);
@@ -38,6 +38,36 @@ export const useAvatars = () => {
     return () => { cancelled = true; };
   }, [avatarMode]);
 
+  // Helper to toggle avatar selection (max 3)
+  const toggleAvatarSelection = (avatar) => {
+    setSelectedAvatars(prev => {
+      if (!prev) return [avatar];
+      
+      const isSelected = prev.some(a => a?.url === avatar?.url || a?.key === avatar?.key);
+      
+      if (isSelected) {
+        // Remove avatar
+        return prev.filter(a => a?.url !== avatar?.url && a?.key !== avatar?.key);
+      } else if (prev.length < 3) {
+        // Add avatar if less than 3
+        return [...prev, avatar];
+      } else {
+        toast.warning("Maximum 3 avatars can be selected");
+        return prev;
+      }
+    });
+  };
+
+  // Clear all selected avatars
+  const clearSelectedAvatars = () => {
+    setSelectedAvatars([]);
+  };
+
+  // Check if an avatar is selected
+  const isAvatarSelected = (avatar) => {
+    return (selectedAvatars || []).some(a => a?.url === avatar?.url || a?.key === avatar?.key);
+  };
+
   const handleGenerateAvatars = async () => {
     if (!avatarPrompt.trim() || avatarPrompt.trim().length < 10) return;
     setGeneratingAvatar(true);
@@ -51,7 +81,17 @@ export const useAvatars = () => {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
-      setGeneratedAvatars(data.images || []);
+      
+      // Convert generated images to avatar objects
+      const generatedAvatarObjects = (data.images || []).map((img, index) => ({
+        url: img.url,
+        file: dataUrlToFile(img.url, `avatar-generated-${index}.png`),
+        name: `Generated ${index + 1}`,
+        angle: img.angle,
+        variant: img.variant
+      }));
+      
+      setGeneratedAvatars(generatedAvatarObjects);
       toast.success(`Generated ${data.images.length} avatar(s)!`);
     } catch (err) {
       toast.error("Avatar generation failed", { description: err.message });
@@ -61,15 +101,18 @@ export const useAvatars = () => {
   };
 
   const selectAvatarFromGeneration = (av, index) => {
-    const file = dataUrlToFile(av.url, `avatar-re-${index}.png`);
-    setSelectedAvatar({ url: av.url, file, name: `Generated ${index + 1}` });
+    // Instead of setting single, toggle selection
+    toggleAvatarSelection(av);
   };
 
   return {
     avatarMode,
     setAvatarMode,
-    selectedAvatar,
-    setSelectedAvatar,
+    selectedAvatars,
+    setSelectedAvatars,
+    toggleAvatarSelection,
+    clearSelectedAvatars,
+    isAvatarSelected,
     uploadedAvatarFile,
     setUploadedAvatarFile,
     avatarPrompt,

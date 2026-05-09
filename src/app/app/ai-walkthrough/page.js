@@ -39,18 +39,21 @@ function RealEstateVideoContent() {
   const [propertyImages, setPropertyImages] = useState([]);
 
   // ========== INITIALIZE ALL HOOKS ==========
-  // Order matters! Hooks that depend on others must come after
   const { step, setStep } = useSession(sessionId, isClient);
   const propertyBriefHook = usePropertyBrief();
   const avatarHook = useAvatars();
-  const compositesHook = useComposites(propertyImages, avatarHook.selectedAvatar);
+  
+  // FIX: Pass selectedAvatars (array) instead of selectedAvatar (single)
+  const compositesHook = useComposites(propertyImages, avatarHook.selectedAvatars);
+  
   const scriptHook = useScript(
     compositesHook.selectedCompositeArray, 
     propertyBriefHook.propertyBrief
   );
   const videoHook = useVideoGeneration(
     compositesHook.selectedCompositeArray, 
-    scriptHook
+    scriptHook,
+    sessionId
   );
 
   // ========== SESSION MANAGEMENT ==========
@@ -75,9 +78,15 @@ function RealEstateVideoContent() {
             if (savedData.propertyBrief) propertyBriefHook.setPropertyBrief(savedData.propertyBrief);
             if (savedData.avatarData) {
               avatarHook.setAvatarMode(savedData.avatarData.avatarMode);
-              avatarHook.setSelectedAvatar(savedData.avatarData.selectedAvatar);
+              // FIX: Use setSelectedAvatars instead of setSelectedAvatar
+              if (savedData.avatarData.selectedAvatars) {
+                avatarHook.setSelectedAvatars(savedData.avatarData.selectedAvatars);
+              } else if (savedData.avatarData.selectedAvatar) {
+                // Handle legacy single avatar data
+                avatarHook.setSelectedAvatars([savedData.avatarData.selectedAvatar]);
+              }
               avatarHook.setAvatarPrompt(savedData.avatarData.avatarPrompt || "");
-              avatarHook.setAvatarVariantCount(savedData.avatarData.avatarVariantCount || 1);
+              avatarHook.setAvatarVariantCount(savedData.avatarData.avatarVariantCount || 3);
             }
             if (savedData.images?.length > 0) setPropertyImages(savedData.images);
             if (savedData.composites) compositesHook.setComposites(savedData.composites);
@@ -126,7 +135,7 @@ function RealEstateVideoContent() {
           propertyBrief: propertyBriefHook.propertyBrief,
           avatarData: {
             avatarMode: avatarHook.avatarMode,
-            selectedAvatar: avatarHook.selectedAvatar,
+            selectedAvatars: avatarHook.selectedAvatars, // FIX: Use selectedAvatars
             avatarPrompt: avatarHook.avatarPrompt,
             avatarVariantCount: avatarHook.avatarVariantCount,
           },
@@ -175,7 +184,7 @@ function RealEstateVideoContent() {
     scriptHook.structuredScripts,
     step,
     avatarHook.avatarMode,
-    avatarHook.selectedAvatar,
+    avatarHook.selectedAvatars, // FIX: Use selectedAvatars
     avatarHook.avatarPrompt,
     avatarHook.avatarVariantCount,
     sessionId,
@@ -214,13 +223,14 @@ function RealEstateVideoContent() {
   }, [initialScript]);
 
   // Derived values
-  const step0Valid = propertyImages.length >= 1 && !!avatarHook.selectedAvatar;
+  // FIX: Check if at least one avatar is selected (selectedAvatars length > 0)
+  const step0Valid = propertyImages.length >= 1 && avatarHook.selectedAvatars.length >= 1;
   const step1Valid = compositesHook.selectedCompositeIndices.size >= 1;
   const showResults = videoHook.videoStatuses.length > 0 && videoHook.videoStatuses.some(s => s !== "idle");
 
   const handleReset = () => {
     setPropertyImages([]);
-    avatarHook.setSelectedAvatar(null);
+    avatarHook.setSelectedAvatars([]); // FIX: Use setSelectedAvatars
     avatarHook.setUploadedAvatarFile(null);
     compositesHook.setComposites([]);
     compositesHook.setSelectedCompositeIndices(new Set());
@@ -262,7 +272,7 @@ function RealEstateVideoContent() {
       <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 flex gap-2.5 mb-6">
         <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
         <p className="text-xs text-muted-foreground leading-relaxed">
-          <strong className="text-foreground">1.</strong> Upload properties + pick avatar →{" "}
+          <strong className="text-foreground">1.</strong> Upload properties + pick avatar(s) →{" "}
           <strong className="text-foreground">2.</strong> Choose your best composite →{" "}
           <strong className="text-foreground">3.</strong> Add script & generate!
         </p>

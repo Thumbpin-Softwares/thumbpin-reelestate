@@ -32,9 +32,12 @@ export const Step0Upload = ({
   const {
     avatarMode,
     setAvatarMode,
-    selectedAvatar,
-    setSelectedAvatar,
+    selectedAvatars, // Changed from selectedAvatar to selectedAvatars
+    setSelectedAvatars, // Changed from setSelectedAvatar to setSelectedAvatars
     uploadedAvatarFile,
+    toggleAvatarSelection,  // Add this
+    clearSelectedAvatars,   // Add this
+    isAvatarSelected, 
     setUploadedAvatarFile,
     avatarPrompt,
     setAvatarPrompt,
@@ -68,6 +71,24 @@ export const Step0Upload = ({
         <div className="h-px flex-1 bg-border" />
       </div>
 
+      {/* Selected Avatars Counter */}
+      {selectedAvatars.length > 0 && (
+        <div className="flex items-center justify-between bg-primary/5 rounded-lg px-3 py-2 border border-primary/20">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-primary" />
+            <span className="text-sm font-medium">
+              {selectedAvatars.length} avatar{selectedAvatars.length > 1 ? 's' : ''} selected
+            </span>
+          </div>
+          <button
+            onClick={clearSelectedAvatars}
+            className="text-xs text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
+          >
+            Clear all
+          </button>
+        </div>
+      )}
+
       {/* Avatar selection */}
       <div className="space-y-4">
         <div className="flex gap-2">
@@ -77,7 +98,7 @@ export const Step0Upload = ({
             return (
               <button
                 key={mode.id}
-                onClick={() => { setAvatarMode(mode.id); setSelectedAvatar(null); }}
+                onClick={() => { setAvatarMode(mode.id); clearSelectedAvatars(); }}
                 className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                   avatarMode === mode.id ? "gradient-bg text-white shadow-md" : 
                   "border border-border hover:border-primary/40 text-muted-foreground"
@@ -124,43 +145,49 @@ export const Step0Upload = ({
 
             {!reAvatarsLoading && !reAvatarsError && reAvatars.length > 0 && (
               <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-                {reAvatars.map((av) => (
-                  <div
-                    key={av.id}
-                    className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all group ${
-                      selectedAvatar?.key === av.key
-                        ? "border-primary ring-2 ring-primary/30 scale-105"
-                        : "border-border/50 hover:border-primary/50"
-                    }`}
-                  >
-                    <img
-                      src={av.url}
-                      alt={av.name}
-                      className="w-full h-full object-cover cursor-pointer"
-                      onClick={() =>
-                        setSelectedAvatar({ url: av.url, key: av.key, file: null, name: av.name })
-                      }
-                    />
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setLightboxUrl(av.url); }}
-                      className="absolute top-1 right-1 w-5 h-5 bg-black/60 rounded-full items-center justify-center hidden group-hover:flex transition-all cursor-pointer"
-                      title="Expand"
+                {reAvatars.map((av) => {
+                  const isSelected = isAvatarSelected(av);
+                  return (
+                    <div
+                      key={av.id}
+                      className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all group cursor-pointer ${
+                        isSelected
+                          ? "border-primary ring-2 ring-primary/30 scale-105"
+                          : "border-border/50 hover:border-primary/50"
+                      }`}
+                      onClick={() => toggleAvatarSelection({ url: av.url, key: av.key, file: null, name: av.name })}
                     >
-                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                          d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                      </svg>
-                    </button>
-                    {selectedAvatar?.key === av.key && (
-                      <div className="absolute top-1 left-1 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
-                        <CheckCircle2 className="w-3 h-3 text-white" />
+                      <img
+                        src={av.url}
+                        alt={av.name}
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setLightboxUrl(av.url); }}
+                        className="absolute top-1 right-1 w-5 h-5 bg-black/60 rounded-full items-center justify-center hidden group-hover:flex transition-all cursor-pointer"
+                        title="Expand"
+                      >
+                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                            d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                        </svg>
+                      </button>
+                      {isSelected && (
+                        <div className="absolute top-1 left-1 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                          <CheckCircle2 className="w-3 h-3 text-white" />
+                        </div>
+                      )}
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm px-1 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <p className="text-[10px] text-white text-center truncate">{av.name}</p>
                       </div>
-                    )}
-                    <div className="absolute bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm px-1 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <p className="text-[10px] text-white text-center truncate">{av.name}</p>
+                      {isSelected && (
+                        <div className="absolute bottom-0 left-0 right-0 bg-primary/80 px-1 py-0.5">
+                          <p className="text-[8px] text-white text-center">Selected</p>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -168,13 +195,13 @@ export const Step0Upload = ({
 
         {/* Upload Avatar */}
         {avatarMode === "upload" && (
-          <div className="space-y-2">
+          <div className="space-y-4">
             {uploadedAvatarFile ? (
               <div className="relative rounded-xl overflow-hidden border border-border/50 shadow-md bg-card group max-w-[200px]">
                 <img src={URL.createObjectURL(uploadedAvatarFile)} alt="Avatar" className="w-full aspect-square object-cover" />
                 <button
-                  onClick={() => { setUploadedAvatarFile(null); setSelectedAvatar(null); }}
-                  className="absolute top-2 right-2 w-7 h-7 bg-black/60 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                  onClick={() => { setUploadedAvatarFile(null); clearSelectedAvatars(); }}
+                  className="absolute top-2 right-2 w-7 h-7 bg-black/60 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
                 >
                   <X className="w-3.5 h-3.5 text-white" />
                 </button>
@@ -196,7 +223,9 @@ export const Step0Upload = ({
                       const file = e.target.files?.[0];
                       if (file) {
                         setUploadedAvatarFile(file);
-                        setSelectedAvatar({ url: URL.createObjectURL(file), file, name: "Custom" });
+                        const newAvatar = { url: URL.createObjectURL(file), file, name: "Custom", key: `upload-${Date.now()}` };
+                        // For upload mode, we allow selecting this as one of the avatars
+                        toggleAvatarSelection(newAvatar);
                       }
                     }} 
                   />
@@ -206,8 +235,8 @@ export const Step0Upload = ({
                     const res = await fetch(asset.url);
                     const blob = await res.blob();
                     const file = new File([blob], asset.name, { type: blob.type });
-                    setUploadedAvatarFile(file);
-                    setSelectedAvatar({ url: URL.createObjectURL(file), file, name: asset.name });
+                    const newAvatar = { url: URL.createObjectURL(file), file, name: asset.name, key: asset.id };
+                    toggleAvatarSelection(newAvatar);
                   } catch (err) { 
                     toast.error("Failed to load asset"); 
                   }
@@ -263,36 +292,37 @@ export const Step0Upload = ({
             </div>
             {generatedAvatars.length > 0 && (
               <div className="grid grid-cols-3 gap-3 pt-2">
-                {generatedAvatars.map((av, i) => (
-                  <button
-                    key={i}
-                    onClick={() => selectAvatarFromGeneration(av, i)}
-                    className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all cursor-pointer ${
-                      selectedAvatar?.url === av.url ? 
-                      "border-primary ring-2 ring-primary/30 scale-105" : 
-                      "border-border/50 hover:border-primary/50"
-                    }`}
-                  >
-                    <img src={av.url} alt={`V${i + 1}`} className="w-full h-full object-cover" />
-                    {selectedAvatar?.url === av.url && (
-                      <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
-                        <CheckCircle2 className="w-3 h-3 text-white" />
-                      </div>
-                    )}
-                    <Badge className="absolute top-1 left-1 bg-primary/80 text-white text-[8px] px-1 py-0 border-0">
-                      V{i + 1}
-                    </Badge>
-                  </button>
-                ))}
+                {generatedAvatars.map((av, i) => {
+                  const isSelected = isAvatarSelected(av);
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => toggleAvatarSelection(av)}
+                      className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all cursor-pointer ${
+                        isSelected ? 
+                        "border-primary ring-2 ring-primary/30 scale-105" : 
+                        "border-border/50 hover:border-primary/50"
+                      }`}
+                    >
+                      <img src={av.url} alt={`V${i + 1}`} className="w-full h-full object-cover" />
+                      {isSelected && (
+                        <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                          <CheckCircle2 className="w-3 h-3 text-white" />
+                        </div>
+                      )}
+                      <Badge className="absolute top-1 left-1 bg-primary/80 text-white text-[8px] px-1 py-0 border-0">
+                        V{i + 1}
+                      </Badge>
+                      {isSelected && (
+                        <div className="absolute bottom-0 left-0 right-0 bg-primary/80 px-1 py-0.5">
+                          <p className="text-[8px] text-white text-center">Selected</p>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             )}
-          </div>
-        )}
-
-        {selectedAvatar && (
-          <div className="flex items-center gap-2 pt-1">
-            <CheckCircle2 className="w-4 h-4 text-primary" />
-            <span className="text-sm">Presenter: <strong>{selectedAvatar.name}</strong></span>
           </div>
         )}
       </div>
@@ -317,14 +347,14 @@ export const Step0Upload = ({
         </div>
       </button>
 
-      {/* Next Button */}
+      {/* Next Button - Updated validation */}
       <div className="flex justify-end">
         <Button 
           onClick={onNext} 
-          disabled={!isValid} 
+          disabled={!isValid || selectedAvatars.length === 0} 
           className="gradient-bg text-white shadow-md cursor-pointer px-6"
         >
-          Create Composites <ChevronRight className="w-4 h-4 ml-1" />
+          Create Composites<ChevronRight className="w-4 h-4 ml-1" />
         </Button>
       </div>
 

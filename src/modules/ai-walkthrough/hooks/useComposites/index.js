@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { ensureFileObject, compressImage, dataUrlToFile } from '../../helpers/fileHelpers';
 
-export const useComposites = (propertyImages, selectedAvatar) => {
+export const useComposites = (propertyImages, selectedAvatars) => {
   const [composites, setComposites] = useState([]);
   const [generatingComposites, setGeneratingComposites] = useState(false);
   const [selectedCompositeIndices, setSelectedCompositeIndices] = useState(new Set());
@@ -34,56 +34,100 @@ export const useComposites = (propertyImages, selectedAvatar) => {
   };
 
   const handleGenerateComposites = async () => {
-    if (!selectedAvatar || propertyImages.length === 0) return;
+    // Check if we have avatars and property images
+    if (!selectedAvatars || selectedAvatars.length === 0) {
+      toast.error("Please select at least one avatar");
+      return;
+    }
+    
+    if (propertyImages.length === 0) {
+      toast.error("Please upload at least one property image");
+      return;
+    }
+    
     setGeneratingComposites(true);
     setComposites([]);
     setSelectedCompositeIndices(new Set());
     
     try {
-      // Ensure avatar is a proper file
-      let avatarFile;
-      if (selectedAvatar.file) {
-        avatarFile = await ensureFileObject(selectedAvatar.file);
-        avatarFile = await compressImage(avatarFile);
-      } else if (selectedAvatar.url) {
-        avatarFile = await ensureFileObject(selectedAvatar.url);
-        avatarFile = await compressImage(avatarFile);
-      }
-      
-      if (!avatarFile) {
-        throw new Error('Failed to process avatar image');
+      // Process all selected avatars
+      const avatarFiles = [];
+      for (let i = 0; i < selectedAvatars.length; i++) {
+        const avatar = selectedAvatars[i];
+        let avatarFile;
+        
+        if (avatar.file) {
+          avatarFile = await ensureFileObject(avatar.file);
+          avatarFile = await compressImage(avatarFile);
+        } else if (avatar.url) {
+          avatarFile = await ensureFileObject(avatar.url);
+          avatarFile = await compressImage(avatarFile);
+        }
+        
+        if (!avatarFile) {
+          throw new Error(`Failed to process avatar image ${i + 1}`);
+        }
+        
+        avatarFiles.push({
+          file: avatarFile,
+          name: avatar.name || `Avatar ${i + 1}`,
+          angle: avatar.angle || i === 0 ? "front" : i === 1 ? "three-quarter" : "side"
+        });
       }
 
       const results = [];
-      for (let i = 0; i < propertyImages.length; i++) {
-        toast.info(`Creating composite ${i + 1}/${propertyImages.length}...`, { id: "composite-progress" });
-        
-        // Ensure property image is a proper file
-        let propertyFile = await ensureFileObject(propertyImages[i]);
+      let compositeIndex = 0;
+      
+      // Generate composites for each property image with each avatar
+      for (let propIdx = 0; propIdx < propertyImages.length; propIdx++) {
+        // Process property image
+        let propertyFile = await ensureFileObject(propertyImages[propIdx]);
         if (!propertyFile) {
-          throw new Error(`Failed to process property image ${i + 1}`);
+          throw new Error(`Failed to process property image ${propIdx + 1}`);
         }
         
         const compressedProperty = await compressImage(propertyFile);
-        const fd = new FormData();
-        fd.append("avatarImage", avatarFile);
-        fd.append("propertyImage", compressedProperty);
+        
+        // For each avatar, create a composite with this property
+        for (let avatarIdx = 0; avatarIdx < avatarFiles.length; avatarIdx++) {
+          const avatar = avatarFiles[avatarIdx];
+          toast.info(`Creating composite ${compositeIndex + 1}/${propertyImages.length * avatarFiles.length}...`, 
+            { id: "composite-progress" }
+          );
+          
+          const fd = new FormData();
+          fd.append("avatarImage", avatar.file);
+          fd.append("propertyImage", compressedProperty);
 
-        const res = await fetch("/api/real-estate-video/composite", { method: "POST", body: fd });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || `Composite ${i + 1} failed`);
+          const res = await fetch("/api/real-estate-video/composite", { 
+            method: "POST", 
+            body: fd 
+          });
+          
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || `Composite failed`);
 
-        results.push({
-          url: data.compositeUrl,
-          file: dataUrlToFile(data.compositeUrl, `re-composite-${i}.png`),
-          title: `Property ${i + 1}`,
-          propertyIndex: i,
-        });
+          results.push({
+            url: data.compositeUrl,
+            file: dataUrlToFile(data.compositeUrl, `composite-${propIdx}-${avatarIdx}.png`),
+            title: `${avatar.name} - Property ${propIdx + 1}`,
+            propertyIndex: propIdx,
+            avatarIndex: avatarIdx,
+            avatarAngle: avatar.angle,
+          });
+          
+          compositeIndex++;
+        }
       }
 
       setComposites(results);
       toast.success(`${results.length} composite(s) ready — select your favorites!`, { id: "composite-progress" });
-      if (results.length === 1) setSelectedCompositeIndices(new Set([0]));
+      
+      // Auto-select first few composites if any
+      if (results.length > 0) {
+        const autoSelectCount = Math.min(3, results.length);
+        setSelectedCompositeIndices(new Set(Array.from({ length: autoSelectCount }, (_, i) => i)));
+      }
     } catch (err) {
       console.error('Composite generation error:', err);
       toast.error("Composite generation failed", { description: err.message });
