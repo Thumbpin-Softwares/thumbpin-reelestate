@@ -5,15 +5,7 @@ import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { s3, BUCKET } from "@/lib/r2";
 
 /**
- * GET /api/r2/user?key=users/{userId}/...
- *
- * User-scoped R2 proxy. Validates:
- *  1. The user is authenticated.
- *  2. The requested key is strictly owned by the session user
- *     (key must start with "users/{session.user.id}/").
- *
- * This prevents any user from accessing another user's assets
- * even if they know the exact R2 key.
+ * GET /api/r2?key=users/{userId}/...
  */
 export async function GET(request) {
   try {
@@ -23,33 +15,35 @@ export async function GET(request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const key = searchParams.get("key");
+    const encodedKey = searchParams.get("key");
 
-    if (!key) {
+    if (!encodedKey) {
       return NextResponse.json({ error: "key is required" }, { status: 400 });
     }
 
-    // ── Ownership check ───────────────────────────────────────────────────────
+    // CRITICAL FIX: Decode the URL-encoded key
+    const key = decodeURIComponent(encodedKey);
     
-    // 1. Allow public access to Avatars
+    console.log("[R2 Proxy] Encoded key:", encodedKey);
+    console.log("[R2 Proxy] Decoded key:", key);
+    console.log("[R2 Proxy] User ID:", session.user.id);
+
+    // Ownership check
     const isPublic = key.startsWith("Avatars/");
+    const ownedPrefix = `users/${session.user.id}/`;
 
-    if (!isPublic) {
-      // 2. For private user assets, require a session
-      if (!session?.user?.id) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
-
-      // 3. Enforce that users can only access their own "users/{userId}/" prefix
-      const ownedPrefix = `users/${session.user.id}/`;
-      if (!key.startsWith(ownedPrefix)) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-      }
+    if (!isPublic && !key.startsWith(ownedPrefix)) {
+      console.log("[R2 Proxy] Forbidden - wrong prefix");
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // ── Fetch from R2 ─────────────────────────────────────────────────────────
+    // Fetch from R2 using DECODED key
+    console.log("[R2 Proxy] Fetching from R2...");
     const response = await s3.send(
-      new GetObjectCommand({ Bucket: BUCKET, Key: key })
+      new GetObjectCommand({ 
+        Bucket: BUCKET, 
+        Key: key  // Use decoded key here
+      })
     );
 
     const contentType = response.ContentType || "application/octet-stream";
@@ -65,6 +59,8 @@ export async function GET(request) {
     }
     const buffer = Buffer.concat(chunks);
 
+    console.log("[R2 Proxy] Success! Returning", buffer.length, "bytes");
+
     return new NextResponse(buffer, {
       status: 200,
       headers: {
@@ -74,10 +70,10 @@ export async function GET(request) {
       },
     });
   } catch (error) {
+    console.error("[R2 Proxy] Error:", error);
     if (error?.name === "NoSuchKey" || error?.$metadata?.httpStatusCode === 404) {
       return NextResponse.json({ error: "Asset not found" }, { status: 404 });
     }
-    console.error("[R2 User Proxy] Error:", error);
     return NextResponse.json({ error: "Failed to retrieve asset" }, { status: 500 });
   }
 }

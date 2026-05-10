@@ -33,6 +33,16 @@ export default function VideoCard({
   const attempts = videoRetryAttempts[index] || 0;
   const isMaxRetriesReached = attempts >= maxRetryAttempts;
 
+  // Helper function to fix the video URL
+  const getFixedVideoUrl = (url) => {
+    if (!url) return '';
+    // Fix incorrect path: replace '/api/r2/user' with '/api/r2'
+    if (url.includes('/api/r2/user')) {
+      return url.replace('/api/r2/user', '/api/r2');
+    }
+    return url;
+  };
+
   const handlePlayPause = () => {
     if (videoRef.current) {
       if (isPlaying) {
@@ -76,6 +86,8 @@ export default function VideoCard({
     }
     return "Generating video...";
   };
+
+  const fixedVideoUrl = isReady ? getFixedVideoUrl(video.videoUrl) : '';
 
   return (
     <div className={`rounded-xl border transition-all duration-300 overflow-hidden ${
@@ -193,12 +205,12 @@ export default function VideoCard({
       )}
 
       {/* Video Player */}
-      {isReady && video?.videoUrl && (
+      {isReady && fixedVideoUrl && (
         <div className="p-4 pt-3">
           <div className="relative rounded-xl overflow-hidden bg-black aspect-[9/16] max-h-96 mx-auto group">
             <video
               ref={videoRef}
-              src={video.videoUrl}
+              src={fixedVideoUrl}
               className="w-full h-full object-contain cursor-pointer"
               onPlay={handleVideoPlay}
               onPause={handleVideoPause}
@@ -272,7 +284,7 @@ export default function VideoCard({
               )}
               
               <a
-                href={video.videoUrl}
+                href={fixedVideoUrl}
                 download={`real-estate-video-${index !== undefined ? index + 1 : 1}.mp4`}
                 target="_blank"
                 rel="noopener noreferrer"
