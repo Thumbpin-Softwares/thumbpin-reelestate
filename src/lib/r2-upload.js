@@ -19,7 +19,7 @@ export async function uploadToR2(buffer, key, contentType = "application/octet-s
       ContentType: contentType,
     })
   );
-  return `/api/r2/user?key=${encodeURIComponent(key)}`;
+  return `/api/r2?key=${encodeURIComponent(key)}`;
 }
 
 /**
