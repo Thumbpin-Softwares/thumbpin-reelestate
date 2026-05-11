@@ -5,7 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/components/auth-provider";
 
 export const metadata = {
-  title: "Thumb AI – Generate UGC Video Ads in 60 Seconds",
+  title: "Thumb AI Generate UGC Video Ads in 60 Seconds",
   description:
     "AI-powered UGC video ad generator for Indian brands & creators. Script to Reel in under 2 minutes with Indian-accent voices, AI avatars, and lip-sync technology.",
   keywords: [
