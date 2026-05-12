@@ -3,23 +3,19 @@ import Link from "next/link";
 import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Menu, X, LayoutDashboard } from "lucide-react";
+import { RectangleGoggles, Menu, X, LayoutDashboard } from "lucide-react";
 
 const navItems = [
     {
-        title : "Home",
+        title : "How It Works",
         link : "",
     },
     {
-        title : "About",
+        title : "Testimonials",
         link : "",
     },
     {
         title : "Pricing",
-        link : "",
-    },
-    {
-        title : "FAQs",
         link : "",
     }
 ];
@@ -30,7 +26,10 @@ export function Navbar() {
   const isAuthenticated = status === "authenticated";
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl">
+    <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-[#f7f5e8] border-b border-b-neutral-200">
+      <div className="flex items-center justify-center bg-black py-2">
+        <h1 className="text-white text-sm">Your next winning ad? We'll build it. <Link href="/" className="underline underline-offset-4">Work with us</Link></h1>
+      </div>
         <div className="flex">
             <div className="h-1 bg-linear-to-r from-purple-500 via-yellow-500 to-green-500 w-full"></div>
             <div className="h-1 bg-linear-to-l from-purple-500 via-yellow-500 to-green-500 w-full"></div>
@@ -39,9 +38,11 @@ export function Navbar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 group">
-            <Sparkles className="w-5 h-5 text-black" />
+          <div className="bg-black flex items-center justify-center p-2 inset-shadow-sidebar-primary-foreground rounded-full">
+            <RectangleGoggles className="w-4 h-4" fill="#c7f038" />
+          </div>
             <span className="text-xl font-semibold">
-              Thumb AI
+              ThumbGram
             </span>
           </Link>
 
@@ -72,7 +73,7 @@ export function Navbar() {
           <div className="hidden md:flex items-center gap-3">
             {isAuthenticated ? (
               <Link href="/app">
-                <span className="bg-black flex items-center justify-center text-white hover:opacity-90 cursor-pointer py-3 px-4 rounded-xl">
+                <span className="cursor-pointer bg-[#dbfd40] text-black py-3 px-4 flex items-center justify-center rounded-full shadow">
                   <LayoutDashboard className="w-4 h-4 mr-2" />
                   Dashboard
                 </span>
@@ -80,10 +81,10 @@ export function Navbar() {
             ) : (
               <div className="flex gap-4">
                 <Link href="/auth/login">
-                  <span className="cursor-pointer text-md text-black bg-transparent">Log In</span>
+                  <span className="cursor-pointer text-md text-black border border-black px-4 py-3 rounded-full bg-transparent">Log In</span>
                 </Link>
                 <Link href="/auth/signup">
-                  <span className="cursor-pointer bg-black text-white py-3 px-4 rounded-xl">
+                  <span className="cursor-pointer bg-[#dbfd40] text-black py-3 px-4 rounded-full shadow">
                     Start Free
                   </span>
                 </Link>

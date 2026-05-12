@@ -3,6 +3,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/components/auth-provider";
+import SmoothScroll from "@/modules/common/smooth-scroll";
 
 export const metadata = {
   title: "Thumb AI Generate UGC Video Ads in 60 Seconds",
@@ -36,19 +37,14 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen">
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="light"
-          enableSystem={false}
-          disableTransitionOnChange
-        >
+        <SmoothScroll>
           <AuthProvider>
             <TooltipProvider>
               {children}
             </TooltipProvider>
           </AuthProvider>
           <Toaster richColors position="top-right" />
-        </ThemeProvider>
+        </SmoothScroll>
       </body>
     </html>
   );

@@ -10,7 +10,7 @@ import Showcase from "@/modules/home/components/showcase";
 
 export default function LandingPage() {
   return (
-    <main className="min-h-screen bg-[#f3f4f6]">
+    <main className="min-h-screen bg-[#f7f5e8]">
       <Navbar />
       <Hero />
       <Showcase />
