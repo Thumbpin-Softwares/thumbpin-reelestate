@@ -6,6 +6,7 @@ export const Step1Composites = ({ compositesHook, onNext, onBack, isValid }) => 
   const {
     composites,
     generatingComposites,
+    compositeGenerationTotal,
     selectedCompositeIndices,
     toggleComposite,
     selectAllComposites,
@@ -40,14 +41,20 @@ export const Step1Composites = ({ compositesHook, onNext, onBack, isValid }) => 
       </p>
 
       {generatingComposites && (
-        <div className="rounded-xl border-2 border-dashed border-amber-500/30 p-8 flex flex-col items-center gap-3 bg-amber-500/5">
-          <Loader2 className="w-8 h-8 animate-spin text-amber-500" />
-          <p className="text-sm text-muted-foreground">Generating composites...</p>
-          <p className="text-xs text-muted-foreground">~15-30 seconds each</p>
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 flex items-center gap-3">
+          <Loader2 className="w-5 h-5 animate-spin text-amber-500 shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-foreground">
+              Generating composites {composites.length}/{compositeGenerationTotal || composites.length || 0}
+            </p>
+            <p className="text-[11px] text-muted-foreground">
+              New composites will appear below as soon as they are ready.
+            </p>
+          </div>
         </div>
       )}
 
-      {composites.length > 0 && !generatingComposites && (
+      {composites.length > 0 && (
         <>
           {/* Select All toggle */}
           {composites.length > 1 && (
@@ -76,7 +83,7 @@ export const Step1Composites = ({ compositesHook, onNext, onBack, isValid }) => 
                       : "border-border/40 bg-card hover:border-primary/40"
                   }`}
                 >
-                  <div className="aspect-[9/16] w-full overflow-hidden bg-muted">
+                  <div className="aspect-9/16 w-full overflow-hidden bg-muted">
                     <img 
                       src={comp.url} 
                       alt={comp.title} 
@@ -85,7 +92,7 @@ export const Step1Composites = ({ compositesHook, onNext, onBack, isValid }) => 
                   </div>
                   
                   {/* Glass Header */}
-                  <div className="absolute top-0 left-0 right-0 p-3 bg-gradient-to-b from-black/60 to-transparent">
+                  <div className="absolute top-0 left-0 right-0 p-3 bg-linear-to-b from-black/60 to-transparent">
                     <Badge className="bg-white/20 text-white border-0 text-[10px] backdrop-blur-md px-2 py-0.5 font-medium">
                       <MapPin className="w-2.5 h-2.5 mr-1 text-primary-foreground/80" /> {comp.title}
                     </Badge>
@@ -99,12 +106,22 @@ export const Step1Composites = ({ compositesHook, onNext, onBack, isValid }) => 
                   )}
 
                   {/* Hover Info */}
-                  <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="absolute bottom-0 left-0 right-0 p-3 bg-linear-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
                     <p className="text-[10px] text-white/90 font-medium">Click to {isSelected ? 'deselect' : 'select'}</p>
                   </div>
                 </div>
               );
             })}
+
+            {generatingComposites && compositeGenerationTotal > composites.length &&
+              Array.from({ length: compositeGenerationTotal - composites.length }).map((_, i) => (
+                <div key={`pending-${i}`} className="relative rounded-2xl overflow-hidden border-2 border-dashed border-border/40 bg-muted/20 aspect-9/16 flex items-center justify-center">
+                  <div className="text-center space-y-2">
+                    <Loader2 className="w-6 h-6 mx-auto animate-spin text-muted-foreground" />
+                    <p className="text-[10px] text-muted-foreground">Generating next composite...</p>
+                  </div>
+                </div>
+              ))}
           </div>
 
           {/* Batch pricing banner */}

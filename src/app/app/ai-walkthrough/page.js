@@ -292,80 +292,110 @@ function RealEstateVideoContent() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto py-8 px-4 animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center shadow-md">
-          <Building2 className="w-5 h-5 text-white" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold font-heading">Real Estate Video</h1>
-          <p className="text-sm text-muted-foreground">
-            3 steps to a cinematic property showcase — powered by Gemini & Veo 3.1
-          </p>
-        </div>
+    <div className="max-w-7xl mx-auto py-6 px-4 lg:px-6 animate-fade-in">
+      <div className="grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
+        {/* Sidebar */}
+        <aside className="space-y-4 lg:sticky lg:top-6 self-start">
+          <div className="rounded-3xl border border-border/60 bg-card/85 backdrop-blur-md p-5 shadow-lg shadow-black/5">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl gradient-bg flex items-center justify-center shadow-md shrink-0">
+                <Building2 className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold font-heading leading-tight">Real Estate Video</h1>
+                <p className="text-xs text-muted-foreground">
+                  Gemini + Veo 3.1 property walkthroughs
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-primary/20 bg-primary/5 p-3 flex gap-2.5">
+              <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Upload property images, choose avatars, generate composites, then build continuation scripts and final videos.
+              </p>
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-border/50 bg-muted/20 p-3">
+                <p className="text-[10px] text-muted-foreground">Property images</p>
+                <p className="text-lg font-semibold">{propertyImages.length}</p>
+              </div>
+              <div className="rounded-2xl border border-border/50 bg-muted/20 p-3">
+                <p className="text-[10px] text-muted-foreground">Avatars</p>
+                <p className="text-lg font-semibold">{avatarHook.selectedAvatars.length}</p>
+              </div>
+              <div className="rounded-2xl border border-border/50 bg-muted/20 p-3">
+                <p className="text-[10px] text-muted-foreground">Composites</p>
+                <p className="text-lg font-semibold">{compositesHook.composites.length}</p>
+              </div>
+              <div className="rounded-2xl border border-border/50 bg-muted/20 p-3">
+                <p className="text-[10px] text-muted-foreground">Selected</p>
+                <p className="text-lg font-semibold">{compositesHook.selectedCompositeIndices.size}</p>
+              </div>
+            </div>
+
+            {step > 0 && (
+              <div className="mt-4 rounded-2xl border border-border/50 bg-muted/15 p-3">
+                <SessionStatus />
+              </div>
+            )}
+          </div>
+        </aside>
+
+        {/* Main content */}
+        <main className="space-y-5 min-w-0">
+          {!showResults && (
+            <div className="rounded-3xl border border-border/60 bg-card/85 backdrop-blur-md p-4 shadow-lg shadow-black/5">
+              <StepIndicator steps={STEPS} currentStep={step} onStepClick={setStep} />
+            </div>
+          )}
+
+          <div className="rounded-3xl border border-border/60 bg-card/85 backdrop-blur-md p-4 sm:p-5 lg:p-6 shadow-lg shadow-black/5 min-w-0">
+          {!showResults && step === 0 && (
+            <Step0Upload
+              propertyImages={propertyImages}
+              setPropertyImages={setPropertyImages}
+              avatarHook={avatarHook}
+              propertyBriefHook={propertyBriefHook}
+              onNext={() => {
+                setStep(1);
+                compositesHook.handleGenerateComposites();
+              }}
+              isValid={step0Valid}
+            />
+          )}
+
+          {!showResults && step === 1 && (
+            <Step1Composites
+              compositesHook={compositesHook}
+              onNext={() => setStep(2)}
+              onBack={() => setStep(0)}
+              isValid={step1Valid}
+            />
+          )}
+
+          {!showResults && step === 2 && (
+            <Step2Script
+              compositesHook={compositesHook}
+              scriptHook={scriptHook}
+              videoHook={videoHook}
+              onBack={() => setStep(1)}
+              onGenerate={videoHook.handleGenerateVideo}
+              isValid={scriptHook.isStep2Valid(compositesHook.selectedCompositeIndices.size)}
+            />
+          )}
+
+          {showResults && (
+            <VideoResults
+              videoHook={videoHook}
+              compositesHook={compositesHook}
+              onReset={handleReset}
+            />
+          )}
+          </div>
+        </main>
       </div>
-
-      {/* Info */}
-      <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 flex gap-2.5 mb-6">
-        <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-        <p className="text-xs text-muted-foreground leading-relaxed">
-          <strong className="text-foreground">1.</strong> Upload properties + pick avatar(s) →{" "}
-          <strong className="text-foreground">2.</strong> Choose your best composite →{" "}
-          <strong className="text-foreground">3.</strong> Add script & generate!
-        </p>
-      </div>
-
-      {/* Step Indicator */}
-      {!showResults && (
-        <StepIndicator steps={STEPS} currentStep={step} onStepClick={setStep} />
-      )}
-
-      {/* Step 0 */}
-      {!showResults && step === 0 && (
-        <Step0Upload
-          propertyImages={propertyImages}
-          setPropertyImages={setPropertyImages}
-          avatarHook={avatarHook}
-          propertyBriefHook={propertyBriefHook}
-          onNext={() => {
-            setStep(1);
-            compositesHook.handleGenerateComposites();
-          }}
-          isValid={step0Valid}
-        />
-      )}
-
-      {/* Step 1 */}
-      {!showResults && step === 1 && (
-        <Step1Composites
-          compositesHook={compositesHook}
-          onNext={() => setStep(2)}
-          onBack={() => setStep(0)}
-          isValid={step1Valid}
-        />
-      )}
-
-      {/* Step 2 */}
-      {!showResults && step === 2 && (
-        <Step2Script
-          compositesHook={compositesHook}
-          scriptHook={scriptHook}
-          videoHook={videoHook}
-          onBack={() => setStep(1)}
-          onGenerate={videoHook.handleGenerateVideo}
-          isValid={scriptHook.isStep2Valid(compositesHook.selectedCompositeIndices.size)}
-        />
-      )}
-
-      {/* Results */}
-      {showResults && (
-        <VideoResults
-          videoHook={videoHook}
-          compositesHook={compositesHook}
-          onReset={handleReset}
-        />
-      )}
 
       {/* Property Drawer */}
       <PropertyDrawer
@@ -376,9 +406,6 @@ function RealEstateVideoContent() {
         toggleFeature={propertyBriefHook.toggleFeature}
         toggleAmenity={propertyBriefHook.toggleAmenity}
       />
-
-      {/* Session Status */}
-      {step > 0 && <SessionStatus />}
     </div>
   );
 }

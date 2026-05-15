@@ -171,7 +171,7 @@ NATURAL SPEAKING & EMOTION RULES (MANDATORY):
 
 AUDIO CLEANLINESS RULE (MANDATORY):
   - The generated clip must imply ONLY presenter speech audio.
-  - Do NOT suggest background sounds, transition SFX, music, crowd chatter, or ambient voice layers.
+  - Must NOT add background sounds, ending sounds, transition sounds, whoosh sounds, suspense sounds, music, crowd chatter, or ambient voice layers.
   - No extra speaker voices.
 
 FOR THE UI FIELDS (hook / walkthrough / cta):

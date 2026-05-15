@@ -7,6 +7,7 @@ export const useComposites = (propertyImages, selectedAvatars) => {
   const [generatingComposites, setGeneratingComposites] = useState(false);
   const [selectedCompositeIndices, setSelectedCompositeIndices] = useState(new Set());
   const [savingComposites, setSavingComposites] = useState(false);
+  const [compositeGenerationTotal, setCompositeGenerationTotal] = useState(0);
 
   const selectedCompositeArray = [...selectedCompositeIndices].sort().map((i) => composites[i]).filter(Boolean);
   const isBatchMode = selectedCompositeIndices.size > 1;
@@ -48,6 +49,7 @@ export const useComposites = (propertyImages, selectedAvatars) => {
     setGeneratingComposites(true);
     setComposites([]);
     setSelectedCompositeIndices(new Set());
+    setCompositeGenerationTotal(propertyImages.length);
     
     try {
       // Process all selected avatars
@@ -121,29 +123,35 @@ export const useComposites = (propertyImages, selectedAvatars) => {
           throw new Error("Invalid response from server");
         }
 
-        results.push({
+        const newComposite = {
           url: data.compositeUrl,
           file: dataUrlToFile(data.compositeUrl, `composite-${propIdx}.png`),
           title: `${primaryAvatar.name} - Property ${propIdx + 1}`,
           propertyIndex: propIdx,
           avatarIndex: 0,
           avatarAngle: primaryAvatar.angle,
+        };
+
+        results.push(newComposite);
+
+        // Reveal each generated composite immediately so the user never waits for all of them.
+        setComposites([...results]);
+
+        // Auto-select newly generated composites progressively (up to first 3).
+        setSelectedCompositeIndices((prev) => {
+          const next = new Set(prev);
+          if (next.size < 3) next.add(propIdx);
+          return next;
         });
       }
 
-      setComposites(results);
       toast.success(`${results.length} composite(s) ready — select your favorites!`, { id: "composite-progress" });
-      
-      // Auto-select first few composites if any
-      if (results.length > 0) {
-        const autoSelectCount = Math.min(3, results.length);
-        setSelectedCompositeIndices(new Set(Array.from({ length: autoSelectCount }, (_, i) => i)));
-      }
     } catch (err) {
       console.error('Composite generation error:', err);
       toast.error("Composite generation failed", { description: err.message });
     } finally {
       setGeneratingComposites(false);
+      setCompositeGenerationTotal(0);
     }
   };
 
@@ -185,6 +193,7 @@ export const useComposites = (propertyImages, selectedAvatars) => {
     composites,
     setComposites,
     generatingComposites,
+    compositeGenerationTotal,
     selectedCompositeIndices,
     setSelectedCompositeIndices,
     savingComposites,

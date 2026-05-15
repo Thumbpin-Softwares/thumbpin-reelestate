@@ -246,30 +246,67 @@ export const useVideoGeneration = (selectedCompositeArray, scriptHook, sessionId
           }
         }
       } else {
-        const response = await fetch("/api/real-estate-video/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            compositeImageUrl: composite.url,
-            script: scripts[videoIndex].trim(),
-            sharedVoicePrompt: capturedVoice
-          })
-        });
-        
-        if (!response.ok) throw new Error("Generation failed");
-        const data = await response.json();
-        
-        setVideoStatuses(prev => {
-          const next = [...prev];
-          next[videoIndex] = "ready";
-          return next;
-        });
-        setVideoResults(prev => {
-          const next = [...prev];
-          next[videoIndex] = { videoUrl: data.videoUrl };
-          return next;
-        });
-        toast.success(`Video ${videoIndex + 1} regenerated successfully!`);
+        const formData = new FormData();
+        if (composite.file instanceof File) {
+          formData.append("compositeImage", composite.file);
+        } else if (typeof composite.url === 'string' && composite.url.startsWith('data:')) {
+          const blob = dataURLToBlob(composite.url);
+          formData.append("compositeImage", new File([blob], `composite-${videoIndex}.png`, { type: 'image/png' }));
+        } else if (typeof composite.url === 'string') {
+          const response = await fetch(composite.url);
+          const blob = await response.blob();
+          formData.append("compositeImage", new File([blob], `composite-${videoIndex}.png`, { type: blob.type }));
+        }
+        formData.append("script", scripts[videoIndex].trim());
+        formData.append("language", language || "hindi");
+        if (capturedVoice) formData.append("sharedVoicePrompt", capturedVoice);
+
+        const response = await fetch("/api/real-estate-video/generate", { method: "POST", body: formData });
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({}));
+          throw new Error(err.error || "Generation failed");
+        }
+
+        if (!response.body) throw new Error("No response stream");
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            try {
+              const event = JSON.parse(line.slice(6));
+              if (event.type === "voice_ready" && event.voicePrompt && videoIndex === 0) {
+                capturedVoice = event.voicePrompt;
+                setSharedVoicePrompt(event.voicePrompt);
+              }
+              if (event.type === "video_ready") {
+                setVideoStatuses(prev => {
+                  const next = [...prev];
+                  next[videoIndex] = "ready";
+                  return next;
+                });
+                setVideoResults(prev => {
+                  const next = [...prev];
+                  next[videoIndex] = { videoUrl: event.videoUrl };
+                  return next;
+                });
+                toast.success(`Video ${videoIndex + 1} regenerated successfully!`);
+              }
+              if (event.type === "error") {
+                throw new Error(event.message);
+              }
+            } catch (e) {}
+          }
+        }
       }
     } catch (err) {
       console.error(`Retry failed for video ${videoIndex + 1}:`, err);

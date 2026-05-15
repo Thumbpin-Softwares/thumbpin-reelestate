@@ -195,8 +195,19 @@ export async function POST(request) {
 
           const result = await pollOperation(generationOp);
 
-          const generatedVideo = result.generatedVideos?.[0]?.video;
-          if (!generatedVideo) throw new Error("Video generation returned no video");
+          const generatedVideo =
+            result?.generatedVideos?.[0]?.video ||
+            result?.response?.generatedVideos?.[0]?.video ||
+            result?.response?.generatedVideos?.[0]?.videoResponse;
+
+          if (!generatedVideo) {
+            console.error("[RealEstateVideo] Unexpected Veo response shape:", {
+              keys: result ? Object.keys(result) : null,
+              generatedVideos: result?.generatedVideos,
+              responseKeys: result?.response ? Object.keys(result.response) : null,
+            });
+            throw new Error("Video generation returned no video. The prompt may have been rejected or Veo returned an unexpected response shape.");
+          }
 
           const uriParts = generatedVideo.uri.split("/");
           const fileName = uriParts.pop() || "";
@@ -384,7 +395,7 @@ function buildVideoPrompt(script, voicePrompt, language = "hindi") {
 - ZERO robotic artifacts: no metallic overtones, no synthetic buzz, no digital clipping
 - ZERO echo or reverb — dry, close-mic recording feel only
 - ZERO surrounding noise: no room reflections, no crowd, no traffic, no fan/AC noise, no wind, no hiss/hum
-- ZERO background sounds of any kind: no transition whoosh, no cinematic hits, no swells, no ambience bed, no foley tails
+- ZERO background sounds of any kind: no ending sound, no transition whoosh, no cinematic hits, no swells, no ambience bed, no foley tails
 - ZERO background voices: no second speaker, no chatter, no murmur, no off-screen dialogue
 - ONLY one clear voice track: the avatar/presenter voice and nothing else
 - Voice should have natural chest resonance and body
@@ -416,6 +427,7 @@ function buildVideoPrompt(script, voicePrompt, language = "hindi") {
 - High-quality synchronized audio throughout
 - This must look and SOUND like a REAL professional real estate video — not AI-generated
 - Audio must be single-speaker clean close-mic only. Absolutely no background SFX/music/transition sounds/ambient tails.
+- Audio must be single-speaker clean close-mic only. Absolutely no background SFX/music/transition sounds/ending sounds/ambient tails.
 - ❌ ABSOLUTELY NO TEXT ON SCREEN — no captions, no subtitles, no titles, no overlays, no watermarks, no on-screen text of any kind. Clean video only.
 - ❌ NO GRAPHICS, NO LOGOS, NO UI ELEMENTS overlaid on the video
 - ${SKIN_TOKENS}`;
