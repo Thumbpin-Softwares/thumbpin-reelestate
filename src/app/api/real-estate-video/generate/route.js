@@ -336,6 +336,7 @@ ${languageRule}
 The script may include inline emotion tags like {{happy}}, {{sad}}, {{excited}}, {{calm}}. Use these tags to shape delivery, but do NOT speak the tags aloud.
 
 Generate a DETAILED voice description. The voice must sound like a CONFIDENT REAL ESTATE PROFESSIONAL — warm, authoritative, aspirational.
+The speaking style must be NATURAL and HUMAN — like a real presenter talking to camera, not a voice assistant.
 
 Return a single paragraph with ALL attributes comma-separated:
 - Gender and age range
@@ -343,10 +344,15 @@ Return a single paragraph with ALL attributes comma-separated:
 - Pitch level and variation
 - Tone quality (warm, confident, rich, authoritative, inviting)
 - Emotional delivery arc: opens with hook energy, transitions to smooth walkthrough, ends aspirational
+- Expressive prosody: dynamic volume/pacing (slightly louder/faster on highlights, softer/slower on premium details), natural emphasis on key words
 - Speaking style: confident real estate presenter, NOT stiff
 - Vocal expressiveness (dramatic pauses before key features, voice drops for intimate moments)
 - Pacing: measured but engaging, ~140 wpm
-- RECORDING QUALITY: dry close-mic (6 inches), zero reverb, zero echo, zero surround sound, zero robotic artifacts, warm chest resonance, natural sibilance, soft room ambient hum, natural dynamic range
+- RECORDING QUALITY (STRICT): dry close-mic (4-6 inches), studio-clean signal, zero reverb, zero echo, zero surrounding/room noise, zero crowd noise, zero wind noise, zero hiss/hum/buzz, zero surround sound, zero robotic artifacts, warm chest resonance, natural sibilance, natural dynamic range
+
+CRITICAL AUDIO OUTPUT RULE:
+- The final result must sound like a presenter speaking directly into a close mic in a treated room.
+- No "echo echo" effect, no distant-room tone, no hall ambience, no bathroom-like reflections.
 
 Return ONLY the voice description paragraph. No headers, no explanations.`;
 
@@ -364,7 +370,7 @@ Return ONLY the voice description paragraph. No headers, no explanations.`;
  * Fallback voice prompt if Gemini fails.
  */
 function getDefaultVoicePrompt() {
-  return "Male or female, age 28-38, polished neutral Indian-English accent with confident urban inflection, medium pitch that drops for authoritative property facts and rises with warm excitement for premium features, rich confident tone with natural warmth, opens with dramatic attention-grabbing hook delivery then transitions to smooth professional walkthrough and closes with aspirational warmth, confident real estate presenter style, deliberate pauses for emphasis on key features, measured pacing around 140 words per minute, recorded on dry close-mic with zero reverb, zero echo, zero surround sound, warm chest resonance with natural sibilance, subtle room ambient hum, natural dynamic range, absolutely no robotic or metallic artifacts.";
+  return "Male or female, age 28-38, polished neutral Indian-English accent with confident urban inflection, medium pitch with natural variation, rich warm authoritative tone, natural conversational presenter delivery, dynamic prosody with slightly faster/louder emphasis on highlights and softer/slower delivery on premium details, deliberate pauses before key features, measured pacing around 140 words per minute, recorded on dry close-mic (4-6 inches) in treated studio conditions, zero reverb, zero echo, zero surrounding noise, zero hiss or hum, zero surround sound, warm chest resonance with natural sibilance, natural dynamic range, absolutely no robotic or metallic artifacts.";
 }
 
 /**
@@ -374,12 +380,16 @@ function buildVideoPrompt(script, voicePrompt, language = "hindi") {
   const SKIN_TOKENS = `Photorealistic detail. Real human skin with visible natural texture, pores, and micro shadows. Preserve natural under-eye detail and realistic lip texture. No airbrushing or waxy finish. Authentic facial structure with natural micro-expressions and eye depth. Lighting behaves naturally with soft highlights and realistic shadows. High-detail editorial realism, grounded in real-world 4k camera capture.`;
 
   const AUDIO_REALISM = `AUDIO REALISM (CRITICAL — NO ROBOTIC ARTIFACTS):
-- Voice must sound like a REAL human recording on a quality lavalier mic — warm, present, intimate
+- Voice must sound like a REAL human recording on a premium close mic (lavalier or boom) — warm, present, intimate
 - ZERO robotic artifacts: no metallic overtones, no synthetic buzz, no digital clipping
-- ZERO echo or reverb — dry, close-mic recording feel
-- Natural room tone: very subtle ambient hum
+- ZERO echo or reverb — dry, close-mic recording feel only
+- ZERO surrounding noise: no room reflections, no crowd, no traffic, no fan/AC noise, no wind, no hiss/hum
+- ZERO background sounds of any kind: no transition whoosh, no cinematic hits, no swells, no ambience bed, no foley tails
+- ZERO background voices: no second speaker, no chatter, no murmur, no off-screen dialogue
+- ONLY one clear voice track: the avatar/presenter voice and nothing else
 - Voice should have natural chest resonance and body
-- Audio dynamics should be natural: louder for hooks, softer for intimate points`;
+- Natural expressive dynamics: slightly louder/faster on hooks & highlights, softer/slower on emotional or premium details
+- Preserve natural emotional shifts so delivery feels human and spontaneous`;
 
   const VOICE_LINE = `VOICE CHARACTERISTICS: ${voicePrompt}
 - Lip movements must be perfectly synchronized with speech at all times`;
@@ -405,6 +415,7 @@ function buildVideoPrompt(script, voicePrompt, language = "hindi") {
 - No changes to appearance whatsoever
 - High-quality synchronized audio throughout
 - This must look and SOUND like a REAL professional real estate video — not AI-generated
+- Audio must be single-speaker clean close-mic only. Absolutely no background SFX/music/transition sounds/ambient tails.
 - ❌ ABSOLUTELY NO TEXT ON SCREEN — no captions, no subtitles, no titles, no overlays, no watermarks, no on-screen text of any kind. Clean video only.
 - ❌ NO GRAPHICS, NO LOGOS, NO UI ELEMENTS overlaid on the video
 - ${SKIN_TOKENS}`;
@@ -450,6 +461,12 @@ PRESENTER ENERGY & BODY LANGUAGE:
 - Natural head movements — slight nods of approval, looking around the space then back to camera
 - Professional posture — confident stance, slight lean toward camera for intimate moments
 - At least ONE moment where they step to the side or gesture widely to reveal more of the space behind them
+
+SPEAKING STYLE (VERY IMPORTANT):
+- Natural conversational delivery — do not sound scripted, stiff, or robotic
+- Emotionally expressive and dynamic like a real property host
+- Slight speed/energy lift on highlight words, then softer delivery for premium details
+- Use meaningful pauses to let key points land
 
 PROPERTY SHOWCASE MOMENTS:
 - The property/space is clearly visible around and behind the presenter throughout

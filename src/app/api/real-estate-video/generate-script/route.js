@@ -46,8 +46,23 @@ export async function POST(request) {
     const tone            = formData.get("tone")            || "professional";
     const allowEmotionTags= formData.get("allowEmotionTags") === "true";
     const compositeCount  = parseInt(formData.get("compositeCount")) || 0;
+    const selectedClosingHook = (formData.get("closingHook") || "none").toString();
+    const customClosingHook = (formData.get("customClosingHook") || "").toString().trim();
     // userIntent: optional text — what the user wants the presenter to say/highlight
     const userIntent      = (formData.get("userIntent") || formData.get("script") || "").trim();
+
+    const CLOSING_HOOK_LIBRARY = {
+      none: "No special closing hook. Keep ending clean, confident, and premium.",
+      key_handover_happy: "Final clip hook: presenter warmly hands over keys to happy silent buyers, smiling to camera.",
+      sunset_balcony_toast: "Final clip hook: presenter gestures to sunset balcony view and closes with aspirational warmth.",
+      door_open_reveal: "Final clip hook: presenter opens door to best room and invites viewer in with confident smile.",
+      light_humor_line: "Final clip hook: include one short classy witty line, then premium confident close.",
+      family_entry_silent: "Final clip hook: a small family appears silently in background while presenter signals homecoming.",
+      signature_key_toss: "Final clip hook: presenter performs subtle signature key gesture, then calm premium close.",
+      warm_handshake_close: "Final clip hook: presenter gives brief warm handshake to buyer (silent), then final camera line.",
+    };
+    const resolvedClosingHook = CLOSING_HOOK_LIBRARY[selectedClosingHook] || CLOSING_HOOK_LIBRARY.none;
+    const customClosingHookLine = customClosingHook ? `Custom user closing hook (highest priority): ${customClosingHook}` : "";
 
     async function fileToBase64(file) {
       const buf = Buffer.from(await file.arrayBuffer());
@@ -106,7 +121,7 @@ export async function POST(request) {
     const langRule = langMap[language] || langMap.hindi;
 
     const emotionRule = allowEmotionTags
-      ? "You may embed emotion tags like {{excited}}, {{calm}}, {{happy}} immediately before the word/phrase they color. Keep tags exactly as written."
+      ? "You may embed emotion tags like {{excited}}, {{calm}}, {{happy}}, {{confident}}, {{warm}}, {{soft}}, {{energetic}} immediately before the word/phrase they color. Keep tags exactly as written."
       : "Do NOT include emotion tags or any special markup in the spoken text.";
 
     const userIntentBlock = userIntent
@@ -146,6 +161,18 @@ Write 2-4 tight sentences describing:
   2. PRESENTER ACTION: What does the presenter DO before speaking? (gesture, turn, step aside, look up, touch a surface)
   3. SPOKEN LINE (≤18 words total, verbatim): Exactly what the presenter says. If user intent provided, honor it.
   4. CLOSING ENERGY: How does the clip end? (lingering shot, quick cut, zoom-out, freeze on presenter)
+
+NATURAL SPEAKING & EMOTION RULES (MANDATORY):
+  - Spoken line must sound human and conversational, not robotic or overly formal.
+  - Add emotional variation naturally: higher energy on key highlights, calmer tone on detail/value points.
+  - Use short punchy phrasing that is easy to speak naturally on camera.
+  - If emotion tags are enabled, use them only where meaningful — not every phrase.
+  - Delivery should feel like a confident real estate host speaking directly to viewer in one take.
+
+AUDIO CLEANLINESS RULE (MANDATORY):
+  - The generated clip must imply ONLY presenter speech audio.
+  - Do NOT suggest background sounds, transition SFX, music, crowd chatter, or ambient voice layers.
+  - No extra speaker voices.
 
 FOR THE UI FIELDS (hook / walkthrough / cta):
   hook        — first 5-6 spoken words only (the attention-grabbing fragment)
@@ -211,6 +238,17 @@ ${intentLines}
       
     Clip ${N} (CLOSING): Avatar ENTERS from the LEFT side of the frame at the START.
       Walks into the final space. Delivers the closing line. Stays in frame — does NOT exit.
+
+OPTIONAL CLOSING HOOK (only for final clip, use occasionally and naturally):
+  - You may add a light cinematic beat where 1-2 silent people (no dialogue) appear briefly,
+    and the presenter happily hands over keys with a warm smile.
+  - Keep this tasteful, premium, and subtle (no slapstick).
+  - If you add humor, make it soft and classy in the spoken line (one witty phrase max).
+  - No extra voices from other people; only presenter speaks.
+
+FINAL CLIP USER-SELECTED CLOSING HOOK (apply to Clip ${N}):
+  - ${resolvedClosingHook}
+  ${customClosingHookLine ? `- ${customClosingHookLine}` : ""}
 
     This exit-right → enter-left pattern is MANDATORY for every transition.
     The avatar MUST wear the EXACT SAME outfit in every clip.
@@ -310,11 +348,17 @@ No markdown, no explanation, no text outside the JSON array.`;
         continuationBlock = `\nCONTINUATION: This is clip ${clipIndex + 1} of ${totalClips}. At the START, the avatar must ENTER from the LEFT. At the END, the avatar must EXIT to the RIGHT.\n`;
       }
     }
+
+    const shouldApplyClosingHook = totalClips === 1 || clipPosition === "last" || clipPosition === "only";
+    const closingHookBlock = shouldApplyClosingHook
+      ? `\nOPTIONAL CLOSING HOOK: You may include a subtle key-handover beat to 1-2 silent people (no dialogue), with a happy/warm finish and light classy humor. Keep premium tone.\nUSER SELECTED CLOSING HOOK: ${resolvedClosingHook}${customClosingHook ? `\nCUSTOM USER CLOSING HOOK (highest priority): ${customClosingHook}` : ""}\n`
+      : "";
     
     const singlePrompt = `${DIRECTOR_BRIEF}
 
 You have ONE composite image showing a presenter in a property space.
 ${continuationBlock}
+  ${closingHookBlock}
 CAMERA STYLE: Use smooth, slow, professional real estate camera movements. NO face zooms. Keep MEDIUM to WIDE framing — show the property around the presenter. Slow Steadicam-style movement.
 
 Generate ONE cinematic 8-second real estate video ad prompt.

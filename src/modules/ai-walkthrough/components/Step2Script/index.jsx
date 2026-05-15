@@ -3,7 +3,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { FileText, Loader2, PenLine, Sparkles, RotateCcw, ArrowRight, ArrowLeft, Video } from "lucide-react";
-import { LANGUAGES, TONES, MAX_SCRIPT } from "@/utils/constants";
+import { LANGUAGES, TONES, MAX_SCRIPT, CLOSING_HOOK_OPTIONS } from "@/utils/constants";
 
 export const Step2Script = ({ compositesHook, scriptHook, videoHook, onBack, onGenerate, isValid }) => {
   const {
@@ -26,6 +26,10 @@ export const Step2Script = ({ compositesHook, scriptHook, videoHook, onBack, onG
     setBatchScripts,
     manualScripts,
     useManualForIndex,
+    closingHook,
+    setClosingHook,
+    customClosingHook,
+    setCustomClosingHook,
     toggleManualForIndex,
     updateManualScript,
     getFinalScripts,
@@ -131,6 +135,38 @@ export const Step2Script = ({ compositesHook, scriptHook, videoHook, onBack, onG
           className="min-h-20 resize-none text-sm"
           maxLength={MAX_SCRIPT}
         />
+      </div>
+
+      {/* Closing Hook Selection (applied to final clip) */}
+      <div className="space-y-2">
+        <Label className="text-xs">
+          Final clip closing hook <span className="text-muted-foreground font-normal">(optional — applied to last video)</span>
+        </Label>
+        <div className="flex gap-2 flex-wrap">
+          {CLOSING_HOOK_OPTIONS.map((opt) => (
+            <button
+              key={opt.id}
+              onClick={() => setClosingHook(opt.id)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                closingHook === opt.id
+                  ? "gradient-bg text-white"
+                  : "border border-border text-muted-foreground hover:border-primary/40"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        <Textarea
+          value={customClosingHook || ""}
+          onChange={(e) => setCustomClosingHook(e.target.value.slice(0, 180))}
+          placeholder="Add your own custom final hook instruction (optional), e.g. 'end with keys handover and warm smile'"
+          className="min-h-16 resize-none text-xs"
+          maxLength={180}
+        />
+        <p className="text-[10px] text-muted-foreground">
+          The chosen hook is used only in the final clip to make the ending memorable.
+        </p>
       </div>
 
       {/* Generate Scripts Button */}

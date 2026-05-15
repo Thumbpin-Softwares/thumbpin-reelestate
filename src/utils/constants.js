@@ -76,3 +76,46 @@ export const AVATAR_MODES = [
   { id: "upload", label: "Upload", icon: "Upload" },
   { id: "generate", label: "Create Avatar", icon: "Sparkles" },
 ];
+
+export const CLOSING_HOOK_OPTIONS = [
+  {
+    id: "none",
+    label: "No Special Hook",
+    prompt: "Keep the ending clean, confident, and premium with no extra closing gimmick."
+  },
+  {
+    id: "key_handover_happy",
+    label: "Happy Key Handover",
+    prompt: "Final beat: presenter warmly hands over keys to a happy buyer couple (silent extras only), smiles to camera."
+  },
+  {
+    id: "sunset_balcony_toast",
+    label: "Balcony Sunset Moment",
+    prompt: "Final beat: presenter gestures toward sunset balcony view and closes with warm aspirational emotion."
+  },
+  {
+    id: "door_open_reveal",
+    label: "Door Open Final Reveal",
+    prompt: "Final beat: presenter opens a door into the best room and invites the viewer in with a confident smile."
+  },
+  {
+    id: "light_humor_line",
+    label: "Light Classy Humor",
+    prompt: "Final beat: include one short classy witty line (not slapstick), then end with premium confidence."
+  },
+  {
+    id: "family_entry_silent",
+    label: "Family Entry (Silent)",
+    prompt: "Final beat: a small family appears in background silently, presenter smiles and signals handover/homecoming."
+  },
+  {
+    id: "signature_key_toss",
+    label: "Signature Key Gesture",
+    prompt: "Final beat: presenter does a subtle signature key gesture (no dramatic toss), then steady confident close."
+  },
+  {
+    id: "warm_handshake_close",
+    label: "Warm Handshake Close",
+    prompt: "Final beat: presenter shares a brief warm handshake with buyer (silent), then turns to camera for final line."
+  },
+];

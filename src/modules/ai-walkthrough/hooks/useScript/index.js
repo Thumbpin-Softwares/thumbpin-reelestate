@@ -11,6 +11,8 @@ export const useScript = (selectedCompositeArray, propertyBrief) => {
   const [manualScripts, setManualScripts] = useState([]);
   // Whether to use manual script for each index (true = use manual, false = use AI)
   const [useManualForIndex, setUseManualForIndex] = useState([]);
+  const [closingHook, setClosingHook] = useState("none");
+  const [customClosingHook, setCustomClosingHook] = useState("");
   const [sharedVoicePrompt, setSharedVoicePrompt] = useState("");
   const [language, setLanguage] = useState("hindi");
   const [scriptTone, setScriptTone] = useState("professional");
@@ -129,6 +131,10 @@ export const useScript = (selectedCompositeArray, propertyBrief) => {
       
       // Enable continuation mode for visual flow between clips
       fd.append("continuationMode", "true");
+      fd.append("closingHook", closingHook || "none");
+      if (customClosingHook.trim()) {
+        fd.append("customClosingHook", customClosingHook.trim());
+      }
       
       const res = await fetch("/api/real-estate-video/generate-script", { 
         method: "POST", 
@@ -243,10 +249,14 @@ export const useScript = (selectedCompositeArray, propertyBrief) => {
       
       // Include position context for continuation
       const N = selectedCompositeArray.length;
-      const position = scriptIndex === 0 ? "first" : scriptIndex === N - 1 ? "last" : "middle";
+      const position = N === 1 ? "only" : scriptIndex === 0 ? "first" : scriptIndex === N - 1 ? "last" : "middle";
       fd.append("clipPosition", position);
       fd.append("clipIndex", String(scriptIndex));
       fd.append("totalClips", String(N));
+      fd.append("closingHook", closingHook || "none");
+      if (customClosingHook.trim()) {
+        fd.append("customClosingHook", customClosingHook.trim());
+      }
       
       if (script.trim()) {
         fd.append("userIntent", script.trim());
@@ -312,6 +322,10 @@ export const useScript = (selectedCompositeArray, propertyBrief) => {
     setManualScripts,
     useManualForIndex,
     setUseManualForIndex,
+    closingHook,
+    setClosingHook,
+    customClosingHook,
+    setCustomClosingHook,
     toggleManualForIndex,
     updateManualScript,
     getFinalScripts,

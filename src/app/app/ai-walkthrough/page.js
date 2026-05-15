@@ -104,6 +104,12 @@ function RealEstateVideoContent() {
               if (Array.isArray(savedData.scriptData.useManualForIndex)) {
                 scriptHook.setUseManualForIndex(savedData.scriptData.useManualForIndex);
               }
+              if (savedData.scriptData.closingHook) {
+                scriptHook.setClosingHook(savedData.scriptData.closingHook);
+              }
+              if (typeof savedData.scriptData.customClosingHook === "string") {
+                scriptHook.setCustomClosingHook(savedData.scriptData.customClosingHook);
+              }
             }
             if (savedData.step) setStep(parseInt(savedData.step));
             
@@ -123,6 +129,8 @@ function RealEstateVideoContent() {
           if (s.script) scriptHook.setScript(s.script);
           if (Array.isArray(s.manualScripts)) scriptHook.setManualScripts(s.manualScripts);
           if (Array.isArray(s.useManualForIndex)) scriptHook.setUseManualForIndex(s.useManualForIndex);
+          if (s.closingHook) scriptHook.setClosingHook(s.closingHook);
+          if (typeof s.customClosingHook === "string") scriptHook.setCustomClosingHook(s.customClosingHook);
           if (s.avatarMode) avatarHook.setAvatarMode(s.avatarMode);
         }
       } catch (error) {
@@ -157,6 +165,8 @@ function RealEstateVideoContent() {
             manualScripts: scriptHook.manualScripts,
             useManualForIndex: scriptHook.useManualForIndex,
             batchScripts: scriptHook.batchScripts,
+            closingHook: scriptHook.closingHook,
+            customClosingHook: scriptHook.customClosingHook,
           },
           metadata: {
             lastEdited: Date.now(),
@@ -195,6 +205,8 @@ function RealEstateVideoContent() {
     scriptHook.batchScripts,
     scriptHook.manualScripts,
     scriptHook.useManualForIndex,
+    scriptHook.closingHook,
+    scriptHook.customClosingHook,
     step,
     avatarHook.avatarMode,
     avatarHook.selectedAvatars, // FIX: Use selectedAvatars
@@ -216,6 +228,8 @@ function RealEstateVideoContent() {
       script: scriptHook.script,
       manualScripts: scriptHook.manualScripts,
       useManualForIndex: scriptHook.useManualForIndex,
+      closingHook: scriptHook.closingHook,
+      customClosingHook: scriptHook.customClosingHook,
       avatarMode: avatarHook.avatarMode,
     }));
   }, [
@@ -227,6 +241,8 @@ function RealEstateVideoContent() {
     scriptHook.script,
     scriptHook.manualScripts,
     scriptHook.useManualForIndex,
+    scriptHook.closingHook,
+    scriptHook.customClosingHook,
     avatarHook.avatarMode,
     isClient,
   ]);
@@ -256,6 +272,8 @@ function RealEstateVideoContent() {
     scriptHook.setBatchScripts([]);
     scriptHook.setManualScripts([]);
     scriptHook.setUseManualForIndex([]);
+    scriptHook.setClosingHook("none");
+    scriptHook.setCustomClosingHook("");
     scriptHook.setSharedVoicePrompt("");
     videoHook.setVideoStatuses([]);
     videoHook.setVideoResults([]);
