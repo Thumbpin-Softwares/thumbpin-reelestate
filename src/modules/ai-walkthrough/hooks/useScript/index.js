@@ -3,7 +3,24 @@ import { toast } from 'sonner';
 import { compressImage } from '../../helpers/fileHelpers';
 import { AMENITIES, MAX_SCRIPT } from '@/utils/constants';
 
-export const useScript = (selectedCompositeArray, propertyBrief) => {
+async function buildReferenceFile(reference, filenamePrefix, index) {
+  if (!reference) return null;
+  if (reference.file instanceof File) return reference.file;
+  if (typeof reference.url === 'string' && reference.url.startsWith('data:')) {
+    const response = await fetch(reference.url);
+    const blob = await response.blob();
+    return new File([blob], `${filenamePrefix}-${index}.png`, { type: blob.type || 'image/png' });
+  }
+  if (typeof reference.url === 'string') {
+    const response = await fetch(reference.url);
+    const blob = await response.blob();
+    return new File([blob], `${filenamePrefix}-${index}.png`, { type: blob.type || 'image/png' });
+  }
+  if (reference instanceof File) return reference;
+  return null;
+}
+
+export const useScript = (selectedLocationArray, propertyBrief, videoHookSettings = {}, avatarReferences = []) => {
   const [script, setScript] = useState("");
   const [batchScripts, setBatchScripts] = useState([]);
   const [structuredScripts, setStructuredScripts] = useState([]);
@@ -19,11 +36,11 @@ export const useScript = (selectedCompositeArray, propertyBrief) => {
   const [allowEmotionTags, setAllowEmotionTags] = useState(true);
   const [generatingScript, setGeneratingScript] = useState(false);
   
-  // Dynamic: one script per selected composite
-  const isBatchMode = selectedCompositeArray.length > 1;
+  // Dynamic: one script per selected location photo
+  const isBatchMode = selectedLocationArray.length > 1;
 
   const isStep2Valid = (compositeCount) => {
-    const count = compositeCount || selectedCompositeArray.length;
+    const count = compositeCount || selectedLocationArray.length;
     if (count === 0) return false;
     
     // Check we have enough scripts (AI or manual) for each composite
@@ -41,7 +58,7 @@ export const useScript = (selectedCompositeArray, propertyBrief) => {
   
   // Get the final script for each composite (AI or manual, with manual having preference)
   const getFinalScripts = () => {
-    const count = selectedCompositeArray.length;
+    const count = selectedLocationArray.length;
     const finals = [];
     for (let i = 0; i < count; i++) {
       const isManual = useManualForIndex[i];
@@ -73,8 +90,8 @@ export const useScript = (selectedCompositeArray, propertyBrief) => {
   };
 
   const handleGenerateScript = async () => {
-    if (selectedCompositeArray.length === 0) {
-      toast.error("Please select at least one composite");
+    if (selectedLocationArray.length === 0) {
+      toast.error("Please select at least one location photo");
       return;
     }
     
@@ -93,37 +110,48 @@ export const useScript = (selectedCompositeArray, propertyBrief) => {
           .join(", "),
       };
       
-      // Prepare all composite images as references
+      // Prepare all location photos and avatar references as inputs
       const fd = new FormData();
       fd.append("propertyBrief", JSON.stringify(enrichedBrief));
       fd.append("language", language);
       fd.append("tone", scriptTone);
       fd.append("allowEmotionTags", String(allowEmotionTags));
       
-      // Add ALL selected composites as reference images
-      fd.append("compositeCount", String(selectedCompositeArray.length));
-      for (let i = 0; i < selectedCompositeArray.length; i++) {
-        fd.append(`compositeImage_${i}`, selectedCompositeArray[i].file);
-        // Also add angle information for each composite
-        if (selectedCompositeArray[i].avatarAngle) {
-          fd.append(`compositeAngle_${i}`, selectedCompositeArray[i].avatarAngle);
+      fd.append("locationCount", String(selectedLocationArray.length));
+      for (let i = 0; i < selectedLocationArray.length; i++) {
+        const locationFile = await buildReferenceFile(selectedLocationArray[i], "location", i);
+        if (locationFile) {
+          fd.append(`locationImage_${i}`, locationFile);
+        }
+        if (selectedLocationArray[i].avatarAngle) {
+          fd.append(`locationAngle_${i}`, selectedLocationArray[i].avatarAngle);
         }
       }
       
-      // Add metadata about the angles available
-      const availableAngles = selectedCompositeArray
+      // Add metadata about the location labels available
+      const availableAngles = selectedLocationArray
         .map(c => c.avatarAngle)
         .filter(Boolean)
         .join(", ");
-      fd.append("availableAngles", availableAngles);
+      if (availableAngles) fd.append("availableAngles", availableAngles);
+
+      if (avatarReferences.length > 0) {
+        fd.append("avatarCount", String(avatarReferences.length));
+        for (let i = 0; i < avatarReferences.length; i++) {
+          const avatarFile = await buildReferenceFile(avatarReferences[i], "avatar", i);
+          if (avatarFile) {
+            fd.append(`avatarImage_${i}`, avatarFile);
+          }
+        }
+      }
       
       // Add user intent if provided (shared across all)
       if (script.trim()) {
         fd.append("userIntent", script.trim());
       }
       
-      // Per-composite manual intents (these get preference in script generation)
-      for (let i = 0; i < selectedCompositeArray.length; i++) {
+      // Per-location manual intents (these get preference in script generation)
+      for (let i = 0; i < selectedLocationArray.length; i++) {
         if (manualScripts[i] && manualScripts[i].trim()) {
           fd.append(`userIntent_${i}`, manualScripts[i].trim());
         }
@@ -135,6 +163,10 @@ export const useScript = (selectedCompositeArray, propertyBrief) => {
       if (customClosingHook.trim()) {
         fd.append("customClosingHook", customClosingHook.trim());
       }
+      // Pass duration so word budget scales for Seedance long-form clips
+      if (videoHookSettings.seedanceDuration && videoHookSettings.videoEngine === "seedance") {
+        fd.append("duration", String(videoHookSettings.seedanceDuration));
+      }
       
       const res = await fetch("/api/real-estate-video/generate-script", { 
         method: "POST", 
@@ -144,36 +176,30 @@ export const useScript = (selectedCompositeArray, propertyBrief) => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Script generation failed");
       
-      // Process the response - expect N scripts (one per composite)
-      const N = selectedCompositeArray.length;
+      // Process the response - expect N prompts (one per location photo)
+      const N = selectedLocationArray.length;
       let generatedScripts = [];
       
-      if (data.scripts && Array.isArray(data.scripts)) {
-        // Batch API returns [{hook, walkthrough, cta, fullScript}, ...]
-        generatedScripts = data.scripts.map((s, idx) => ({
+      if (data.prompts && Array.isArray(data.prompts)) {
+        // Batch API returns [{prompt: "full KLING prompt"}, ...]
+        generatedScripts = data.prompts.map((item, idx) => ({
           id: idx,
           type: `clip_${idx + 1}`,
-          title: `Clip ${idx + 1} of ${data.scripts.length}`,
+          title: `Property ${idx + 1} of ${data.prompts.length}`,
           compositeIndex: idx,
-          position: idx === 0 ? "first" : idx === data.scripts.length - 1 ? "last" : "middle",
-          hook: (s.hook || "").trim(),
-          walkthrough: (s.walkthrough || "").trim(),
-          cta: (s.cta || "").trim(),
-          fullScript: (s.fullScript || [s.hook, s.walkthrough, s.cta].filter(Boolean).join(" ")).trim(),
+          position: idx === 0 ? "first" : idx === data.prompts.length - 1 ? "last" : "middle",
+          fullScript: (item.prompt || "").trim(),
           references: N,
         }));
-      } else if (data.script) {
-        // Single script response
+      } else if (data.prompt) {
+        // Single prompt response - new format with only fullScript
         generatedScripts = [{
           id: 0,
           type: "clip_1",
-          title: "Clip 1 of 1",
+          title: "Property 1 of 1",
           compositeIndex: 0,
           position: "only",
-          fullScript: data.script.fullScript || data.script,
-          hook: data.script.hook || "",
-          walkthrough: data.script.walkthrough || "",
-          cta: data.script.cta || "",
+          fullScript: data.prompt.trim(),
           references: 1,
         }];
       }
@@ -183,10 +209,10 @@ export const useScript = (selectedCompositeArray, propertyBrief) => {
         generatedScripts.push({
           id: generatedScripts.length,
           type: `clip_${generatedScripts.length + 1}`,
-          title: `Clip ${generatedScripts.length + 1} of ${N}`,
+          title: `Property ${generatedScripts.length + 1} of ${N}`,
           compositeIndex: generatedScripts.length,
           position: generatedScripts.length === N - 1 ? "last" : "middle",
-          fullScript: "Discover this amazing property with stunning features and modern amenities.",
+          fullScript: "🎬 KLING AI PROMPT — 8 SEC LUXURY PROPERTY AD\n\n[Generate a detailed prompt for this property]",
           references: N,
         });
       }
@@ -209,7 +235,8 @@ export const useScript = (selectedCompositeArray, propertyBrief) => {
         return next;
       });
       
-      toast.success(`Generated ${generatedScripts.length} script${generatedScripts.length > 1 ? 's' : ''} with continuation flow!`);
+      toast.success(`Generated ${generatedScripts.length} KLING prompt${generatedScripts.length > 1 ? 's' : ''}!`);
+      
       
     } catch (err) {
       console.error("Script generation error:", err);
@@ -221,7 +248,7 @@ export const useScript = (selectedCompositeArray, propertyBrief) => {
 
   const regenerateSingleScript = async (scriptIndex) => {
     // Regenerate just one clip's script while keeping the others
-    if (!selectedCompositeArray.length || !selectedCompositeArray[scriptIndex]) return;
+    if (!selectedLocationArray.length || !selectedLocationArray[scriptIndex]) return;
     
     setGeneratingScript(true);
     
@@ -244,11 +271,24 @@ export const useScript = (selectedCompositeArray, propertyBrief) => {
       fd.append("tone", scriptTone);
       fd.append("allowEmotionTags", String(allowEmotionTags));
       
-      // Single composite for single regeneration
-      fd.append("compositeImage", selectedCompositeArray[scriptIndex].file);
+      // Single location photo for single regeneration
+      const locationFile = await buildReferenceFile(selectedLocationArray[scriptIndex], "location", scriptIndex);
+      if (locationFile) {
+        fd.append("locationImage", locationFile);
+      }
+
+      if (avatarReferences.length > 0) {
+        fd.append("avatarCount", String(avatarReferences.length));
+        for (let i = 0; i < avatarReferences.length; i++) {
+          const avatarFile = await buildReferenceFile(avatarReferences[i], "avatar", i);
+          if (avatarFile) {
+            fd.append(`avatarImage_${i}`, avatarFile);
+          }
+        }
+      }
       
       // Include position context for continuation
-      const N = selectedCompositeArray.length;
+      const N = selectedLocationArray.length;
       const position = N === 1 ? "only" : scriptIndex === 0 ? "first" : scriptIndex === N - 1 ? "last" : "middle";
       fd.append("clipPosition", position);
       fd.append("clipIndex", String(scriptIndex));

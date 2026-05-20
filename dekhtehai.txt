@@ -1,0 +1,17 @@
+{
+    "success": true,
+    "scripts": [
+        {
+            "hook": "{{excited}} क्या आपने ऐसा घर देखा है?",
+            "walkthrough": "{{happy}} ये लग्जरी और कंफर्ट का एकदम परफेक्ट मेल है।",
+            "cta": "{{confident}} चलिए अंदर!",
+            "fullScript": "Medium-wide Steadicam push-in focusing on a modern reading nook with a blue armchair. The presenter in a tan dress smiles and begins speaking naturally. \"{{excited}} क्या आपने ऐसा घर देखा है? {{happy}} ये लग्जरी और कंफर्ट का एकदम परफेक्ट मेल है। {{confident}} चलिए अंदर!\" After finishing the line, she turns and walks gracefully off-screen to the right as the camera lingers on the stylish interior décor."
+        },
+        {
+            "hook": "{{calm}} यहाँ की शांति बेमिसाल है।",
+            "walkthrough": "{{warm}} ये सिर्फ एक घर नहीं, आपका नया प्रीमियम लाइफस्टाइल है।",
+            "cta": "{{confident}} अभी बुक करें!",
+            "fullScript": "The camera tracks laterally as the presenter enters from the left into a bright, upscale living room with floor-to-ceiling windows. She stops in the center, gesturing elegantly towards the airy layout and contemporary wooden coffee table. \"{{calm}} यहाँ की शांति बेमिसाल है। {{warm}} ये सिर्फ एक घर नहीं, आपका नया प्रीमियम लाइफस्टाइल है। {{confident}} अभी बुक करें!\" The clip concludes with a slow, cinematic zoom-out as she stands poised and smiles, letting the high-end space breathe."
+        }
+    ]
+}

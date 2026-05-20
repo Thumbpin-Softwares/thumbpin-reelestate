@@ -29,7 +29,7 @@ export const Step1Composites = ({ compositesHook, onNext, onBack, isValid }) => 
     <div className="space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
       <div className="flex items-center gap-2">
         <Layers className="w-4 h-4 text-primary" />
-        <span className="text-sm font-semibold">Select Composites</span>
+        <span className="text-sm font-semibold">Select Location Photos</span>
         {composites.length > 1 && (
           <Badge variant="outline" className="text-[10px] ml-auto">
             {selectedCompositeIndices.size}/{composites.length} selected
@@ -37,7 +37,7 @@ export const Step1Composites = ({ compositesHook, onNext, onBack, isValid }) => 
         )}
       </div>
       <p className="text-xs text-muted-foreground">
-        Select <strong>one or more</strong> composites to generate videos for. Multiple selections = batch walkthrough with continuation scripts!
+        Select <strong>one or more</strong> location photos to generate videos for. Multiple selections = batch walkthrough with continuation scripts!
       </p>
 
       {generatingComposites && (
@@ -155,7 +155,7 @@ export const Step1Composites = ({ compositesHook, onNext, onBack, isValid }) => 
               onClick={retryCompositeGeneration} 
               className="cursor-pointer text-xs gap-1"
             >
-              <RotateCcw className="w-3 h-3" /> Regenerate All Composites
+              <RotateCcw className="w-3 h-3" /> Refresh Location References
             </Button>
           </div>
         </>

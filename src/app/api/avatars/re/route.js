@@ -11,6 +11,9 @@
 import { ListObjectsV2Command, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { NextResponse } from "next/server";
 import { s3, BUCKET } from "@/lib/r2";
+import dbConnect from "@/lib/mongodb";
+import Asset from "@/models/Asset";
+import { getResolvedUserId } from "@/lib/user-resolver";
 
 const IMAGE_EXTS = new Set([".png", ".jpg", ".jpeg", ".webp"]);
 const RE_PREFIX = "Avatars/RE/";
@@ -21,8 +24,36 @@ function isImage(key) {
   return IMAGE_EXTS.has(key.slice(dot).toLowerCase());
 }
 
-export async function GET() {
+export async function GET(request) {
   try {
+    // 1. Fetch custom avatars for the current authenticated user from MongoDB
+    let customAvatars = [];
+    try {
+      const userId = await getResolvedUserId(request);
+      if (userId) {
+        await dbConnect();
+        const dbAssets = await Asset.find({ userId, type: "avatar" }).sort({ createdAt: -1 });
+        customAvatars = dbAssets.map((asset) => ({
+          id: asset._id.toString(),
+          name: asset.name || "Custom Agent",
+          coverImage: asset.url,
+          imageCount: 1,
+          images: [
+            {
+              url: asset.url,
+              key: asset._id.toString(),
+              index: 0,
+              displayName: asset.name || "Custom"
+            }
+          ],
+          isCustom: true,
+          lastModified: asset.createdAt,
+        }));
+      }
+    } catch (err) {
+      console.warn("[RE Avatars] Failed to fetch custom database avatars:", err.message);
+    }
+
     const allObjects = [];
     let continuationToken;
 
@@ -94,8 +125,8 @@ export async function GET() {
       }
     }
 
-    // Build final avatar list — collections first, then ungrouped
-    const avatars = [];
+    // Build final avatar list — custom first, then collections, then ungrouped
+    const avatars = [...customAvatars];
     let index = 1;
 
     for (const [, collection] of collectionsMap) {

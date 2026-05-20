@@ -57,43 +57,7 @@ export async function POST(request) {
       odia: "Deliver the voice in fluent Odia with a smooth, natural delivery.",
     };
 
-    const prompt = `You are an expert voice casting director specializing in real estate video content and property showcase videos.
-
-Look at this image of a person presenting a property. They will speak the following script in a short property showcase video:
-
-SCRIPT: "${script}"
-
-LANGUAGE / DELIVERY REQUIREMENT:
-${languageGuides[language] || languageGuides.hindi}
-
-Based on:
-1. The person's apparent gender, age, ethnicity, and overall vibe from the image
-2. The tone and content of the script — it's a real estate property showcase
-3. How the BEST real estate content creators on Instagram and YouTube sound — confident, warm, authoritative, aspirational
-
-Generate a DETAILED voice description prompt. The voice must sound like a CONFIDENT REAL ESTATE PROFESSIONAL who makes properties sound irresistible — warm but authoritative, aspirational but genuine.
-
-FORMAT — Return a single paragraph with ALL of these attributes, comma-separated:
-- Gender and age range
-- Accent type (be specific — e.g., "neutral Indian-English accent", "polished urban Hindi-English mix")
-- Pitch level and VARIATION (e.g., "medium pitch that drops for authoritative statements and rises with excitement when revealing features")
-- Tone quality (warm, confident, rich, authoritative, inviting, etc.)
-- Emotional delivery — describe the arc: opens with hook energy (attention-grabbing), transitions to smooth confident walkthrough, ends with aspirational close
-- Speaking style: confident real estate presenter — like a top luxury property YouTuber, NOT a stiff news anchor
-- Vocal expressiveness cues (e.g., "slight dramatic pause before revealing a key feature, voice drops to intimate/warm when describing the view, rises with genuine excitement for spacious rooms")
-- Pacing: measured but engaging — slightly slower for premium feel, speeds up subtly for exciting features, deliberate pauses for emphasis
-- Energy level: confident and warm — the energy of someone who genuinely LOVES showing beautiful spaces
-- Natural vocal habits (slight smile in voice when describing aspirational features, warm breath before hook delivery)
-- RECORDING QUALITY (CRITICAL): dry close-mic (6 inches from mouth), zero reverb, zero echo, zero surround sound, zero robotic artifacts, warm natural chest resonance, subtle lip-smack between sentences, natural sibilance on 's' sounds, soft room ambient hum (NOT dead digital silence), natural dynamic range
-- Background ambience: very soft natural room tone ONLY, NO music, NO echo, NO surround sound, intimate close-mic presence
-
-CRITICAL RULES:
-1. Return ONLY the voice description paragraph. No headers, no explanations.
-2. The voice MUST sound like a REAL human recording — absolutely ZERO robotic, metallic, or synthetic qualities.
-3. This is a REAL ESTATE presenter, not a product reviewer — the voice should convey authority and aspiration.
-
-EXAMPLE OUTPUT:
-"Male, age 30-38, polished neutral Indian-English accent with confident urban inflection, medium-low pitch that drops to authoritative depth when stating facts about the property and rises with warm excitement when revealing views or premium features, rich and confident tone with natural warmth, delivery opens with a dramatic attention-grabbing hook then transitions to smooth confident walkthrough narration and closes with aspirational warmth, professional real estate presenter style like a top luxury property YouTuber who makes every space feel like home, slight dramatic pause before revealing the master bedroom view with voice dropping to intimate warmth, measured pacing around 140 words per minute with deliberate pauses for emphasis on square footage and price points, confident warm energy of someone who genuinely loves showing beautiful spaces and wants you to picture yourself living there, recorded on a dry close-mic with zero reverb and zero echo, warm chest resonance with natural sibilance, subtle lip-smack between phrases, very soft room ambient hum, natural dynamic range with confident louder delivery for hooks and softer intimate tone for aspirational closing, absolutely no robotic or metallic artifacts."`;
+    const prompt = `Voice casting director for real estate video. Analyze the person in this image.\nScript they will speak: "${script}"\nLanguage/delivery: ${languageGuides[language] || languageGuides.hindi}\n\nReturn ONE paragraph, comma-separated, covering: gender + age range, specific accent, pitch variation, tone quality, emotional delivery arc (hook energy → smooth walkthrough → aspirational close), vocal expressiveness cues, pacing ~140 wpm, energy level, and recording quality (dry close-mic, zero reverb/echo/robotic artifacts, warm chest resonance, natural dynamic range, soft room tone only — no music/surround sound).\nReturn ONLY the paragraph. No headers, no explanations.`;
 
     const ai = new GoogleGenAI({ apiKey });
 

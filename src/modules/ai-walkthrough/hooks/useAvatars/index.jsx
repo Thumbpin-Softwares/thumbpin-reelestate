@@ -8,7 +8,8 @@ export const useAvatars = () => {
   const [selectedAvatars, setSelectedAvatars] = useState([]);
   // Track which collection is selected (for prebuilt mode)
   const [selectedCollectionId, setSelectedCollectionId] = useState(null);
-  const [uploadedAvatarFile, setUploadedAvatarFile] = useState(null);
+  const [uploadedAvatarFile, setUploadedAvatarFile] = useState(null); // Keep for compatibility
+  const [uploadedAvatarFiles, setUploadedAvatarFiles] = useState([]);
   const [avatarPrompt, setAvatarPrompt] = useState("");
   const [avatarVariantCount, setAvatarVariantCount] = useState(3);
   const [generatedAvatars, setGeneratedAvatars] = useState([]);
@@ -20,27 +21,156 @@ export const useAvatars = () => {
   const [lightboxUrl, setLightboxUrl] = useState(null);
 
   // Fetch RE avatars (now returns collections)
-  useEffect(() => {
-    if (avatarMode !== "prebuilt") return;
-    let cancelled = false;
+  const fetchReAvatars = async () => {
     setReAvatarsLoading(true);
     setReAvatarsError(null);
-    
-    fetch("/api/avatars/re")
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return;
-        setReAvatars(data.avatars ?? []);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        console.error("[RE Avatars] fetch error:", err);
-        setReAvatarsError("Failed to load avatars");
-      })
-      .finally(() => { if (!cancelled) setReAvatarsLoading(false); });
-      
-    return () => { cancelled = true; };
-  }, [avatarMode]);
+    try {
+      const res = await fetch("/api/avatars/re");
+      const data = await res.json();
+      setReAvatars(data.avatars ?? []);
+    } catch (err) {
+      console.error("[RE Avatars] fetch error:", err);
+      setReAvatarsError("Failed to load avatars");
+    } finally {
+      setReAvatarsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchReAvatars();
+  }, []);
+
+  const handleUploadFile = async (file) => {
+    if (!file) return;
+    if (uploadedAvatarFiles.length >= 5) {
+      toast.error("You can upload up to 5 custom presenters.");
+      return;
+    }
+
+    const id = `upload-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const localUrl = URL.createObjectURL(file);
+    const newUpload = {
+      id,
+      file,
+      url: localUrl,
+      name: file.name ? file.name.replace(/\.[^/.]+$/, "") : "Custom Presenter",
+      isUploading: false,
+      isSaved: false
+    };
+
+    const updatedFiles = [...uploadedAvatarFiles, newUpload];
+    setUploadedAvatarFiles(updatedFiles);
+
+    // If it's the first or only file uploaded, auto-select it!
+    if (updatedFiles.length === 1) {
+      await selectUploadedAvatar(newUpload, updatedFiles);
+    }
+  };
+
+  const selectUploadedAvatar = async (uploadObj, currentFiles = uploadedAvatarFiles) => {
+    if (uploadObj.isUploading) return;
+
+    // If it's already saved to the database/R2, select it immediately
+    if (uploadObj.isSaved) {
+      const avatarObj = {
+        url: uploadObj.url,
+        file: uploadObj.file,
+        name: uploadObj.name,
+        key: uploadObj.id,
+        angle: "front",
+      };
+      setSelectedAvatars([avatarObj]);
+      // For backward compatibility
+      setUploadedAvatarFile(uploadObj.file);
+      return;
+    }
+
+    // Mark as uploading
+    setUploadedAvatarFiles((prev) =>
+      prev.map((f) => (f.id === uploadObj.id ? { ...f, isUploading: true } : f))
+    );
+
+    try {
+      toast.info(`Saving "${uploadObj.name}" to your Asset Library...`);
+      const formData = new FormData();
+      formData.append("file", uploadObj.file);
+      formData.append("name", uploadObj.name);
+      formData.append("type", "avatar");
+      formData.append("category", "avatars");
+
+      const res = await fetch("/api/assets/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Upload failed");
+      }
+
+      const data = await res.json();
+      const savedAsset = data.asset;
+
+      // Update state with permanent URL and saved status
+      setUploadedAvatarFiles((prev) =>
+        prev.map((f) =>
+          f.id === uploadObj.id
+            ? {
+                ...f,
+                url: savedAsset.url,
+                isUploading: false,
+                isSaved: true,
+                id: savedAsset._id || savedAsset.id,
+              }
+            : f
+        )
+      );
+
+      const avatarObj = {
+        url: savedAsset.url,
+        file: uploadObj.file,
+        name: savedAsset.name,
+        key: savedAsset._id || savedAsset.id,
+        angle: "front",
+      };
+
+      setSelectedAvatars([avatarObj]);
+      // Update backward compatibility uploadedAvatarFile
+      setUploadedAvatarFile(uploadObj.file);
+      toast.success(`"${savedAsset.name}" saved to library!`);
+
+      // Refetch the database+S3 list so the avatar appears in "RE Agents" list!
+      fetchReAvatars();
+    } catch (err) {
+      setUploadedAvatarFiles((prev) =>
+        prev.map((f) => (f.id === uploadObj.id ? { ...f, isUploading: false } : f))
+      );
+      toast.error("Failed to save avatar to Asset Library", { description: err.message });
+    }
+  };
+
+  const toggleUploadedAvatar = async (uploadObj) => {
+    const isSelected = selectedAvatars.some(
+      (a) => a.key === uploadObj.id || a.url === uploadObj.url
+    );
+    if (isSelected) {
+      clearSelectedAvatars();
+    } else {
+      await selectUploadedAvatar(uploadObj);
+    }
+  };
+
+  const removeUploadedAvatar = (id) => {
+    setUploadedAvatarFiles((prev) => prev.filter((f) => f.id !== id));
+    setSelectedAvatars((prev) => {
+      const isSelected = prev.some((a) => a.key === id);
+      if (isSelected) {
+        setUploadedAvatarFile(null);
+        return [];
+      }
+      return prev;
+    });
+  };
 
   // Select an avatar collection (prebuilt mode) — max 1
   // All images in the collection become selectedAvatars
@@ -158,6 +288,13 @@ export const useAvatars = () => {
     lightboxUrl,
     setLightboxUrl,
     handleGenerateAvatars,
-    selectAvatarFromGeneration
+    selectAvatarFromGeneration,
+    uploadedAvatarFiles,
+    setUploadedAvatarFiles,
+    handleUploadFile,
+    selectUploadedAvatar,
+    toggleUploadedAvatar,
+    removeUploadedAvatar,
+    fetchReAvatars
   };
 };

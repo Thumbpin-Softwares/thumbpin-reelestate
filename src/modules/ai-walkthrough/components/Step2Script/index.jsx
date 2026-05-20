@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { FileText, Loader2, PenLine, Sparkles, RotateCcw, ArrowRight, ArrowLeft, Video } from "lucide-react";
+import { FileText, Loader2, PenLine, Sparkles, RotateCcw, ArrowRight, ArrowLeft, Video, Zap, Volume2, VolumeX } from "lucide-react";
 import { LANGUAGES, TONES, MAX_SCRIPT, CLOSING_HOOK_OPTIONS } from "@/utils/constants";
 
 export const Step2Script = ({ compositesHook, scriptHook, videoHook, onBack, onGenerate, isValid }) => {
@@ -38,7 +38,20 @@ export const Step2Script = ({ compositesHook, scriptHook, videoHook, onBack, onG
     regenerateSingleScript,
   } = scriptHook;
 
-  const { generating } = videoHook;
+  const {
+    generating,
+    videoEngine,
+    setVideoEngine,
+    seedanceDuration,
+    setSeedanceDuration,
+    seedanceResolution,
+    setSeedanceResolution,
+    seedanceAudio,
+    setSeedanceAudio,
+  } = videoHook;
+
+  const SEEDANCE_DURATIONS = ["5", "8", "10", "12"];
+  const SEEDANCE_RESOLUTIONS = ["480p", "720p", "1080p"];
 
   const N = selectedCompositeArray.length;
   const hasScripts = structuredScripts.length > 0;
@@ -50,13 +63,13 @@ export const Step2Script = ({ compositesHook, scriptHook, videoHook, onBack, onG
         <FileText className="w-4 h-4 text-primary" />
         <span className="text-sm font-semibold">Script & Generate</span>
         <Badge className="gradient-bg text-white border-0 text-[10px]">
-          {selectedCompositeArray.length} Reference Angles
+          {selectedCompositeArray.length} Location Photos
         </Badge>
       </div>
 
       {/* Selected composites preview strip */}
       <div className="space-y-2">
-        <Label className="text-xs text-muted-foreground">Reference Material ({selectedCompositeArray.length} composites)</Label>
+        <Label className="text-xs text-muted-foreground">Reference Material ({selectedCompositeArray.length} location photos)</Label>
         <div className="flex gap-2 overflow-x-auto pb-1">
           {selectedCompositeArray.map((comp, i) => (
             <div key={i} className="flex items-center gap-2 rounded-xl border border-border/50 p-1.5 bg-card/50 shrink-0">
@@ -123,6 +136,131 @@ export const Step2Script = ({ compositesHook, scriptHook, videoHook, onBack, onG
         </span>
       </div>
 
+      {/* ── Video Engine Selector ────────────────────────────────────── */}
+      <div className="space-y-3">
+        <Label className="text-xs">Video Generation Engine</Label>
+        <div className="grid grid-cols-2 gap-3">
+          {/* Veo card */}
+          <button
+            onClick={() => setVideoEngine("veo")}
+            className={`group relative flex flex-col gap-1.5 rounded-xl border-2 p-3 text-left transition-all cursor-pointer ${
+              videoEngine === "veo"
+                ? "border-primary bg-primary/8 shadow-sm"
+                : "border-border bg-card/50 hover:border-primary/40"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-sm ${
+                videoEngine === "veo" ? "gradient-bg text-white" : "bg-muted text-muted-foreground"
+              }`}>
+                🎬
+              </div>
+              <span className="text-xs font-semibold">Google Veo</span>
+              {videoEngine === "veo" && (
+                <span className="ml-auto text-[9px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">ACTIVE</span>
+              )}
+            </div>
+            <p className="text-[10px] text-muted-foreground leading-relaxed">
+              Premium cinematic quality. Best for luxury listings.
+            </p>
+            <p className="text-[9px] text-muted-foreground/60">~2–3 min per clip</p>
+          </button>
+
+          {/* Seedance card */}
+          <button
+            onClick={() => setVideoEngine("seedance")}
+            className={`group relative flex flex-col gap-1.5 rounded-xl border-2 p-3 text-left transition-all cursor-pointer ${
+              videoEngine === "seedance"
+                ? "border-violet-500 bg-violet-500/8 shadow-sm"
+                : "border-border bg-card/50 hover:border-violet-400/40"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                videoEngine === "seedance" ? "bg-violet-500 text-white" : "bg-muted text-muted-foreground"
+              }`}>
+                <Zap className="w-3.5 h-3.5" />
+              </div>
+              <span className="text-xs font-semibold">Seedance 1.5 Pro</span>
+              {videoEngine === "seedance" && (
+                <span className="ml-auto text-[9px] font-bold text-violet-600 bg-violet-500/15 px-1.5 py-0.5 rounded-full">ACTIVE</span>
+              )}
+            </div>
+            <p className="text-[10px] text-muted-foreground leading-relaxed">
+              Faster renders + native AI audio. Powered by fal.ai.
+            </p>
+            <p className="text-[9px] text-muted-foreground/60">~30–60s per clip</p>
+          </button>
+        </div>
+
+        {/* Seedance-specific settings */}
+        {videoEngine === "seedance" && (
+          <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-3 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
+            {/* Duration */}
+            <div className="space-y-1.5">
+              <Label className="text-[10px] text-violet-700 dark:text-violet-400 font-semibold">Clip Duration</Label>
+              <div className="flex gap-2">
+                {SEEDANCE_DURATIONS.map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => setSeedanceDuration(d)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                      seedanceDuration === d
+                        ? "bg-violet-500 text-white shadow-sm"
+                        : "border border-violet-300/30 text-muted-foreground hover:border-violet-400/50"
+                    }`}
+                  >
+                    {d}s
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Resolution */}
+            <div className="space-y-1.5">
+              <Label className="text-[10px] text-violet-700 dark:text-violet-400 font-semibold">Resolution</Label>
+              <div className="flex gap-2">
+                {SEEDANCE_RESOLUTIONS.map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => setSeedanceResolution(r)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                      seedanceResolution === r
+                        ? "bg-violet-500 text-white shadow-sm"
+                        : "border border-violet-300/30 text-muted-foreground hover:border-violet-400/50"
+                    }`}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Audio toggle */}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-semibold text-violet-700 dark:text-violet-400">Native AI Audio</p>
+                <p className="text-[9px] text-muted-foreground">Seedance generates speech from your script</p>
+              </div>
+              <button
+                onClick={() => setSeedanceAudio((v) => !v)}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer ${
+                  seedanceAudio ? "bg-violet-500" : "bg-muted-foreground/30"
+                }`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                  seedanceAudio ? "translate-x-4" : "translate-x-0.5"
+                }`} />
+              </button>
+            </div>
+
+            <p className="text-[9px] text-violet-600/70 dark:text-violet-400/70">
+              ✨ Voice characteristics from Step 2 are included in the generation prompt for consistent delivery.
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* User Intent Input (Optional) */}
       <div className="space-y-2">
         <Label className="text-xs">
@@ -131,7 +269,7 @@ export const Step2Script = ({ compositesHook, scriptHook, videoHook, onBack, onG
         <Textarea
           value={script}
           onChange={(e) => setScript(e.target.value.slice(0, MAX_SCRIPT))}
-          placeholder="e.g. 'mention the terrace view' or 'highlight the modern kitchen' — AI will incorporate this into both scripts"
+          placeholder="e.g. 'mention the terrace view' or 'highlight the modern kitchen' — AI will incorporate this into every location prompt"
           className="min-h-20 resize-none text-sm"
           maxLength={MAX_SCRIPT}
         />
@@ -178,7 +316,7 @@ export const Step2Script = ({ compositesHook, scriptHook, videoHook, onBack, onG
         className={`w-full cursor-pointer text-sm h-11 transition-all ${generatingScript ? 'bg-primary/5' : 'hover:bg-primary/5 hover:border-primary/50'}`}
       >
         {generatingScript ? (
-          <><Loader2 className="w-4 h-4 mr-2 animate-spin text-primary" /> Crafting {N} Script{N > 1 ? 's' : ''} with Continuation...</>
+          <><Loader2 className="w-4 h-4 mr-2 animate-spin text-primary" /> Crafting {N} Location Script{N > 1 ? 's' : ''} with Continuation...</>
         ) : (
           <><Sparkles className="w-4 h-4 mr-2 text-primary" /> ✨ Generate {N} Script{N > 1 ? 's' : ''} (1 per Composite){N > 1 ? ' with Transitions' : ''}</>
         )}
@@ -379,12 +517,18 @@ export const Step2Script = ({ compositesHook, scriptHook, videoHook, onBack, onG
           <Button 
             onClick={onGenerate} 
             disabled={!canGenerateFinalVideos || generating || generatingScript} 
-            className="gradient-bg text-white shadow-lg cursor-pointer px-10 h-10 font-semibold"
+            className={`text-white shadow-lg cursor-pointer px-10 h-10 font-semibold transition-all ${
+              videoEngine === "seedance"
+                ? "bg-violet-600 hover:bg-violet-700"
+                : "gradient-bg"
+            }`}
           >
             {generating ? (
               <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating {N} Video{N > 1 ? 's' : ''}...</>
+            ) : videoEngine === "seedance" ? (
+              <><Zap className="w-4 h-4 mr-2" /> Generate {N} Video{N > 1 ? 's' : ''} via Seedance</>
             ) : (
-              <><Video className="w-4 h-4 mr-2" /> Generate {N} Video{N > 1 ? 's' : ''}</>
+              <><Video className="w-4 h-4 mr-2" /> Generate {N} Video{N > 1 ? 's' : ''} via Veo</>
             )}
           </Button>
         </div>

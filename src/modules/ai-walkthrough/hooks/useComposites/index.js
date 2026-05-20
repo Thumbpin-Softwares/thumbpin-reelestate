@@ -2,6 +2,15 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { ensureFileObject, compressImage, dataUrlToFile } from '../../helpers/fileHelpers';
 
+async function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 export const useComposites = (propertyImages, selectedAvatars) => {
   const [composites, setComposites] = useState([]);
   const [generatingComposites, setGeneratingComposites] = useState(false);
@@ -37,12 +46,12 @@ export const useComposites = (propertyImages, selectedAvatars) => {
   const handleGenerateComposites = async () => {
     // Check if we have avatars and property images
     if (!selectedAvatars || selectedAvatars.length === 0) {
-      toast.error("Please select at least one avatar");
+      toast.error("Please select at least one avatar collection or presenter");
       return;
     }
-    
+
     if (propertyImages.length === 0) {
-      toast.error("Please upload at least one property image");
+      toast.error("Please upload at least one location photo");
       return;
     }
     
@@ -52,92 +61,33 @@ export const useComposites = (propertyImages, selectedAvatars) => {
     setCompositeGenerationTotal(propertyImages.length);
     
     try {
-      // Process all selected avatars
-      const avatarFiles = [];
-      for (let i = 0; i < selectedAvatars.length; i++) {
-        const avatar = selectedAvatars[i];
-        let avatarFile;
-        
-        if (avatar.file) {
-          avatarFile = await ensureFileObject(avatar.file);
-          avatarFile = await compressImage(avatarFile);
-        } else if (avatar.url) {
-          avatarFile = await ensureFileObject(avatar.url);
-          avatarFile = await compressImage(avatarFile);
-        }
-        
-        if (!avatarFile) {
-          throw new Error(`Failed to process avatar image ${i + 1}`);
-        }
-        
-        avatarFiles.push({
-          file: avatarFile,
-          name: avatar.name || `Avatar ${i + 1}`,
-          angle: avatar.angle || i === 0 ? "front" : i === 1 ? "three-quarter" : "side"
-        });
-      }
-
       const results = [];
-      
-      // Use the FIRST (cover) avatar pose for compositing.
-      // Extra poses in the collection are visual references only — NOT separate composites.
-      const primaryAvatar = avatarFiles[0];
-      
-      // Generate exactly 1 composite per property image
+
+      // Normalize each location photo into a local reference card.
       for (let propIdx = 0; propIdx < propertyImages.length; propIdx++) {
-        // Process property image
         let propertyFile = await ensureFileObject(propertyImages[propIdx]);
         if (!propertyFile) {
-          throw new Error(`Failed to process property image ${propIdx + 1}`);
+          throw new Error(`Failed to process location photo ${propIdx + 1}`);
         }
-        
+
         const compressedProperty = await compressImage(propertyFile);
-        
-        toast.info(`Creating composite ${propIdx + 1}/${propertyImages.length}...`, 
-          { id: "composite-progress" }
-        );
-        
-        const fd = new FormData();
-        fd.append("avatarImage", primaryAvatar.file);
-        fd.append("propertyImage", compressedProperty);
-
-        const res = await fetch("/api/real-estate-video/composite", { 
-          method: "POST", 
-          body: fd 
-        });
-        
-        const contentType = res.headers.get("content-type");
-        let data;
-        if (contentType && contentType.includes("application/json")) {
-          data = await res.json();
-        }
-
-        if (!res.ok) {
-          if (res.status === 413) {
-            throw new Error("The images are too large. Please try smaller files.");
-          }
-          throw new Error(data?.error || `Composite failed with status ${res.status}`);
-        }
-
-        if (!data) {
-          throw new Error("Invalid response from server");
-        }
+        const referenceUrl = await fileToDataUrl(compressedProperty);
 
         const newComposite = {
-          url: data.compositeUrl,
-          file: dataUrlToFile(data.compositeUrl, `composite-${propIdx}.png`),
-          title: `${primaryAvatar.name} - Property ${propIdx + 1}`,
+          url: referenceUrl,
+          file: dataUrlToFile(referenceUrl, `location-${propIdx}.png`),
+          title: `Location Photo ${propIdx + 1}`,
           propertyIndex: propIdx,
           avatarIndex: 0,
-          avatarAngle: primaryAvatar.angle,
+          avatarAngle: selectedAvatars[0]?.angle || "front",
         };
 
         results.push(newComposite);
 
-        // Reveal each generated composite immediately so the user never waits for all of them.
+        // Reveal each location reference immediately so the user never waits for all of them.
         setComposites([...results]);
 
-        // Auto-select newly generated composites progressively (up to first 3).
+        // Auto-select newly prepared location references progressively (up to first 3).
         setSelectedCompositeIndices((prev) => {
           const next = new Set(prev);
           if (next.size < 3) next.add(propIdx);
@@ -145,10 +95,10 @@ export const useComposites = (propertyImages, selectedAvatars) => {
         });
       }
 
-      toast.success(`${results.length} composite(s) ready — select your favorites!`, { id: "composite-progress" });
+      toast.success(`${results.length} location reference(s) ready — select your favorites!`, { id: "composite-progress" });
     } catch (err) {
-      console.error('Composite generation error:', err);
-      toast.error("Composite generation failed", { description: err.message });
+      console.error('Location reference preparation error:', err);
+      toast.error("Reference preparation failed", { description: err.message });
     } finally {
       setGeneratingComposites(false);
       setCompositeGenerationTotal(0);

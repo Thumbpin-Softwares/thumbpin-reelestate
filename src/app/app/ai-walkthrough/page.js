@@ -42,18 +42,25 @@ function RealEstateVideoContent() {
   const { step, setStep } = useSession(sessionId, isClient);
   const propertyBriefHook = usePropertyBrief();
   const avatarHook = useAvatars();
-  
-  // FIX: Pass selectedAvatars (array) instead of selectedAvatar (single)
   const compositesHook = useComposites(propertyImages, avatarHook.selectedAvatars);
-  
+
+  // Engine settings lifted to page level so both scriptHook (word budget) and videoHook (routing) share them
+  const [videoEngine, setVideoEngine] = useState('veo');
+  const [seedanceDuration, setSeedanceDuration] = useState('5');
+  const [seedanceResolution, setSeedanceResolution] = useState('720p');
+  const [seedanceAudio, setSeedanceAudio] = useState(true);
+
   const scriptHook = useScript(
-    compositesHook.selectedCompositeArray, 
-    propertyBriefHook.propertyBrief
+    compositesHook.selectedCompositeArray,
+    propertyBriefHook.propertyBrief,
+    { videoEngine, seedanceDuration },
+    avatarHook.selectedAvatars
   );
   const videoHook = useVideoGeneration(
-    compositesHook.selectedCompositeArray, 
+    compositesHook.selectedCompositeArray,
     scriptHook,
-    sessionId
+    sessionId,
+    { videoEngine, setVideoEngine, seedanceDuration, setSeedanceDuration, seedanceResolution, setSeedanceResolution, seedanceAudio, setSeedanceAudio }
   );
 
   // ========== SESSION MANAGEMENT ==========

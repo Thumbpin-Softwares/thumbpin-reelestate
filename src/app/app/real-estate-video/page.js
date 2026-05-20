@@ -628,7 +628,7 @@ function RealEstateVideoContent() {
     setGeneratingScript(true);
     try {
       const fd = new FormData();
-      if (bgFile) fd.append("propertyImage", bgFile);
+      if (bgFile) fd.append("locationImage", bgFile);
       fd.append("language", scriptLanguage);
       fd.append("tone", scriptTone);
       fd.append("allowEmotionTags", allowEmotionTags ? "true" : "false");
@@ -643,8 +643,9 @@ function RealEstateVideoContent() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Script generation failed");
-      if (data.script) setScript(data.script);
-      if (data.scripts?.length) setScript(data.scripts[0]);
+      if (data.script?.fullScript) setScript(data.script.fullScript);
+      else if (typeof data.script === "string") setScript(data.script);
+      if (data.scripts?.length) setScript(data.scripts[0]?.fullScript || data.scripts[0] || "");
       toast.success("Script generated!");
     } catch (err) {
       toast.error("Script generation failed", { description: err.message });
@@ -692,7 +693,7 @@ function RealEstateVideoContent() {
         <div>
           <h1 className="text-2xl font-bold font-heading">Real Estate Video</h1>
           <p className="text-sm text-muted-foreground">
-            Generate a professional spokesperson video for any property — powered by HeyGen.
+            Generate a professional spokesperson video for any location photo — powered by HeyGen.
           </p>
         </div>
       </div>

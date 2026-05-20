@@ -337,35 +337,13 @@ async function generateVoicePromptInternal(ai, compositeInlineData, script, lang
   };
   const languageRule = languageRules[language] || languageRules.hindi;
 
-  const prompt = `You are an expert voice casting director for real estate video content.
+  const prompt = `Voice casting director for real estate video. Analyze the person in this image.
+They will speak: "${script}"
+Language/accent: ${languageRule}
+Emotion tags ({{happy}} etc.) shape delivery only — never spoken aloud.
 
-Look at this image of a person presenting a property. They will speak: "${script}"
-
-LANGUAGE / ACCENT REQUIREMENT:
-${languageRule}
-
-The script may include inline emotion tags like {{happy}}, {{sad}}, {{excited}}, {{calm}}. Use these tags to shape delivery, but do NOT speak the tags aloud.
-
-Generate a DETAILED voice description. The voice must sound like a CONFIDENT REAL ESTATE PROFESSIONAL — warm, authoritative, aspirational.
-The speaking style must be NATURAL and HUMAN — like a real presenter talking to camera, not a voice assistant.
-
-Return a single paragraph with ALL attributes comma-separated:
-- Gender and age range
-- Accent type (specific — e.g., "neutral Indian-English accent")
-- Pitch level and variation
-- Tone quality (warm, confident, rich, authoritative, inviting)
-- Emotional delivery arc: opens with hook energy, transitions to smooth walkthrough, ends aspirational
-- Expressive prosody: dynamic volume/pacing (slightly louder/faster on highlights, softer/slower on premium details), natural emphasis on key words
-- Speaking style: confident real estate presenter, NOT stiff
-- Vocal expressiveness (dramatic pauses before key features, voice drops for intimate moments)
-- Pacing: measured but engaging, ~140 wpm
-- RECORDING QUALITY (STRICT): dry close-mic (4-6 inches), studio-clean signal, zero reverb, zero echo, zero surrounding/room noise, zero crowd noise, zero wind noise, zero hiss/hum/buzz, zero surround sound, zero robotic artifacts, warm chest resonance, natural sibilance, natural dynamic range
-
-CRITICAL AUDIO OUTPUT RULE:
-- The final result must sound like a presenter speaking directly into a close mic in a treated room.
-- No "echo echo" effect, no distant-room tone, no hall ambience, no bathroom-like reflections.
-
-Return ONLY the voice description paragraph. No headers, no explanations.`;
+Return ONE paragraph, comma-separated, covering: gender + age range, specific accent, pitch variation, tone quality, emotional delivery arc (hook energy → smooth walkthrough → aspirational close), expressive prosody, pacing ~140 wpm, and recording quality (dry close-mic, zero reverb/echo/noise/robotic artifacts, warm chest resonance, natural dynamic range).
+Return ONLY the paragraph. No headers, no explanations.`;
 
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
@@ -388,125 +366,42 @@ function getDefaultVoicePrompt() {
  * Build a cinematic Veo prompt for real estate property showcase.
  */
 function buildVideoPrompt(script, voicePrompt, language = "hindi") {
-  const SKIN_TOKENS = `Photorealistic detail. Real human skin with visible natural texture, pores, and micro shadows. Preserve natural under-eye detail and realistic lip texture. No airbrushing or waxy finish. Authentic facial structure with natural micro-expressions and eye depth. Lighting behaves naturally with soft highlights and realistic shadows. High-detail editorial realism, grounded in real-world 4k camera capture.`;
-
-  const AUDIO_REALISM = `AUDIO REALISM (CRITICAL — NO ROBOTIC ARTIFACTS):
-- Voice must sound like a REAL human recording on a premium close mic (lavalier or boom) — warm, present, intimate
-- ZERO robotic artifacts: no metallic overtones, no synthetic buzz, no digital clipping
-- ZERO echo or reverb — dry, close-mic recording feel only
-- ZERO surrounding noise: no room reflections, no crowd, no traffic, no fan/AC noise, no wind, no hiss/hum
-- ZERO background sounds of any kind: no ending sound, no transition whoosh, no cinematic hits, no swells, no ambience bed, no foley tails
-- ZERO background voices: no second speaker, no chatter, no murmur, no off-screen dialogue
-- ONLY one clear voice track: the avatar/presenter voice and nothing else
-- Voice should have natural chest resonance and body
-- Natural expressive dynamics: slightly louder/faster on hooks & highlights, softer/slower on emotional or premium details
-- Preserve natural emotional shifts so delivery feels human and spontaneous`;
-
-  const VOICE_LINE = `VOICE CHARACTERISTICS: ${voicePrompt}
-- Lip movements must be perfectly synchronized with speech at all times`;
-
   const LANGUAGE_LINE = {
-    english: "The presenter speaks in clear Indian-English.",
-    hindi: "The presenter speaks in natural Hindi.",
-    hinglish: "The presenter speaks in natural Hinglish.",
-    marathi: "The presenter speaks in fluent Marathi.",
-    tamil: "The presenter speaks in fluent Tamil.",
-    telugu: "The presenter speaks in fluent Telugu.",
-    kannada: "The presenter speaks in fluent Kannada.",
-    malayalam: "The presenter speaks in fluent Malayalam.",
-    bengali: "The presenter speaks in fluent Bengali.",
-    gujarati: "The presenter speaks in fluent Gujarati.",
-    punjabi: "The presenter speaks in fluent Punjabi.",
-    urdu: "The presenter speaks in fluent Urdu.",
-    odia: "The presenter speaks in fluent Odia.",
-  }[language] || "The presenter speaks in natural Hindi.";
+    english: "Indian-English", hindi: "natural Hindi", hinglish: "natural Hinglish",
+    marathi: "fluent Marathi", tamil: "fluent Tamil", telugu: "fluent Telugu",
+    kannada: "fluent Kannada", malayalam: "fluent Malayalam", bengali: "fluent Bengali",
+    gujarati: "fluent Gujarati", punjabi: "fluent Punjabi", urdu: "fluent Urdu", odia: "fluent Odia",
+  }[language] || "natural Hindi";
 
-  const REALISM_FOOTER = `CRITICAL CONSTRAINTS:
-- The person, their clothing, the property, and the setting must EXACTLY match the reference image
-- No changes to appearance whatsoever
-- High-quality synchronized audio throughout
-- This must look and SOUND like a REAL professional real estate video — not AI-generated
-- Audio must be single-speaker clean close-mic only. Absolutely no background SFX/music/transition sounds/ambient tails.
-- Audio must be single-speaker clean close-mic only. Absolutely no background SFX/music/transition sounds/ending sounds/ambient tails.
-- ❌ ABSOLUTELY NO TEXT ON SCREEN — no captions, no subtitles, no titles, no overlays, no watermarks, no on-screen text of any kind. Clean video only.
-- ❌ NO GRAPHICS, NO LOGOS, NO UI ELEMENTS overlaid on the video
-- ${SKIN_TOKENS}`;
+  // Detect if script is already a cinematic director's brief from generate-script
+  const isCinematicPrompt = script.length > 120 || /camera|push.in|pull.back|dolly|handheld|whip.pan|presenter|shot/i.test(script);
 
-  // ── Detect cinematic prompt (generated by generate-script endpoint) ──────────
-  // A cinematic prompt is typically longer and contains camera/action language.
-  const isCinematicPrompt = script.length > 120 || /camera|push.in|pull.back|rack focus|dolly|handheld|whip.pan|presenter|shot/i.test(script);
-
-  const CAMERA_RULES = `CAMERA MOVEMENT RULES (CRITICAL — REAL ESTATE STYLE):
-- ❌ NEVER zoom into the presenter's face — no close-up face shots
-- ❌ NEVER use aggressive zoom, whip-pan, or shaky handheld camera
-- ❌ NEVER crop tight on the presenter — always show the property environment
-- ✅ Keep the presenter at MEDIUM to WIDE framing — the property is the star
-- ✅ Use SLOW, SMOOTH, ELEGANT camera movements — think luxury real estate cinematography
-- ✅ Steadicam-style tracking: slow lateral dolly, gentle push-in from wide, subtle tracking
-- ✅ Camera speed: very slow and deliberate — like a high-end property showcase
-- ✅ If following the presenter walking, maintain consistent medium-wide distance
-- ✅ Subtle depth-of-field: presenter sharp, property environment slightly soft but visible`;
+  const SHARED_CONSTRAINTS = `
+VOICE: ${voicePrompt}. Lip movements perfectly synced.
+Language: ${LANGUAGE_LINE}.
+AUDIO: Single presenter voice only — dry close-mic, zero reverb/echo/noise/SFX/music/background voices/robotic artifacts.
+VIDEO: Exactly match reference image (person, clothing, property). No text, captions, overlays, watermarks, or graphics on screen.
+SKIN: Photorealistic — natural texture, pores, micro-shadows, no airbrushing.
+CAMERA: Medium-to-wide framing, slow Steadicam-style movement. No face close-ups, no aggressive zoom or shaky cam.
+9:16 portrait. Must look and sound like a real professional real estate video.`;
 
   if (isCinematicPrompt) {
-    // The script IS already a director's brief — wrap with realism tokens and camera rules
-    return `Ultra-realistic real estate property showcase video in 9:16 portrait format for Instagram Reels / YouTube Shorts.
+    return `Ultra-realistic real estate showcase video, 9:16 portrait for Instagram Reels / YouTube Shorts.
 
 CINEMATIC DIRECTION:
 ${script}
-
-${CAMERA_RULES}
-
-${VOICE_LINE}
-
-${AUDIO_REALISM}
-
-${REALISM_FOOTER}`;
+${SHARED_CONSTRAINTS}`;
   }
 
-  // ── Fallback: plain dialogue — use original detailed template ──────────────
-  return `Ultra-realistic real estate property showcase video in 9:16 portrait format. This should look EXACTLY like a professional real estate influencer's property tour on Instagram Reels or YouTube Shorts. The person (exactly as seen in the reference image) is standing inside the property and presenting it directly to the camera with confident enthusiasm.
+  // Fallback: plain dialogue
+  return `Ultra-realistic real estate property showcase video, 9:16 portrait for Instagram Reels / YouTube Shorts.
+Presenter (exactly as in reference image) stands inside the property, speaks directly to camera with confident warmth.
 
-PRESENTER ENERGY & BODY LANGUAGE:
-- The presenter is CONFIDENT and WARM — like a top real estate creator who genuinely believes this is the perfect property
-- Professional warm smile — inviting and trustworthy
-- Confident hand gestures — sweeping arm movements to showcase the space, pointing to features, gesturing toward windows/views
-- Natural head movements — slight nods of approval, looking around the space then back to camera
-- Professional posture — confident stance, slight lean toward camera for intimate moments
-- At least ONE moment where they step to the side or gesture widely to reveal more of the space behind them
+Presenter energy: confident, warm smile, natural hand gestures showcasing the space, at least one moment stepping aside to reveal more of the room. Delivery: conversational, dynamic — faster on highlights, softer on premium details, meaningful pauses.
 
-SPEAKING STYLE (VERY IMPORTANT):
-- Natural conversational delivery — do not sound scripted, stiff, or robotic
-- Emotionally expressive and dynamic like a real property host
-- Slight speed/energy lift on highlight words, then softer delivery for premium details
-- Use meaningful pauses to let key points land
-
-PROPERTY SHOWCASE MOMENTS:
-- The property/space is clearly visible around and behind the presenter throughout
-- Natural light from windows enhances the premium feel
-- The property should look aspirational, well-lit, and inviting
-
-SPEECH AND AUDIO:
-- The person speaks the following with confident warmth and real estate presenter energy: "${script}"
-- ${LANGUAGE_LINE}
-- ${VOICE_LINE}
-- Delivery should feel professional but genuine — like a trusted advisor showing you your dream home
-- Hook delivery should be attention-grabbing — designed to stop the scroll
-
-${AUDIO_REALISM}
-
-VISUAL STYLE:
-- Cinematic real estate video quality — premium feel
-- Warm, golden natural lighting
-- SLOW, SMOOTH camera movement only — gentle drift, slow dolly, subtle pan
-- ❌ NO zoom to face, NO close-ups of the presenter, NO aggressive camera moves
-- ✅ MEDIUM to WIDE framing — always show the property environment around the presenter
-- Shallow depth of field — presenter sharp, background slightly softer
-- Color grading: warm, aspirational, premium
-- Think: luxury real estate cinematography, Steadicam-style elegance
-
-${CAMERA_RULES}
-
-${REALISM_FOOTER}`;
+Speech: "${script}" — in ${LANGUAGE_LINE}.
+Property visible around presenter throughout. Warm golden natural lighting. Aspirational, premium feel.
+${SHARED_CONSTRAINTS}`;
 }
 
 

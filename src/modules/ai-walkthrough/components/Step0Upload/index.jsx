@@ -56,6 +56,13 @@ export const Step0Upload = ({
     reAvatarsError,
     handleGenerateAvatars,
     selectAvatarFromGeneration,
+    uploadedAvatarFiles,
+    setUploadedAvatarFiles,
+    handleUploadFile,
+    selectUploadedAvatar,
+    toggleUploadedAvatar,
+    removeUploadedAvatar,
+    fetchReAvatars,
   } = avatarHook;
 
   const { getFilledCount, setPropertyDrawerOpen } = propertyBriefHook;
@@ -186,9 +193,15 @@ export const Step0Upload = ({
                         )}
 
                         {/* Collection Badge */}
-                        <Badge className="absolute top-3 right-3 bg-black/60 text-white border-0 text-[9px] backdrop-blur-md font-bold tracking-wider py-0.5">
-                          COLLECTION
-                        </Badge>
+                        {(collection.id?.startsWith("db-") || collection.id?.startsWith("legacy-")) ? (
+                          <Badge className="absolute top-3 right-3 bg-emerald-600 hover:bg-emerald-600 text-white border-0 text-[9px] font-bold tracking-wider py-0.5 px-1.5 shadow-sm">
+                            YOUR UPLOAD
+                          </Badge>
+                        ) : (
+                          <Badge className="absolute top-3 right-3 bg-black/60 text-white border-0 text-[9px] backdrop-blur-md font-bold tracking-wider py-0.5">
+                            COLLECTION
+                          </Badge>
+                        )}
 
                         {/* Info bar */}
                         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent px-3 py-4">
@@ -254,25 +267,93 @@ export const Step0Upload = ({
 
         {/* Upload Avatar */}
         {avatarMode === "upload" && (
-          <div className="space-y-4">
-            {uploadedAvatarFile ? (
-              <div className="relative rounded-xl overflow-hidden border border-border/50 shadow-md bg-card group max-w-[200px]">
-                <img src={URL.createObjectURL(uploadedAvatarFile)} alt="Avatar" className="w-full aspect-square object-cover" />
-                <button
-                  onClick={() => { setUploadedAvatarFile(null); clearSelectedAvatars(); }}
-                  className="absolute top-2 right-2 w-7 h-7 bg-black/60 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
-                >
-                  <X className="w-3.5 h-3.5 text-white" />
-                </button>
+          <div className="space-y-4 animate-in fade-in duration-300">
+            {/* Grid of uploaded avatars */}
+            {uploadedAvatarFiles.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Your Custom Presenters ({uploadedAvatarFiles.length}/5)</Label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  {uploadedAvatarFiles.map((upload) => {
+                    const isSelected = selectedAvatars.some(
+                      (a) => a.key === upload.id || a.url === upload.url
+                    );
+                    return (
+                      <div
+                        key={upload.id}
+                        onClick={() => toggleUploadedAvatar(upload)}
+                        className={`group relative rounded-2xl overflow-hidden border-2 transition-all cursor-pointer aspect-square ${
+                          isSelected
+                            ? "border-primary ring-4 ring-primary/20 scale-[1.02] shadow-xl"
+                            : "border-border/40 hover:border-primary/40 bg-card shadow-sm hover:shadow-md"
+                        }`}
+                      >
+                        <img
+                          src={upload.url}
+                          alt={upload.name}
+                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        />
+                        
+                        {/* Selected Check Badge */}
+                        {isSelected && (
+                          <div className="absolute top-2 left-2 w-6 h-6 rounded-full bg-primary flex items-center justify-center shadow-md animate-in zoom-in-50">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                          </div>
+                        )}
+
+                        {/* Custom Presenter Emerald Badge */}
+                        <Badge className="absolute top-2 right-2 bg-emerald-600 hover:bg-emerald-600 text-white border-0 text-[8px] font-bold py-0.5 px-1.5 shadow-sm">
+                          YOUR UPLOAD
+                        </Badge>
+
+                        {/* Loading Spinner for Upload state */}
+                        {upload.isUploading && (
+                          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center gap-1.5 animate-in fade-in">
+                            <Loader2 className="w-6 h-6 text-primary animate-spin" />
+                            <span className="text-[10px] text-white font-medium">Saving...</span>
+                          </div>
+                        )}
+
+                        {/* Remove close button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeUploadedAvatar(upload.id);
+                          }}
+                          className="absolute bottom-2 right-2 w-6 h-6 bg-black/70 hover:bg-destructive rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer shadow-md"
+                          title="Remove custom presenter"
+                        >
+                          <X className="w-3.5 h-3.5 text-white" />
+                        </button>
+
+                        {/* Footer name strip */}
+                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-2.5 py-2">
+                          <p className="text-[10px] text-white font-semibold truncate leading-tight">
+                            {upload.name}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            ) : (
-              <>
+            )}
+
+            {/* Dropzone trigger / library selector */}
+            {uploadedAvatarFiles.length < 5 && (
+              <div className="space-y-4">
                 <div
                   onClick={() => document.getElementById("avatar-upload-input")?.click()}
-                  className="border-2 border-dashed border-border/50 rounded-xl p-6 flex flex-col items-center gap-2 hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer"
+                  className="border-2 border-dashed border-border/50 rounded-2xl p-8 flex flex-col items-center justify-center gap-3 hover:border-primary/55 hover:bg-primary/5 transition-all cursor-pointer group bg-card/50"
                 >
-                  <User className="w-5 h-5 text-primary" />
-                  <p className="text-xs text-muted-foreground">Upload a clear photo of the presenter</p>
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <User className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="text-center space-y-1">
+                    <p className="text-sm font-semibold text-foreground">Upload a Presenter Photo</p>
+                    <p className="text-xs text-muted-foreground max-w-xs">
+                      Supports PNG, JPG, or JPEG. Clear face with good lighting works best.
+                    </p>
+                  </div>
                   <input 
                     id="avatar-upload-input" 
                     type="file" 
@@ -281,25 +362,68 @@ export const Step0Upload = ({
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (file) {
-                        setUploadedAvatarFile(file);
-                        const newAvatar = { url: URL.createObjectURL(file), file, name: "Custom", key: `upload-${Date.now()}` };
-                        toggleAvatarSelection(newAvatar);
+                        handleUploadFile(file);
+                        // Reset input value so same file can be uploaded again if deleted
+                        e.target.value = "";
                       }
                     }} 
                   />
                 </div>
-                <AssetSelector type="avatars" onSelect={async (asset) => {
-                  try {
-                    const res = await fetch(asset.url);
-                    const blob = await res.blob();
-                    const file = new File([blob], asset.name, { type: blob.type });
-                    const newAvatar = { url: URL.createObjectURL(file), file, name: asset.name, key: asset.id };
-                    toggleAvatarSelection(newAvatar);
-                  } catch (err) { 
-                    toast.error("Failed to load asset"); 
-                  }
-                }} />
-              </>
+
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Or choose from your assets</Label>
+                  <AssetSelector
+                    type="avatars"
+                    onSelect={async (asset) => {
+                      try {
+                        const res = await fetch(asset.url);
+                        const blob = await res.blob();
+                        const file = new File([blob], asset.name || "Library Avatar", { type: blob.type });
+                        
+                        if (uploadedAvatarFiles.length >= 5) {
+                          toast.error("You can upload up to 5 custom presenters.");
+                          return;
+                        }
+                        
+                        const id = asset.id || asset._id || `lib-${Date.now()}`;
+                        const newUpload = {
+                          id,
+                          file,
+                          url: asset.url,
+                          name: asset.name || "Library Avatar",
+                          isUploading: false,
+                          isSaved: true
+                        };
+                        
+                        const updatedFiles = [...uploadedAvatarFiles, newUpload];
+                        setUploadedAvatarFiles(updatedFiles);
+                        
+                        // Select it
+                        const avatarObj = {
+                          url: asset.url,
+                          file: file,
+                          name: asset.name,
+                          key: id,
+                          angle: "front",
+                        };
+                        setSelectedAvatars([avatarObj]);
+                        setUploadedAvatarFile(file);
+                        toast.success(`Selected "${asset.name}" from library!`);
+                      } catch (err) { 
+                        toast.error("Failed to load asset"); 
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+            
+            {uploadedAvatarFiles.length >= 5 && (
+              <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 p-3 text-center animate-in slide-in-from-top-2 duration-300">
+                <p className="text-xs text-amber-500 font-medium">
+                  Maximum of 5 custom presenters reached. Remove one to upload another.
+                </p>
+              </div>
             )}
           </div>
         )}
