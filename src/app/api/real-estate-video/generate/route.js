@@ -91,7 +91,7 @@ export async function POST(request) {
     const stream = new ReadableStream({
       async start(controller) {
         function send(data) {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\\n\\n`));
         }
 
         async function pollOperation(initialOperation) {
@@ -336,13 +336,26 @@ async function generateVoicePromptInternal(ai, compositeInlineData, script, lang
   };
   const languageRule = languageRules[language] || languageRules.hindi;
 
-  const prompt = `Voice casting director for real estate video. Analyze the person in this image.
-They will speak: "${script}"
-Language/accent: ${languageRule}
-Emotion tags ({{happy}} etc.) shape delivery only — never spoken aloud.
+  const prompt = `You are a professional voice casting director for a luxury real estate video. Study the person in the image and design the most believable on-camera presenter voice possible for this exact video.
 
-Return ONE paragraph, comma-separated, covering: gender + age range, specific accent, pitch variation, tone quality, emotional delivery arc (hook energy → smooth walkthrough → aspirational close), expressive prosody, pacing ~140 wpm, and recording quality (dry close-mic, zero reverb/echo/noise/robotic artifacts, warm chest resonance, natural dynamic range).
-Return ONLY the paragraph. No headers, no explanations.`;
+They will speak this script verbatim:
+"${script}"
+
+Language/accent direction:
+${languageRule}
+
+Important: emotion tags like {{happy}}, {{confident}}, or {{warm}} are only for delivery guidance and must never be spoken aloud.
+
+Return exactly ONE paragraph, comma-separated, with these elements in this order:
+1. gender and age range that best match the person,
+2. precise accent and regional texture,
+3. pitch range and tonal character,
+4. emotional delivery arc across the full video: strong opening hook, smooth guided walkthrough, and polished aspirational closing,
+5. natural expressiveness and emphasis patterns,
+6. pacing around 140 words per minute with clear pauses before key property details,
+7. recording characteristics: dry close-mic studio capture, intimate presence, zero reverb, zero echo, zero room noise, zero hiss, zero hum, zero clipping, zero robotic texture, warm chest resonance, realistic breath control, and natural dynamic range.
+
+The voice must feel like a real premium property presenter: credible, calm, affluent, friendly, articulate, and camera-confident, with subtle enthusiasm rather than exaggerated performance. Return ONLY the paragraph, with no heading, no bullets, no labels, and no explanation.`;
 
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
@@ -376,31 +389,43 @@ function buildVideoPrompt(script, voicePrompt, language = "hindi") {
   const isCinematicPrompt = script.length > 120 || /camera|push.in|pull.back|dolly|handheld|whip.pan|presenter|shot/i.test(script);
 
   const SHARED_CONSTRAINTS = `
-VOICE: ${voicePrompt}. Lip movements perfectly synced.
+VOICE: ${voicePrompt}. Lip movements perfectly synced and natural to the spoken line timing.
 Language: ${LANGUAGE_LINE}.
-AUDIO: Single presenter voice only — dry close-mic, zero reverb/echo/noise/SFX/music/background voices/robotic artifacts.
-VIDEO: Exactly match reference image (person, clothing, property). No text, captions, overlays, watermarks, or graphics on screen.
-SKIN: Photorealistic — natural texture, pores, micro-shadows, no airbrushing.
-CAMERA: Medium-to-wide framing, slow Steadicam-style movement. No face close-ups, no aggressive zoom or shaky cam.
-9:16 portrait. Must look and sound like a real professional real estate video.`;
+AUDIO: Single presenter voice only — dry close-mic, clean studio sound, zero reverb, zero echo, zero background music, zero ambient voices, zero SFX, zero robotic artifacts, no distortions, no compression pumping.
+VIDEO: Must remain faithful to the reference image for the presenter identity, clothing style, and property context. No text, no captions, no overlays, no watermarks, no graphics, no subtitles, no logo bugs.
+FACE AND SKIN: Ultra-photorealistic human skin with natural pores, micro-shadows, subtle under-eye texture, realistic teeth, believable eye reflections, natural blink cadence, and no airbrushed or plastic appearance.
+CAMERA: Medium-wide to wide framing, slow Steadicam-style motion, stable horizon, gentle cinematic parallax, realistic lens behavior, no aggressive zooms, no jitter, no warped perspective, no unnatural face close-ups.
+LIGHTING: Natural interior daylight or warm mixed real-estate lighting, believable shadow falloff, soft highlights, realistic reflections on glass, metal, and polished surfaces.
+MOOD: Premium, aspirational, tasteful, modern, high-trust real estate marketing with authentic presenter energy.
+FORMAT: 9:16 portrait, optimized for Instagram Reels / Shorts, but still must look like a real property walkthrough shot on a professional camera.`;
 
   if (isCinematicPrompt) {
-    return `Ultra-realistic real estate showcase video, 9:16 portrait for Instagram Reels / YouTube Shorts.
+    return `Ultra-realistic premium real estate showcase video, 9:16 portrait for Instagram Reels / YouTube Shorts.
 
 CINEMATIC DIRECTION:
 ${script}
+
+VISUAL QUALITY:
+Photorealistic, polished, elegant, highly believable property walkthrough. Interior details should look physically consistent and grounded in a real home. Maintain realistic room geometry, truthful proportions, natural reflections, and clean composition.
+
 ${SHARED_CONSTRAINTS}`;
   }
 
   // Fallback: plain dialogue
   return `Ultra-realistic real estate property showcase video, 9:16 portrait for Instagram Reels / YouTube Shorts.
-Presenter (exactly as in reference image) stands inside the property, speaks directly to camera with confident warmth.
+Presenter (exactly as in reference image) stands naturally inside the property and speaks directly to camera with confident warmth and premium realtor energy.
 
-Presenter energy: confident, warm smile, natural hand gestures showcasing the space, at least one moment stepping aside to reveal more of the room. Delivery: conversational, dynamic — faster on highlights, softer on premium details, meaningful pauses.
+PERFORMANCE:
+The presenter should feel like a real experienced agent, with relaxed posture, subtle hand gestures, natural head movement, occasional small smiles, and one or two moments of stepping slightly aside to reveal the room more clearly. Delivery should be smooth, articulate, persuasive, and human — energetic at the opening, steady through the walkthrough, and aspirational at the close.
 
-Speech: "${script}" — in ${LANGUAGE_LINE}.
-Property visible around presenter throughout. Warm golden natural lighting. Aspirational, premium feel.
+SCRIPT:
+"${script}"
+
+Language:
+${LANGUAGE_LINE}
+
+ENVIRONMENT:
+The property should remain continuously visible around the presenter, with believable room depth, accurate scale, tasteful staging, clean surfaces, and realistic lighting. Use warm, inviting, luxury-leaning real estate cinematography with natural motion and grounded visual behavior. The result should feel like a genuine professional property tour, not an advertisement with artificial effects.
+
 ${SHARED_CONSTRAINTS}`;
 }
-
-

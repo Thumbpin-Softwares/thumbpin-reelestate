@@ -11,25 +11,25 @@ import { consumeCreditsForAction, refundCreditsForAction } from "@/lib/credit-sy
  * POST /api/veo-long-ad/generate-pipeline
  *
  * Core SSE pipeline:
- *   1. Generate first 8s clip (Veo 3.1 generateVideos with reference images)
- *   2. For each subsequent chunk, extend using Veo 3.1 extend (video: { uri })
- *   3. Return final extended video URL
+ * 1. Generate first 8s clip (Veo 3.1 generateVideos with reference images)
+ * 2. For each subsequent chunk, extend using Veo 3.1 extend (video: { uri })
+ * 3. Return final extended video URL
  *
  * Input (FormData):
- *   chunks: JSON string (array of chunk objects from /chunk-script)
- *   masterVoicePrompt: string
- *   locationImages[]: File[]
- *   avatarImages[]: File[]
- *   language: string
- *   aspectRatio: "9:16" | "16:9"
+ * chunks: JSON string (array of chunk objects from /chunk-script)
+ * masterVoicePrompt: string
+ * locationImages[]: File[]
+ * avatarImages[]: File[]
+ * language: string
+ * aspectRatio: "9:16" | "16:9"
  *
  * SSE events:
- *   { type: "progress", chunkIndex, totalChunks, status, message }
- *   { type: "chunk_done", chunkIndex, totalChunks, estimatedDuration }
- *   { type: "uploading", message }
- *   { type: "video_ready", videoUrl, totalChunks, totalDuration }
- *   { type: "error", message, failedChunkIndex? }
- *   { type: "done" }
+ * { type: "progress", chunkIndex, totalChunks, status, message }
+ * { type: "chunk_done", chunkIndex, totalChunks, estimatedDuration }
+ * { type: "uploading", message }
+ * { type: "video_ready", videoUrl, totalChunks, totalDuration }
+ * { type: "error", message, failedChunkIndex? }
+ * { type: "done" }
  */
 export async function POST(request) {
   let userId = null;
@@ -145,11 +145,11 @@ export async function POST(request) {
     const referenceImages = [
       ...avatarImgs.slice(0, avatarSlots).map((img) => ({
         image: img,
-        referenceType: "asset",
+        referenceType: "SUBJECT", // 🎯 Tells Veo this is the primary human character
       })),
       ...locationImgs.slice(0, locationSlots).map((img) => ({
         image: img,
-        referenceType: "asset",
+        referenceType: "STYLE", // 🎯 Tells Veo this is the background environment/style
       })),
     ];
     console.log(`[VeoLongAd] Total referenceImages: ${referenceImages.length}`);
@@ -192,7 +192,6 @@ export async function POST(request) {
         }
 
         function extractGeneratedVideo(result) {
-          // Defensive extractor — handles all known SDK response shapes
           return (
             result?.generatedVideos?.[0]?.video ||
             result?.generatedVideos?.[0]?.videoResponse ||
@@ -211,13 +210,9 @@ export async function POST(request) {
 
         /**
          * Strip :download?alt=media (and any query params) from the Veo URI.
-         * Veo returns:  https://.../files/<id>:download?alt=media
-         * Extension needs: https://.../files/<id>
          */
         function cleanVeoUri(uri) {
           if (!uri) return uri;
-          // Remove anything after and including the colon suffix (:download...)
-          // e.g. "https://.../files/21wkcqsf1kgd:download?alt=media" → "https://.../files/21wkcqsf1kgd"
           return uri.replace(/:download.*$/, "").replace(/\?.*$/, "");
         }
 
@@ -251,9 +246,7 @@ export async function POST(request) {
 
           if (!genOp) throw new Error("Failed to start base video generation");
 
-          // ── DIAGNOSTIC: log the operation object shape ─────────────────
           console.log("[VeoLongAd] genOp keys:", genOp ? Object.keys(genOp) : null);
-          console.log("[VeoLongAd] genOp.done:", genOp?.done, "genOp.name:", genOp?.name);
 
           send({
             type: "progress",
@@ -264,27 +257,14 @@ export async function POST(request) {
           });
 
           const firstResult = await pollOperation(genOp);
-
-          // ── DIAGNOSTIC: log full result shape to understand SDK nesting ─
-          console.log("[VeoLongAd] firstResult keys:", firstResult ? Object.keys(firstResult) : null);
-          console.log("[VeoLongAd] firstResult.generatedVideos:", JSON.stringify(firstResult?.generatedVideos, null, 2));
-          console.log("[VeoLongAd] firstResult.response:", JSON.stringify(firstResult?.response, null, 2));
-          console.log("[VeoLongAd] firstResult.candidates:", JSON.stringify(firstResult?.candidates, null, 2));
-
           const firstGeneratedVideo = extractGeneratedVideo(firstResult);
 
           if (!firstGeneratedVideo?.uri) {
-            console.error("[VeoLongAd] Unexpected first result shape:", JSON.stringify({
-              keys: firstResult ? Object.keys(firstResult) : null,
-              generatedVideos: firstResult?.generatedVideos,
-            }));
             throw new Error("Base video generation returned no video. The prompt may have been rejected or Veo returned an unexpected response shape.");
           }
 
-          // Store the raw URI for downloading, clean URI for extension
           const rawVideoUri = firstGeneratedVideo.uri;
           currentVideoUri = cleanVeoUri(rawVideoUri);
-          console.log("[VeoLongAd] Base clip URI (raw):", rawVideoUri);
           console.log("[VeoLongAd] Base clip URI (clean for extension):", currentVideoUri);
 
           send({
@@ -299,17 +279,14 @@ export async function POST(request) {
           let cumulativeDuration = chunk0.estimatedSeconds || 8;
 
           if (chunks.length > 1) {
-            // Give Veo time to fully "process" the base clip before it can be
-            // used as extension input (avoids INVALID_ARGUMENT "not processed" error).
-            // 45s is the empirically safe minimum for Veo 3.1.
             send({
               type: "progress",
               chunkIndex: 0,
               totalChunks,
               status: "extending",
-              message: "⏳ Waiting for base clip to be indexed by Veo (45s)...",
+              message: "⏳ Waiting for base clip to be indexed by Veo (15s)...",
             });
-            await new Promise((r) => setTimeout(r, 45000));
+            await new Promise((r) => setTimeout(r, 15000));
           }
 
           for (let i = 1; i < chunks.length; i++) {
@@ -330,9 +307,6 @@ export async function POST(request) {
 
             for (let attempt = 0; attempt < 3; attempt++) {
               try {
-                console.log(`[VeoLongAd] Extend chunk ${i} attempt ${attempt + 1}: uri=${currentVideoUri}`);
-
-                // Extension: generateVideos with video: { uri } — use the CLEAN uri (no :download suffix)
                 const extOp = await ai.models.generateVideos({
                   model: "veo-3.1-generate-preview",
                   video: { uri: currentVideoUri },
@@ -354,23 +328,15 @@ export async function POST(request) {
                 });
 
                 const extResult = await pollOperation(extOp);
-
-                // ── DIAGNOSTIC: log extension result shape ────────────────
-                console.log(`[VeoLongAd] extResult chunk ${i} keys:`, extResult ? Object.keys(extResult) : null);
-                console.log(`[VeoLongAd] extResult.generatedVideos:`, JSON.stringify(extResult?.generatedVideos, null, 2));
-
                 const extVideo = extractGeneratedVideo(extResult);
                 const rawExtUri = extVideo?.uri || extVideo?.fileUri || null;
                 extVideoUri = cleanVeoUri(rawExtUri);
 
                 if (!extVideoUri) {
-                  console.error(`[VeoLongAd] Extension chunk ${i} returned no URI. extVideo:`, extVideo);
                   throw new Error(`Extension chunk ${i + 1} returned no video URI`);
                 }
 
-                console.log(`[VeoLongAd] Chunk ${i} extended. Clean URI:`, extVideoUri);
                 break; // success
-
               } catch (err) {
                 lastErr = err;
                 const msg = (err.message || "").toLowerCase();
@@ -385,12 +351,10 @@ export async function POST(request) {
 
                 if (!isTransient || attempt === 2) throw err;
 
-                // For "not processed" errors, wait longer between retries
                 const delay = msg.includes("not processed") || msg.includes("invalid_argument")
                   ? 30000 * (attempt + 1)
                   : 8000 * (attempt + 1);
 
-                console.warn(`[VeoLongAd] Transient error on chunk ${i}, retrying in ${delay}ms:`, err.message);
                 send({
                   type: "progress",
                   chunkIndex: i,
@@ -403,7 +367,6 @@ export async function POST(request) {
             }
 
             if (!extVideoUri) {
-              // Non-fatal partial failure: stop extending, save what we have
               send({
                 type: "error",
                 failedChunkIndex: i,
@@ -444,7 +407,6 @@ export async function POST(request) {
 
             const key = buildUserKey(userId, "videos", "mp4", "veo-long-ad");
             finalVideoUrl = await uploadToR2(videoBytes, key, "video/mp4");
-            console.log(`[VeoLongAd] Uploaded to R2: ${key} (${(videoBytes.length / 1024 / 1024).toFixed(1)} MB)`);
           } catch (saveErr) {
             console.error("[VeoLongAd] R2 upload failed, using proxy URL:", saveErr.message);
           }
@@ -536,9 +498,9 @@ export async function POST(request) {
 }
 
 /**
- * High-quality realism tokens from the master creative SOP.
+ * Highly realistic aesthetic instructions.
  */
-const SKIN_ENHANCER_TOKENS = `Photorealistic detail. Real human skin with visible natural texture, pores, and micro shadows. Preserve natural under-eye detail and realistic lip texture. No airbrushing or waxy finish. Authentic facial structure with natural micro-expressions and eye depth. Lighting behaves naturally with soft highlights and realistic shadows. High-detail editorial realism, grounded in real-world 4k camera capture.`;
+const REALISM_AESTHETICS = `REALISTIC PROFESSIONAL REAL ESTATE SHOOT: This should look like a high-quality, real-life property tour. Avoid overly glossy or fake "studio" lighting. Use natural daylight and realistic shadows. The footage should feel 100% authentic, with a slight touch of natural imperfection (like a subtle natural breeze or slight handheld realism) to make it feel genuinely real rather than CGI.`;
 
 /**
  * Build the prompt for the FIRST Veo clip.
@@ -552,32 +514,30 @@ function buildFirstClipPrompt(chunk, masterVoicePrompt, language) {
   };
   const langLabel = langMap[language] || "Indian-English";
 
-  return `Cinematic ultra-realistic luxury real estate video ad in 9:16 portrait format for Instagram Reels / YouTube Shorts. High-end cinematic luxury property walkthrough aesthetic, warm natural sunlight, shallow depth of field, 4k editorial photorealistic detail.
+  return `Realistic real estate video ad in 9:16 portrait format. Natural daylight, lifelike textures, and authentic environment styling.
 
-${chunk.veoPrompt || ""}
+${REALISM_AESTHETICS}
 
-PRESENTER IDENTITY BINDING:
-• Strictly match the physical face, hair, gender, features, and clothing of the presenter shown in the presenter/avatar reference images.
-• The presenter is speaking directly to the camera with natural micro-expressions, dynamic facial movement, and realistic eye depth.
+SCENE 1:
+${chunk.veoPrompt || "Smooth, professional establishing shot of the presenter at the property exterior."}
 
-ENVIRONMENT BINDING:
-• Strictly match the architectural style, materials, colors, and layout of the contemporary luxury house shown in the property/location reference images.
-• Show premium exterior details: white stucco walls, natural warm wood facade panels, a dark black/grey gabled metal roof, clean modern lines, minimalist glass railings, and elegant landscaping.
+PRESENTER IDENTITY:
+• CRITICAL: Match the provided SUBJECT reference image EXACTLY (gender, age, face, hair, body, clothing). Ignore any conflicting terms in the prompt.
+• The presenter is speaking naturally to the camera with lifelike, relaxed expressions and body language.
 
-${SKIN_ENHANCER_TOKENS}
+ENVIRONMENT:
+• Strictly match the architectural style of the STYLE reference images.
+• Keep lighting natural and realistic.
 
-VOICE DIRECTION:
-• Voice characteristics: ${masterVoicePrompt || "Confident professional Indian real estate presenter, warm authoritative tone, natural delivery, ~140 wpm, dry close-mic studio recording."}
+VOICE & LIP-SYNC:
+• Voice: ${masterVoicePrompt || "Natural, clear, authoritative real estate presenter tone. No background music."}
 • Speaking language: ${langLabel}.
-• PERFECT LIP-SYNC: The presenter's lip movements must perfectly sync to the dialogue: "${chunk.text}".
-• Audio quality: Clean dry close-mic recording, absolute studio quality with no echo, reverb, background music, or sound effects.
+• EXACT LIP-SYNC: The presenter's lip movements must perfectly sync to: "${chunk.text}".
 
 CAMERA ACTION:
-• Camera: ${chunk.cameraDirection || "Dynamic energetic camera movement toward presenter standing at a luxury property exterior gate"}.
+• ${chunk.cameraDirection || "Smooth tracking shot introducing the presenter."}
 
-STRICT VISUAL RULES:
-• ONLY exterior shots (gate, facade, exterior walls, balcony, front elevation). NO interior shots.
-• NO text, NO captions, NO watermarks, NO overlays on screen.`;
+RULES: ONLY exterior shots. NO text, NO watermarks on screen.`;
 }
 
 /**
@@ -592,32 +552,27 @@ function buildExtensionPrompt(chunk, masterVoicePrompt, language) {
   };
   const langLabel = langMap[language] || "Indian-English";
 
-  return `SEAMLESS MOTION & VISUAL CONTINUITY: Continue the SAME video with the EXACT SAME presenter and in the EXACT SAME location. Zero visual jumps, zero color shifts, perfect seamless continuation of the scene.
+  return `SEAMLESS CONTINUATION: Continue the SAME video with the EXACT SAME presenter and in the EXACT SAME location.
 
-${chunk.veoPrompt ? `SCENE DIRECTION:\n${chunk.veoPrompt}\n` : ""}
+${REALISM_AESTHETICS}
 
-PRESENTER VISUAL CONTINUITY:
-• Maintain identical appearance of the presenter: same face, same hair, same clothing, and styling. No variations.
-• Speaking naturally with realistic micro-expressions and eye movement.
+SCENE EXTENSION:
+${chunk.veoPrompt || "Cut to a new professional angle (e.g., medium close-up or slightly different perspective) to keep the video engaging."}
 
-ENVIRONMENT VISUAL CONTINUITY:
-• Maintain identical high-end contemporary property setting: white stucco walls, natural wood panels, dark gabled metal roof, and lighting.
-• Keep identical warm golden hour or natural sunlight.
+PRESENTER CONTINUITY:
+• MUST maintain the exact same person, face, and outfit as the previous shot. No variations.
+• Speaking naturally to the camera with genuine expressions.
 
-${SKIN_ENHANCER_TOKENS}
+ENVIRONMENT CONTINUITY:
+• Keep the exact same property style and natural daylight from the previous shot.
 
-DIALOGUE FOR THIS EXTENSION:
-• Dialogue: "${chunk.text}"
-• PERFECT LIP-SYNC: The presenter's lip movements must perfectly sync to this dialogue.
-
-VOICE (must remain identical):
-• Voice style: ${masterVoicePrompt || "Keep the same voice characteristics as the original clip."}
+VOICE & LIP-SYNC:
+• Voice: ${masterVoicePrompt || "Keep the exact same voice characteristics."}
 • Speaking language: ${langLabel}.
+• EXACT LIP-SYNC: The presenter's lip movements must perfectly sync to: "${chunk.text}".
 
-CAMERA CONTINUITY:
-• Camera: ${chunk.cameraDirection || "Continue with cinematic exterior shot, presenter walking"}
+CAMERA ACTION:
+• ${chunk.cameraDirection || "Cut to a different angle or smoothly follow the presenter to add visual interest."}
 
-STRICT VISUAL RULES:
-• ONLY exterior shots. NO interior shots.
-• NO text, NO captions, NO watermarks on screen.`;
+RULES: ONLY exterior shots. NO text, NO watermarks on screen.`;
 }
