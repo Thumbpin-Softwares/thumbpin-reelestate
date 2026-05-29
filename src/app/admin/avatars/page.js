@@ -17,7 +17,8 @@ import {
   Image as ImageIcon2,
   ChevronLeft,
   ChevronRight,
-  AlertTriangle
+  AlertTriangle,
+  Star
 } from "lucide-react";
 
 // Collection Card Component
@@ -59,9 +60,11 @@ function CollectionCard({ collection, onClick }) {
 }
 
 // Collection View Modal
-function CollectionViewModal({ collection, onClose, onDelete }) {
+function CollectionViewModal({ collection, onClose, onDelete, onThumbnailSet }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [deleting, setDeleting] = useState(false);
+  const [settingThumbnail, setSettingThumbnail] = useState(false);
+  const [thumbnailKey, setThumbnailKey] = useState(collection.thumbnailKey || null);
 
   // Safety check
   if (!collection || !collection.files || collection.files.length === 0) {
@@ -83,6 +86,27 @@ function CollectionViewModal({ collection, onClose, onDelete }) {
         </div>
       </div>
     );
+  }
+
+  async function handleSetThumbnail(fileKey) {
+    if (settingThumbnail || thumbnailKey === fileKey) return;
+    setSettingThumbnail(true);
+    try {
+      const res = await fetch("/api/admin/avatars", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ collectionId: collection.id, thumbnailKey: fileKey }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setThumbnailKey(fileKey);
+      onThumbnailSet?.(collection.id, fileKey);
+      toast.success("Thumbnail updated");
+    } catch {
+      toast.error("Failed to set thumbnail");
+    } finally {
+      setSettingThumbnail(false);
+    }
   }
 
   async function handleDeleteCollection() {
@@ -187,29 +211,60 @@ function CollectionViewModal({ collection, onClose, onDelete }) {
             )}
           </div>
 
+          {/* Set as thumbnail button for current image */}
+          <div className="flex justify-end mb-4">
+            <button
+              onClick={() => handleSetThumbnail(collection.files[currentIndex]?.key)}
+              disabled={settingThumbnail || thumbnailKey === collection.files[currentIndex]?.key || (!thumbnailKey && currentIndex === 0)}
+              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition-all disabled:opacity-40 disabled:cursor-not-allowed border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
+            >
+              {settingThumbnail ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Star className={`w-3.5 h-3.5 ${thumbnailKey === collection.files[currentIndex]?.key || (!thumbnailKey && currentIndex === 0) ? "fill-amber-400 text-amber-400" : ""}`} />
+              )}
+              {thumbnailKey === collection.files[currentIndex]?.key || (!thumbnailKey && currentIndex === 0)
+                ? "Current thumbnail"
+                : "Set as thumbnail"}
+            </button>
+          </div>
+
           {/* Thumbnails */}
           {collection.files.length > 1 && (
             <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
-              {collection.files.map((file, idx) => (
-                <button
-                  key={file.id || idx}
-                  onClick={() => setCurrentIndex(idx)}
-                  className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${
-                    currentIndex === idx 
-                      ? "border-gray-900 ring-2 ring-gray-900/20" 
-                      : "border-gray-200 hover:border-gray-400"
-                  }`}
-                >
-                  <img
-                    src={file.url}
-                    alt={`Thumbnail ${idx + 1}`}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      e.target.src = "https://placehold.co/100x100?text=Error";
-                    }}
-                  />
-                </button>
-              ))}
+              {collection.files.map((file, idx) => {
+                const isThumb = thumbnailKey ? thumbnailKey === file.key : idx === 0;
+                return (
+                  <div key={file.id || idx} className="relative group">
+                    <button
+                      onClick={() => setCurrentIndex(idx)}
+                      className={`relative w-full aspect-square rounded-lg overflow-hidden border-2 transition-all ${
+                        currentIndex === idx
+                          ? "border-gray-900 ring-2 ring-gray-900/20"
+                          : "border-gray-200 hover:border-gray-400"
+                      }`}
+                    >
+                      <img
+                        src={file.url}
+                        alt={`Thumbnail ${idx + 1}`}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.src = "https://placehold.co/100x100?text=Error";
+                        }}
+                      />
+                    </button>
+                    {/* Star badge — filled if this is the thumbnail */}
+                    <button
+                      onClick={() => handleSetThumbnail(file.key)}
+                      disabled={settingThumbnail || isThumb}
+                      title={isThumb ? "Collection thumbnail" : "Set as thumbnail"}
+                      className="absolute top-1 right-1 p-0.5 rounded-full bg-black/50 hover:bg-black/80 transition-all disabled:cursor-default opacity-0 group-hover:opacity-100 disabled:opacity-100"
+                    >
+                      <Star className={`w-3 h-3 ${isThumb ? "fill-amber-400 text-amber-400" : "text-white"}`} />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -475,6 +530,16 @@ export default function AdminAvatarsPage() {
     setCollections(prev => prev.filter(c => c.id !== collectionId));
   }
 
+  function handleThumbnailSet(collectionId, thumbnailKey) {
+    setCollections(prev =>
+      prev.map(c =>
+        c.id === collectionId
+          ? { ...c, coverImage: `/api/admin/r2?key=${encodeURIComponent(thumbnailKey)}`, thumbnailKey }
+          : c
+      )
+    );
+  }
+
   // Filter collections by search
   const filtered = search
     ? collections.filter(c => 
@@ -579,6 +644,7 @@ export default function AdminAvatarsPage() {
           collection={selectedCollection}
           onClose={() => setSelectedCollection(null)}
           onDelete={handleDeleteCollection}
+          onThumbnailSet={handleThumbnailSet}
         />
       )}
 

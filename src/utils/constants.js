@@ -73,6 +73,7 @@ export const FLOOR_OPTIONS = ["Ground", "1-5", "6-10", "11-20", "20+", "Top Floo
 
 export const AVATAR_MODES = [
   { id: "prebuilt", label: "RE Agents", icon: "PersonStanding" },
+  { id: "library", label: "Your Library", icon: "BookMarked" },
   { id: "upload", label: "Upload", icon: "Upload" },
   { id: "generate", label: "Create Avatar", icon: "Sparkles" },
 ];

@@ -19,8 +19,10 @@ export const useAvatars = () => {
   const [reAvatarsLoading, setReAvatarsLoading] = useState(false);
   const [reAvatarsError, setReAvatarsError] = useState(null);
   const [lightboxUrl, setLightboxUrl] = useState(null);
+  // User's saved avatar library from MongoDB
+  const [library, setLibrary] = useState([]);
 
-  // Fetch RE avatars (now returns collections)
+  // Fetch RE avatars (admin collections) + user library
   const fetchReAvatars = async () => {
     setReAvatarsLoading(true);
     setReAvatarsError(null);
@@ -28,6 +30,7 @@ export const useAvatars = () => {
       const res = await fetch("/api/avatars/re");
       const data = await res.json();
       setReAvatars(data.avatars ?? []);
+      setLibrary(data.library ?? []);
     } catch (err) {
       console.error("[RE Avatars] fetch error:", err);
       setReAvatarsError("Failed to load avatars");
@@ -157,6 +160,31 @@ export const useAvatars = () => {
       clearSelectedAvatars();
     } else {
       await selectUploadedAvatar(uploadObj);
+    }
+  };
+
+  const selectLibraryAvatar = (item) => {
+    const isSelected = selectedAvatars.some((a) => a.key === item.id);
+    if (isSelected) {
+      clearSelectedAvatars();
+    } else {
+      setSelectedAvatars([{ url: item.url, file: null, name: item.name, key: item.id, angle: 'front' }]);
+    }
+  };
+
+  const deleteLibraryAvatar = async (id) => {
+    try {
+      const res = await fetch(`/api/assets?id=${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Delete failed');
+      setLibrary((prev) => prev.filter((a) => a.id !== id));
+      setSelectedAvatars((prev) => {
+        const wasSelected = prev.some((a) => a.key === id);
+        if (wasSelected) { setUploadedAvatarFile(null); return []; }
+        return prev;
+      });
+      toast.success('Avatar removed from library');
+    } catch {
+      toast.error('Failed to delete avatar');
     }
   };
 
@@ -295,6 +323,9 @@ export const useAvatars = () => {
     selectUploadedAvatar,
     toggleUploadedAvatar,
     removeUploadedAvatar,
-    fetchReAvatars
+    fetchReAvatars,
+    library,
+    selectLibraryAvatar,
+    deleteLibraryAvatar,
   };
 };

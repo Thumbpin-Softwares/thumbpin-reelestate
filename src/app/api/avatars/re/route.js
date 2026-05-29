@@ -8,7 +8,7 @@
  * Response: { avatars: [{ id, name, images: [{url, key, index}], coverImage }] }
  */
 
-import { ListObjectsV2Command, HeadObjectCommand } from "@aws-sdk/client-s3";
+import { ListObjectsV2Command, HeadObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { NextResponse } from "next/server";
 import { s3, BUCKET } from "@/lib/r2";
 import dbConnect from "@/lib/mongodb";
@@ -26,28 +26,18 @@ function isImage(key) {
 
 export async function GET(request) {
   try {
-    // 1. Fetch custom avatars for the current authenticated user from MongoDB
-    let customAvatars = [];
+    // 1. Fetch user's saved custom avatars from MongoDB (returned as "library", not mixed into RE agents)
+    let library = [];
     try {
       const userId = await getResolvedUserId(request);
       if (userId) {
         await dbConnect();
         const dbAssets = await Asset.find({ userId, type: "avatar" }).sort({ createdAt: -1 });
-        customAvatars = dbAssets.map((asset) => ({
+        library = dbAssets.map((asset) => ({
           id: asset._id.toString(),
-          name: asset.name || "Custom Agent",
-          coverImage: asset.url,
-          imageCount: 1,
-          images: [
-            {
-              url: asset.url,
-              key: asset._id.toString(),
-              index: 0,
-              displayName: asset.name || "Custom"
-            }
-          ],
-          isCustom: true,
-          lastModified: asset.createdAt,
+          name: asset.name || "Custom Avatar",
+          url: asset.url,
+          createdAt: asset.createdAt,
         }));
       }
     } catch (err) {
@@ -125,17 +115,41 @@ export async function GET(request) {
       }
     }
 
-    // Build final avatar list — custom first, then collections, then ungrouped
-    const avatars = [...customAvatars];
+    // Fetch thumbnail manifests for all collections in parallel
+    const thumbnailMap = new Map();
+    await Promise.all(
+      Array.from(collectionsMap.keys()).map(async (collId) => {
+        try {
+          const res = await s3.send(new GetObjectCommand({
+            Bucket: BUCKET,
+            Key: `Avatars/meta/${collId}.json`,
+          }));
+          const text = await res.Body.transformToString();
+          const { thumbnailKey } = JSON.parse(text);
+          if (thumbnailKey) thumbnailMap.set(collId, thumbnailKey);
+        } catch {
+          // No manifest — use first image
+        }
+      })
+    );
+
+    // Build final avatar list — admin RE collections only (no user custom avatars)
+    const avatars = [];
     let index = 1;
 
-    for (const [, collection] of collectionsMap) {
+    for (const [collId, collection] of collectionsMap) {
       // Sort images within collection by index
       collection.images.sort((a, b) => a.index - b.index);
+
+      const thumbnailKey = thumbnailMap.get(collId);
+      const coverImage = thumbnailKey
+        ? `/api/r2?key=${encodeURIComponent(thumbnailKey)}`
+        : collection.images[0]?.url;
+
       avatars.push({
         id: collection.id,
         name: collection.name || `RE Agent ${index}`,
-        coverImage: collection.images[0]?.url,
+        coverImage,
         imageCount: collection.images.length,
         images: collection.images,
         lastModified: collection.lastModified,
@@ -155,7 +169,7 @@ export async function GET(request) {
       index++;
     }
 
-    return NextResponse.json({ avatars }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ avatars, library }, { headers: { "Cache-Control": "no-store" } });
   } catch (err) {
     console.error("[Public RE Avatars] R2 error:", err);
     return NextResponse.json({ error: "Failed to load avatars", avatars: [] }, { status: 500 });

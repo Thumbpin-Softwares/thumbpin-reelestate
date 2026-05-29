@@ -15,6 +15,8 @@ import {
   X,
   Building2,
   Images,
+  BookMarked,
+  Trash2,
 } from "lucide-react";
 import { AssetSelector } from "@/components/dashboard/asset-selector";
 import MultiImageUploadBox from "@/modules/ai-walkthrough/components/MultiImageUploadBox";
@@ -63,6 +65,9 @@ export const Step0Upload = ({
     toggleUploadedAvatar,
     removeUploadedAvatar,
     fetchReAvatars,
+    library,
+    selectLibraryAvatar,
+    deleteLibraryAvatar,
   } = avatarHook;
 
   const { getFilledCount, setPropertyDrawerOpen } = propertyBriefHook;
@@ -109,7 +114,8 @@ export const Step0Upload = ({
       <div className="space-y-4">
         <div className="flex gap-2">
           {AVATAR_MODES.map((mode) => {
-            const IconComponent = mode.icon === "PersonStanding" ? PersonStanding : 
+            const IconComponent = mode.icon === "PersonStanding" ? PersonStanding :
+                                 mode.icon === "BookMarked" ? BookMarked :
                                  mode.icon === "Upload" ? Upload : Sparkles;
             return (
               <button
@@ -257,6 +263,78 @@ export const Step0Upload = ({
                           ))}
                         </div>
                       )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Your Library */}
+        {avatarMode === "library" && (
+          <div className="animate-in fade-in duration-300">
+            {reAvatarsLoading && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="aspect-square rounded-xl bg-muted/60 animate-pulse" />
+                ))}
+              </div>
+            )}
+
+            {!reAvatarsLoading && library.length === 0 && (
+              <div className="rounded-xl border border-border/40 bg-muted/30 p-8 flex flex-col items-center gap-2">
+                <BookMarked className="w-6 h-6 text-muted-foreground" />
+                <p className="text-xs text-muted-foreground text-center">
+                  No saved avatars yet. Upload a photo or generate one with AI — it'll appear here.
+                </p>
+              </div>
+            )}
+
+            {!reAvatarsLoading && library.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                {library.map((item) => {
+                  const isSelected = selectedAvatars.some((a) => a.key === item.id);
+                  return (
+                    <div
+                      key={item.id}
+                      className={`group relative rounded-2xl overflow-hidden border-2 transition-all cursor-pointer aspect-square ${
+                        isSelected
+                          ? "border-primary ring-4 ring-primary/20 scale-[1.02] shadow-xl"
+                          : "border-border/40 hover:border-primary/40 bg-card shadow-sm hover:shadow-md"
+                      }`}
+                      onClick={() => selectLibraryAvatar(item)}
+                    >
+                      <img
+                        src={item.url}
+                        alt={item.name}
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      />
+
+                      {isSelected && (
+                        <div className="absolute top-2 left-2 w-6 h-6 rounded-full bg-primary flex items-center justify-center shadow-md animate-in zoom-in-50">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                        </div>
+                      )}
+
+                      {/* Delete button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteLibraryAvatar(item.id);
+                        }}
+                        className="absolute top-2 right-2 w-6 h-6 bg-black/60 hover:bg-destructive rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer shadow-md"
+                        title="Remove from library"
+                      >
+                        <Trash2 className="w-3 h-3 text-white" />
+                      </button>
+
+                      {/* Name strip */}
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-2.5 py-2">
+                        <p className="text-[10px] text-white font-semibold truncate leading-tight">
+                          {item.name}
+                        </p>
+                      </div>
                     </div>
                   );
                 })}

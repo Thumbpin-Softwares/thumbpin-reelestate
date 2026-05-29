@@ -1,6 +1,3 @@
-// src/app/utils/indexedDB.js
-
-// Database configuration
 const DB_NAME = 'RealEstateVideoDB';
 const DB_VERSION = 3;
 const STORES = {
@@ -9,530 +6,433 @@ const STORES = {
   AVATAR_DATA: 'avatarData',
   IMAGES: 'images',
   COMPOSITES: 'composites',
-  SCRIPTS: 'scripts'
+  SCRIPTS: 'scripts',
 };
 
-// Open database connection
-const openDB = () => {
-  return new Promise((resolve, reject) => {
+// ─── Singleton connection ────────────────────────────────────────────────────
+
+let dbPromise = null;
+
+const getDB = () => {
+  if (dbPromise) return dbPromise;
+
+  dbPromise = new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
-    
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
-    
+
+    request.onerror = () => {
+      dbPromise = null;
+      reject(request.error);
+    };
+
+    request.onsuccess = () => {
+      const db = request.result;
+      db.onclose = () => { dbPromise = null; };
+      db.onversionchange = () => { db.close(); dbPromise = null; };
+      resolve(db);
+    };
+
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
-      
+
       if (!db.objectStoreNames.contains(STORES.SESSIONS)) {
-        const sessionStore = db.createObjectStore(STORES.SESSIONS, { keyPath: 'sessionId' });
-        sessionStore.createIndex('timestamp', 'timestamp', { unique: false });
-        sessionStore.createIndex('isActive', 'isActive', { unique: false });
+        const s = db.createObjectStore(STORES.SESSIONS, { keyPath: 'sessionId' });
+        s.createIndex('timestamp', 'timestamp', { unique: false });
+        s.createIndex('isActive', 'isActive', { unique: false });
       }
-      
+
       if (!db.objectStoreNames.contains(STORES.PROPERTY_DATA)) {
-        const propertyStore = db.createObjectStore(STORES.PROPERTY_DATA, { keyPath: 'sessionId' });
-        propertyStore.createIndex('lastUpdated', 'lastUpdated', { unique: false });
+        const s = db.createObjectStore(STORES.PROPERTY_DATA, { keyPath: 'sessionId' });
+        s.createIndex('lastUpdated', 'lastUpdated', { unique: false });
       }
-      
+
       if (!db.objectStoreNames.contains(STORES.AVATAR_DATA)) {
-        const avatarStore = db.createObjectStore(STORES.AVATAR_DATA, { keyPath: 'sessionId' });
-        avatarStore.createIndex('avatarMode', 'avatarMode', { unique: false });
+        const s = db.createObjectStore(STORES.AVATAR_DATA, { keyPath: 'sessionId' });
+        s.createIndex('avatarMode', 'avatarMode', { unique: false });
       }
-      
+
       if (!db.objectStoreNames.contains(STORES.IMAGES)) {
-        const imageStore = db.createObjectStore(STORES.IMAGES, { keyPath: 'id' });
-        imageStore.createIndex('sessionId', 'sessionId', { unique: false });
-        imageStore.createIndex('type', 'type', { unique: false });
-        imageStore.createIndex('uploadedAt', 'uploadedAt', { unique: false });
+        const s = db.createObjectStore(STORES.IMAGES, { keyPath: 'id' });
+        s.createIndex('sessionId', 'sessionId', { unique: false });
+        s.createIndex('type', 'type', { unique: false });
+        s.createIndex('uploadedAt', 'uploadedAt', { unique: false });
       }
-      
+
       if (!db.objectStoreNames.contains(STORES.COMPOSITES)) {
-        const compositeStore = db.createObjectStore(STORES.COMPOSITES, { keyPath: 'id' });
-        compositeStore.createIndex('sessionId', 'sessionId', { unique: false });
-        compositeStore.createIndex('createdAt', 'createdAt', { unique: false });
+        const s = db.createObjectStore(STORES.COMPOSITES, { keyPath: 'id' });
+        s.createIndex('sessionId', 'sessionId', { unique: false });
+        s.createIndex('createdAt', 'createdAt', { unique: false });
       }
-      
+
       if (!db.objectStoreNames.contains(STORES.SCRIPTS)) {
-        const scriptStore = db.createObjectStore(STORES.SCRIPTS, { keyPath: 'id' });
-        scriptStore.createIndex('sessionId', 'sessionId', { unique: false });
-        scriptStore.createIndex('createdAt', 'createdAt', { unique: false });
+        const s = db.createObjectStore(STORES.SCRIPTS, { keyPath: 'id' });
+        s.createIndex('sessionId', 'sessionId', { unique: false });
+        s.createIndex('createdAt', 'createdAt', { unique: false });
       }
     };
   });
+
+  return dbPromise;
 };
 
-// Helper: Convert file to base64
-const fileToBase64 = (file) => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+// Wrap a single IDB request in a Promise
+const req = (idbRequest) =>
+  new Promise((resolve, reject) => {
+    idbRequest.onsuccess = () => resolve(idbRequest.result);
+    idbRequest.onerror = () => reject(idbRequest.error);
   });
-};
 
-// Helper: Convert base64 to file
-const base64ToFile = (base64, filename, mimeType) => {
-  const arr = base64.split(',');
-  const mime = mimeType || arr[0].match(/:(.*?);/)[1];
-  const bstr = atob(arr[1]);
-  let n = bstr.length;
-  const u8arr = new Uint8Array(n);
-  while (n--) {
-    u8arr[n] = bstr.charCodeAt(n);
+// Wrap a transaction's completion in a Promise (fire-and-forget put/delete calls inside cb)
+const tx = (db, storeNames, mode, cb) =>
+  new Promise((resolve, reject) => {
+    const t = db.transaction(storeNames, mode);
+    t.oncomplete = () => resolve();
+    t.onerror = () => reject(t.error);
+    t.onabort = () => reject(t.error);
+    cb(t);
+  });
+
+// Convert a File to ArrayBuffer (native, no base64 overhead)
+const fileToBuffer = (file) => file.arrayBuffer();
+
+// Reconstruct a File from a stored image record (handles legacy base64 rows)
+const recordToFile = (img) => {
+  if (img.fileData instanceof ArrayBuffer || ArrayBuffer.isView(img.fileData)) {
+    return new File([img.fileData], img.fileName, { type: img.fileType });
   }
-  return new File([u8arr], filename, { type: mime });
+  // Legacy base64 data URL stored before this rewrite
+  const arr = img.fileData.split(',');
+  const mime = img.fileType || arr[0].match(/:(.*?);/)?.[1];
+  const bstr = atob(arr[1]);
+  const u8 = new Uint8Array(bstr.length);
+  for (let i = 0; i < bstr.length; i++) u8[i] = bstr.charCodeAt(i);
+  return new File([u8], img.fileName, { type: mime });
 };
 
-// Generate session ID
-export const generateSessionId = () => {
-  return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-};
+// ─── Public API ───────────────────────────────────────────────────────────────
 
-// Save session progress
+export const generateSessionId = () =>
+  `session_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+
+// Save session metadata + property brief + avatar data in one transaction
 export const saveSessionProgress = async (sessionData) => {
-  const db = await openDB();
-  const sessionId = sessionData.sessionId;
-  
-  // Save session metadata
-  await new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORES.SESSIONS], 'readwrite');
-    const store = transaction.objectStore(STORES.SESSIONS);
-    const request = store.put({
+  const db = await getDB();
+  const { sessionId } = sessionData;
+
+  const stores = [STORES.SESSIONS];
+  if (sessionData.propertyBrief) stores.push(STORES.PROPERTY_DATA);
+  if (sessionData.avatarMode || sessionData.selectedAvatar) stores.push(STORES.AVATAR_DATA);
+
+  await tx(db, stores, 'readwrite', (t) => {
+    t.objectStore(STORES.SESSIONS).put({
       sessionId,
       timestamp: Date.now(),
       lastActive: Date.now(),
       isActive: true,
       step: sessionData.step,
-      metadata: sessionData.metadata || {}
+      metadata: sessionData.metadata || {},
     });
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-    transaction.onerror = () => reject(transaction.error);
-  });
-  
-  // Save property brief
-  if (sessionData.propertyBrief) {
-    await new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORES.PROPERTY_DATA], 'readwrite');
-      const store = transaction.objectStore(STORES.PROPERTY_DATA);
-      const request = store.put({
+
+    if (sessionData.propertyBrief) {
+      t.objectStore(STORES.PROPERTY_DATA).put({
         sessionId,
         lastUpdated: Date.now(),
-        ...sessionData.propertyBrief
+        ...sessionData.propertyBrief,
       });
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-      transaction.onerror = () => reject(transaction.error);
-    });
-  }
-  
-  // Save avatar data
-  if (sessionData.avatarMode || sessionData.selectedAvatar) {
-    await new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORES.AVATAR_DATA], 'readwrite');
-      const store = transaction.objectStore(STORES.AVATAR_DATA);
-      const request = store.put({
+    }
+
+    if (sessionData.avatarMode || sessionData.selectedAvatar) {
+      t.objectStore(STORES.AVATAR_DATA).put({
         sessionId,
         avatarMode: sessionData.avatarMode,
         selectedAvatar: sessionData.selectedAvatar,
         avatarPrompt: sessionData.avatarPrompt || '',
         avatarVariantCount: sessionData.avatarVariantCount || 1,
-        lastUpdated: Date.now()
+        lastUpdated: Date.now(),
       });
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-      transaction.onerror = () => reject(transaction.error);
-    });
-  }
-  
+    }
+  });
+
   return sessionId;
 };
 
-// Load session progress
+// Load all session data in parallel reads
 export const loadSessionProgress = async (sessionId) => {
-  const db = await openDB();
-  
-  let propertyData = null;
-  let avatarData = null;
-  let images = [];
-  
-  try {
-    // Load property data
-    await new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORES.PROPERTY_DATA], 'readonly');
-      const store = transaction.objectStore(STORES.PROPERTY_DATA);
-      const request = store.get(sessionId);
-      request.onsuccess = () => {
-        propertyData = request.result;
-        resolve();
-      };
-      request.onerror = () => reject(request.error);
-      transaction.onerror = () => reject(transaction.error);
-    });
-    
-    // Load avatar data
-    await new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORES.AVATAR_DATA], 'readonly');
-      const store = transaction.objectStore(STORES.AVATAR_DATA);
-      const request = store.get(sessionId);
-      request.onsuccess = () => {
-        avatarData = request.result;
-        resolve();
-      };
-      request.onerror = () => reject(request.error);
-      transaction.onerror = () => reject(transaction.error);
-    });
-    
-    // Load images
-    images = await getImagesBySession(sessionId);
-    
-    return {
-      propertyBrief: propertyData || null,
-      avatarData: avatarData || null,
-      images: images
-    };
-  } catch (error) {
-    console.error('Error loading session:', error);
-    return {
-      propertyBrief: null,
-      avatarData: null,
-      images: []
-    };
-  }
+  const db = await getDB();
+
+  const [propertyData, avatarData, images] = await Promise.all([
+    req(db.transaction([STORES.PROPERTY_DATA], 'readonly')
+        .objectStore(STORES.PROPERTY_DATA).get(sessionId)),
+    req(db.transaction([STORES.AVATAR_DATA], 'readonly')
+        .objectStore(STORES.AVATAR_DATA).get(sessionId)),
+    getImagesBySession(sessionId),
+  ]);
+
+  return {
+    propertyBrief: propertyData ?? null,
+    avatarData: avatarData ?? null,
+    images,
+  };
 };
 
-// Save images to IndexedDB
+// Save images — parallel ArrayBuffer conversions, then one batched transaction
 export const saveImagesToDB = async (sessionId, images, type = 'property') => {
-  if (!images || images.length === 0) return;
-  
-  const db = await openDB();
-  
-  // First, delete existing images of this type
-  await new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORES.IMAGES], 'readwrite');
-    const store = transaction.objectStore(STORES.IMAGES);
-    const index = store.index('sessionId');
-    
-    const request = index.getAll(sessionId);
-    request.onsuccess = () => {
-      const existingImages = request.result.filter(img => img.type === type);
-      let deleteCount = 0;
-      
-      if (existingImages.length === 0) {
-        resolve();
-        return;
-      }
-      
-      existingImages.forEach(img => {
-        const deleteRequest = store.delete(img.id);
-        deleteRequest.onsuccess = () => {
-          deleteCount++;
-          if (deleteCount === existingImages.length) {
-            resolve();
-          }
-        };
-        deleteRequest.onerror = () => reject(deleteRequest.error);
-      });
+  if (!images?.length) return;
+
+  const db = await getDB();
+
+  // Convert all files in parallel outside the transaction
+  const records = await Promise.all(
+    images.map(async (file, i) => ({
+      id: `${sessionId}_${type}_${i}_${Date.now()}`,
+      sessionId,
+      type,
+      index: i,
+      fileName: file.name,
+      fileType: file.type,
+      fileData: await fileToBuffer(file),
+      uploadedAt: Date.now(),
+    }))
+  );
+
+  // Delete old + write new in one transaction
+  await tx(db, [STORES.IMAGES], 'readwrite', (t) => {
+    const store = t.objectStore(STORES.IMAGES);
+    store.index('sessionId').getAll(sessionId).onsuccess = (e) => {
+      e.target.result
+        .filter((img) => img.type === type)
+        .forEach((img) => store.delete(img.id));
+      records.forEach((r) => store.put(r));
     };
-    request.onerror = () => reject(request.error);
-    transaction.onerror = () => reject(transaction.error);
   });
-  
-  // Save new images
-  for (let i = 0; i < images.length; i++) {
-    const file = images[i];
-    const fileData = await fileToBase64(file);
-    
-    await new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORES.IMAGES], 'readwrite');
-      const store = transaction.objectStore(STORES.IMAGES);
-      const request = store.put({
-        id: `${sessionId}_${type}_${i}_${Date.now()}`,
-        sessionId,
-        type: type,
-        index: i,
-        fileName: file.name,
-        fileType: file.type,
-        fileData: fileData,
-        uploadedAt: Date.now()
-      });
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-      transaction.onerror = () => reject(transaction.error);
-    });
-  }
 };
 
-// Get images by session
+// Retrieve images for a session, optionally filtered by type
 export const getImagesBySession = async (sessionId, type = null) => {
-  const db = await openDB();
-  
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORES.IMAGES], 'readonly');
-    const store = transaction.objectStore(STORES.IMAGES);
-    const index = store.index('sessionId');
-    
-    const request = index.getAll(sessionId);
-    request.onsuccess = () => {
-      let images = request.result;
-      if (type) {
-        images = images.filter(img => img.type === type);
-      }
-      
-      const files = images.map(img => 
-        base64ToFile(img.fileData, img.fileName, img.fileType)
-      );
-      resolve(files);
-    };
-    request.onerror = () => reject(request.error);
-    transaction.onerror = () => reject(transaction.error);
-  });
+  const db = await getDB();
+  const all = await req(
+    db.transaction([STORES.IMAGES], 'readonly')
+      .objectStore(STORES.IMAGES)
+      .index('sessionId')
+      .getAll(sessionId)
+  );
+  const filtered = type ? all.filter((img) => img.type === type) : all;
+  return filtered.map(recordToFile);
 };
 
-// Save composites
+// Save composites: delete old + write new in one transaction
 export const saveCompositesToDB = async (sessionId, composites) => {
-  if (!composites || composites.length === 0) return;
-  
-  const db = await openDB();
-  
-  // Delete existing composites
-  await new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORES.COMPOSITES], 'readwrite');
-    const store = transaction.objectStore(STORES.COMPOSITES);
-    const index = store.index('sessionId');
-    
-    const request = index.getAll(sessionId);
-    request.onsuccess = () => {
-      const existing = request.result;
-      let deleteCount = 0;
-      
-      if (existing.length === 0) {
-        resolve();
-        return;
-      }
-      
-      existing.forEach(comp => {
-        const deleteRequest = store.delete(comp.id);
-        deleteRequest.onsuccess = () => {
-          deleteCount++;
-          if (deleteCount === existing.length) {
-            resolve();
-          }
-        };
-        deleteRequest.onerror = () => reject(deleteRequest.error);
-      });
-    };
-    request.onerror = () => reject(request.error);
-    transaction.onerror = () => reject(transaction.error);
-  });
-  
-  // Save new composites
-  for (let i = 0; i < composites.length; i++) {
-    const composite = composites[i];
-    await new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORES.COMPOSITES], 'readwrite');
-      const store = transaction.objectStore(STORES.COMPOSITES);
-      const request = store.put({
-        id: `${sessionId}_composite_${i}`,
-        sessionId,
-        index: i,
-        url: composite.url,
-        title: composite.title,
-        propertyIndex: composite.propertyIndex,
-        createdAt: Date.now()
-      });
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-      transaction.onerror = () => reject(transaction.error);
-    });
-  }
-};
+  if (!composites?.length) return;
 
-// Load composites
-export const loadCompositesFromDB = async (sessionId) => {
-  const db = await openDB();
-  
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORES.COMPOSITES], 'readonly');
-    const store = transaction.objectStore(STORES.COMPOSITES);
-    const index = store.index('sessionId');
-    
-    const request = index.getAll(sessionId);
-    request.onsuccess = () => {
-      const composites = request.result.sort((a, b) => a.index - b.index);
-      resolve(composites.map(comp => ({
-        url: comp.url,
-        title: comp.title,
-        propertyIndex: comp.propertyIndex,
-        file: null
-      })));
-    };
-    request.onerror = () => reject(request.error);
-    transaction.onerror = () => reject(transaction.error);
-  });
-};
+  const db = await getDB();
 
-// Save scripts
-export const saveScriptsToDB = async (sessionId, scripts, isBatchMode) => {
-  const db = await openDB();
-  
-  // Delete existing scripts
-  await new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORES.SCRIPTS], 'readwrite');
-    const store = transaction.objectStore(STORES.SCRIPTS);
-    const index = store.index('sessionId');
-    
-    const request = index.getAll(sessionId);
-    request.onsuccess = () => {
-      const existing = request.result;
-      let deleteCount = 0;
-      
-      if (existing.length === 0) {
-        resolve();
-        return;
-      }
-      
-      existing.forEach(script => {
-        const deleteRequest = store.delete(script.id);
-        deleteRequest.onsuccess = () => {
-          deleteCount++;
-          if (deleteCount === existing.length) {
-            resolve();
-          }
-        };
-        deleteRequest.onerror = () => reject(deleteRequest.error);
-      });
-    };
-    request.onerror = () => reject(request.error);
-    transaction.onerror = () => reject(transaction.error);
-  });
-  
-  // Save new scripts
-  if (isBatchMode && Array.isArray(scripts)) {
-    for (let i = 0; i < scripts.length; i++) {
-      await new Promise((resolve, reject) => {
-        const transaction = db.transaction([STORES.SCRIPTS], 'readwrite');
-        const store = transaction.objectStore(STORES.SCRIPTS);
-        const request = store.put({
-          id: `${sessionId}_script_${i}`,
+  await tx(db, [STORES.COMPOSITES], 'readwrite', (t) => {
+    const store = t.objectStore(STORES.COMPOSITES);
+    store.index('sessionId').getAll(sessionId).onsuccess = (e) => {
+      e.target.result.forEach((c) => store.delete(c.id));
+      composites.forEach((composite, i) =>
+        store.put({
+          id: `${sessionId}_composite_${i}`,
           sessionId,
           index: i,
-          hook: scripts[i].hook || '',
-          walkthrough: scripts[i].walkthrough || '',
-          cta: scripts[i].cta || '',
-          fullScript: scripts[i].fullScript || '',
-          _userIntent: scripts[i]._userIntent || '',
-          createdAt: Date.now()
-        });
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-        transaction.onerror = () => reject(transaction.error);
-      });
-    }
-  } else if (typeof scripts === 'string') {
-    await new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORES.SCRIPTS], 'readwrite');
-      const store = transaction.objectStore(STORES.SCRIPTS);
-      const request = store.put({
-        id: `${sessionId}_script_single`,
-        sessionId,
-        index: 0,
-        fullScript: scripts,
-        createdAt: Date.now()
-      });
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-      transaction.onerror = () => reject(transaction.error);
-    });
-  }
-};
-
-// Load scripts
-export const loadScriptsFromDB = async (sessionId) => {
-  const db = await openDB();
-  
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORES.SCRIPTS], 'readonly');
-    const store = transaction.objectStore(STORES.SCRIPTS);
-    const index = store.index('sessionId');
-    
-    const request = index.getAll(sessionId);
-    request.onsuccess = () => {
-      resolve(request.result.sort((a, b) => a.index - b.index));
+          url: composite.url,
+          title: composite.title,
+          propertyIndex: composite.propertyIndex,
+          createdAt: Date.now(),
+        })
+      );
     };
-    request.onerror = () => reject(request.error);
-    transaction.onerror = () => reject(transaction.error);
   });
 };
 
-// Get active sessions
-export const getActiveSessions = async () => {
-  const db = await openDB();
-  
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORES.SESSIONS], 'readonly');
-    const store = transaction.objectStore(STORES.SESSIONS);
-    const index = store.index('isActive');
-    
-    const request = index.getAll(true);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-    transaction.onerror = () => reject(transaction.error);
-  });
+export const loadCompositesFromDB = async (sessionId) => {
+  const db = await getDB();
+  const all = await req(
+    db.transaction([STORES.COMPOSITES], 'readonly')
+      .objectStore(STORES.COMPOSITES)
+      .index('sessionId')
+      .getAll(sessionId)
+  );
+  return all
+    .sort((a, b) => a.index - b.index)
+    .map((c) => ({ url: c.url, title: c.title, propertyIndex: c.propertyIndex, file: null }));
 };
 
-// Delete session
-export const deleteSession = async (sessionId) => {
-  const db = await openDB();
-  const stores = [STORES.SESSIONS, STORES.PROPERTY_DATA, STORES.AVATAR_DATA, STORES.IMAGES, STORES.COMPOSITES, STORES.SCRIPTS];
-  
-  for (const storeName of stores) {
-    await new Promise((resolve, reject) => {
-      const transaction = db.transaction([storeName], 'readwrite');
-      const store = transaction.objectStore(storeName);
-      
-      if (storeName === STORES.IMAGES || storeName === STORES.COMPOSITES || storeName === STORES.SCRIPTS) {
-        const index = store.index('sessionId');
-        const request = index.getAll(sessionId);
-        
-        request.onsuccess = () => {
-          const items = request.result;
-          let deleteCount = 0;
-          
-          if (items.length === 0) {
-            resolve();
-            return;
-          }
-          
-          items.forEach(item => {
-            const deleteRequest = store.delete(item.id);
-            deleteRequest.onsuccess = () => {
-              deleteCount++;
-              if (deleteCount === items.length) {
-                resolve();
-              }
-            };
-            deleteRequest.onerror = () => reject(deleteRequest.error);
-          });
-        };
-        request.onerror = () => reject(request.error);
-      } else {
-        const request = store.delete(sessionId);
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-      }
-      
-      transaction.onerror = () => reject(transaction.error);
+// Save scripts: delete old + write new in one transaction
+export const saveScriptsToDB = async (sessionId, scripts, isBatchMode) => {
+  const db = await getDB();
+
+  const records = [];
+  if (isBatchMode && Array.isArray(scripts)) {
+    scripts.forEach((s, i) =>
+      records.push({
+        id: `${sessionId}_script_${i}`,
+        sessionId,
+        index: i,
+        hook: s.hook || '',
+        walkthrough: s.walkthrough || '',
+        cta: s.cta || '',
+        fullScript: s.fullScript || '',
+        _userIntent: s._userIntent || '',
+        createdAt: Date.now(),
+      })
+    );
+  } else if (typeof scripts === 'string') {
+    records.push({
+      id: `${sessionId}_script_single`,
+      sessionId,
+      index: 0,
+      fullScript: scripts,
+      createdAt: Date.now(),
     });
+  }
+
+  await tx(db, [STORES.SCRIPTS], 'readwrite', (t) => {
+    const store = t.objectStore(STORES.SCRIPTS);
+    store.index('sessionId').getAll(sessionId).onsuccess = (e) => {
+      e.target.result.forEach((s) => store.delete(s.id));
+      records.forEach((r) => store.put(r));
+    };
+  });
+};
+
+export const loadScriptsFromDB = async (sessionId) => {
+  const db = await getDB();
+  const all = await req(
+    db.transaction([STORES.SCRIPTS], 'readonly')
+      .objectStore(STORES.SCRIPTS)
+      .index('sessionId')
+      .getAll(sessionId)
+  );
+  return all.sort((a, b) => a.index - b.index);
+};
+
+export const getActiveSessions = async () => {
+  const db = await getDB();
+  return req(
+    db.transaction([STORES.SESSIONS], 'readonly')
+      .objectStore(STORES.SESSIONS)
+      .index('isActive')
+      .getAll(true)
+  );
+};
+
+// Delete all data for a session in one multi-store transaction
+export const deleteSession = async (sessionId) => {
+  const db = await getDB();
+  const allStores = [
+    STORES.SESSIONS, STORES.PROPERTY_DATA, STORES.AVATAR_DATA,
+    STORES.IMAGES, STORES.COMPOSITES, STORES.SCRIPTS,
+  ];
+
+  await tx(db, allStores, 'readwrite', (t) => {
+    t.objectStore(STORES.SESSIONS).delete(sessionId);
+    t.objectStore(STORES.PROPERTY_DATA).delete(sessionId);
+    t.objectStore(STORES.AVATAR_DATA).delete(sessionId);
+
+    for (const name of [STORES.IMAGES, STORES.COMPOSITES, STORES.SCRIPTS]) {
+      const store = t.objectStore(name);
+      store.index('sessionId').getAll(sessionId).onsuccess = (e) =>
+        e.target.result.forEach((item) => store.delete(item.id));
+    }
+  });
+};
+
+// Clear generation data after video is produced
+export const clearSessionAfterGeneration = async (sessionId, options = {}) => {
+  const { keepSession = false, keepPropertyImages = false, keepAvatars = false } = options;
+  const db = await getDB();
+
+  const storeNames = [STORES.COMPOSITES, STORES.SCRIPTS, STORES.PROPERTY_DATA];
+  if (!keepPropertyImages) storeNames.push(STORES.IMAGES);
+  if (!keepAvatars) storeNames.push(STORES.AVATAR_DATA);
+  storeNames.push(STORES.SESSIONS);
+
+  try {
+    await tx(db, storeNames, 'readwrite', (t) => {
+      // Always clear composites and scripts
+      for (const name of [STORES.COMPOSITES, STORES.SCRIPTS]) {
+        const store = t.objectStore(name);
+        store.index('sessionId').getAll(sessionId).onsuccess = (e) =>
+          e.target.result.forEach((item) => store.delete(item.id));
+      }
+
+      // Always clear property brief
+      t.objectStore(STORES.PROPERTY_DATA).delete(sessionId);
+
+      if (!keepPropertyImages) {
+        const imgStore = t.objectStore(STORES.IMAGES);
+        imgStore.index('sessionId').getAll(sessionId).onsuccess = (e) =>
+          e.target.result.forEach((img) => imgStore.delete(img.id));
+      }
+
+      if (!keepAvatars) {
+        t.objectStore(STORES.AVATAR_DATA).delete(sessionId);
+      }
+
+      const sessStore = t.objectStore(STORES.SESSIONS);
+      if (!keepSession) {
+        sessStore.delete(sessionId);
+      } else {
+        sessStore.get(sessionId).onsuccess = (e) => {
+          const session = e.target.result;
+          if (session) {
+            sessStore.put({
+              ...session,
+              videosGenerated: true,
+              generatedAt: Date.now(),
+              isActive: false,
+              lastActive: Date.now(),
+            });
+          }
+        };
+      }
+    });
+
+    return { success: true, sessionId };
+  } catch (error) {
+    console.error('Error clearing session:', error);
+    return { success: false, error: error.message };
   }
 };
 
-// Auto-save progress
-let autoSaveTimeout;
+export const clearOldSessions = async (daysOld = 7) => {
+  const db = await getDB();
+  const cutoff = Date.now() - daysOld * 24 * 60 * 60 * 1000;
+
+  const all = await req(
+    db.transaction([STORES.SESSIONS], 'readonly')
+      .objectStore(STORES.SESSIONS)
+      .index('timestamp')
+      .getAll()
+  );
+
+  const old = all.filter((s) => s.timestamp < cutoff);
+  const results = await Promise.allSettled(
+    old.map((s) => clearSessionAfterGeneration(s.sessionId, { keepSession: false }))
+  );
+
+  const cleared = results.filter((r) => r.status === 'fulfilled').length;
+  return { success: true, clearedCount: cleared };
+};
+
+export const resetSessionData = async (sessionId, preserveUserPreferences = true) =>
+  clearSessionAfterGeneration(sessionId, {
+    keepSession: true,
+    keepPropertyImages: preserveUserPreferences,
+    keepAvatars: preserveUserPreferences,
+  });
+
+// ─── Auto-save: per-session timeouts (avoids cross-session cancellation) ──────
+
+const autoSaveTimeouts = new Map();
+
 export const autoSaveProgress = (sessionId, getCurrentState, onSaveComplete) => {
-  clearTimeout(autoSaveTimeout);
-  autoSaveTimeout = setTimeout(async () => {
+  clearTimeout(autoSaveTimeouts.get(sessionId));
+
+  const id = setTimeout(async () => {
+    autoSaveTimeouts.delete(sessionId);
     try {
       const state = getCurrentState();
       await saveSessionProgress({
@@ -545,262 +445,29 @@ export const autoSaveProgress = (sessionId, getCurrentState, onSaveComplete) => 
         avatarVariantCount: state.avatarVariantCount,
         metadata: {
           lastEdited: Date.now(),
-          propertyImagesCount: state.propertyImages?.length || 0,
-          compositesCount: state.composites?.length || 0,
-          selectedCount: state.selectedCompositeIndices?.size || 0
-        }
+          propertyImagesCount: state.propertyImages?.length ?? 0,
+          compositesCount: state.composites?.length ?? 0,
+          selectedCount: state.selectedCompositeIndices?.size ?? 0,
+        },
       });
-      
-      if (state.propertyImages?.length > 0) {
+
+      if (state.propertyImages?.length) {
         await saveImagesToDB(sessionId, state.propertyImages, 'property');
       }
-      
-      if (state.composites?.length > 0) {
+      if (state.composites?.length) {
         await saveCompositesToDB(sessionId, state.composites);
       }
-      
-      if (state.structuredScripts?.length > 0) {
+      if (state.structuredScripts?.length) {
         await saveScriptsToDB(sessionId, state.structuredScripts, true);
       } else if (state.script) {
         await saveScriptsToDB(sessionId, state.script, false);
       }
-      
-      if (onSaveComplete) onSaveComplete();
+
+      onSaveComplete?.();
     } catch (error) {
       console.error('Auto-save failed:', error);
     }
   }, 2000);
-};
 
-// Clear session data after video generation
-export const clearSessionAfterGeneration = async (sessionId, options = {}) => {
-  const {
-    keepSession = false,     // Keep session metadata but clear generation data
-    keepPropertyImages = false, // Keep property images
-    keepAvatars = false,     // Keep avatar data
-  } = options;
-  
-  const db = await openDB();
-  
-  try {
-    // Clear composites (always clear after generation)
-    await new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORES.COMPOSITES], 'readwrite');
-      const store = transaction.objectStore(STORES.COMPOSITES);
-      const index = store.index('sessionId');
-      const request = index.getAll(sessionId);
-      
-      request.onsuccess = () => {
-        const composites = request.result;
-        let deleteCount = 0;
-        
-        if (composites.length === 0) {
-          resolve();
-          return;
-        }
-        
-        composites.forEach(composite => {
-          const deleteRequest = store.delete(composite.id);
-          deleteRequest.onsuccess = () => {
-            deleteCount++;
-            if (deleteCount === composites.length) {
-              console.log(`Cleared ${deleteCount} composites`);
-              resolve();
-            }
-          };
-          deleteRequest.onerror = () => reject(deleteRequest.error);
-        });
-      };
-      request.onerror = () => reject(request.error);
-      transaction.onerror = () => reject(transaction.error);
-    });
-    
-    // Clear scripts
-    await new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORES.SCRIPTS], 'readwrite');
-      const store = transaction.objectStore(STORES.SCRIPTS);
-      const index = store.index('sessionId');
-      const request = index.getAll(sessionId);
-      
-      request.onsuccess = () => {
-        const scripts = request.result;
-        let deleteCount = 0;
-        
-        if (scripts.length === 0) {
-          resolve();
-          return;
-        }
-        
-        scripts.forEach(script => {
-          const deleteRequest = store.delete(script.id);
-          deleteRequest.onsuccess = () => {
-            deleteCount++;
-            if (deleteCount === scripts.length) {
-              console.log(`Cleared ${deleteCount} scripts`);
-              resolve();
-            }
-          };
-          deleteRequest.onerror = () => reject(deleteRequest.error);
-        });
-      };
-      request.onerror = () => reject(request.error);
-      transaction.onerror = () => reject(transaction.error);
-    });
-    
-    // Clear property images if not keeping them
-    if (!keepPropertyImages) {
-      await new Promise((resolve, reject) => {
-        const transaction = db.transaction([STORES.IMAGES], 'readwrite');
-        const store = transaction.objectStore(STORES.IMAGES);
-        const index = store.index('sessionId');
-        const request = index.getAll(sessionId);
-        
-        request.onsuccess = () => {
-          const images = request.result;
-          let deleteCount = 0;
-          
-          if (images.length === 0) {
-            resolve();
-            return;
-          }
-          
-          images.forEach(image => {
-            const deleteRequest = store.delete(image.id);
-            deleteRequest.onsuccess = () => {
-              deleteCount++;
-              if (deleteCount === images.length) {
-                console.log(`Cleared ${deleteCount} images`);
-                resolve();
-              }
-            };
-            deleteRequest.onerror = () => reject(deleteRequest.error);
-          });
-        };
-        request.onerror = () => reject(request.error);
-        transaction.onerror = () => reject(transaction.error);
-      });
-    }
-    
-    // Clear avatar data if not keeping
-    if (!keepAvatars) {
-      await new Promise((resolve, reject) => {
-        const transaction = db.transaction([STORES.AVATAR_DATA], 'readwrite');
-        const store = transaction.objectStore(STORES.AVATAR_DATA);
-        const request = store.delete(sessionId);
-        request.onsuccess = () => {
-          console.log('Cleared avatar data');
-          resolve();
-        };
-        request.onerror = () => reject(request.error);
-        transaction.onerror = () => reject(transaction.error);
-      });
-    }
-    
-    // Clear property brief data
-    await new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORES.PROPERTY_DATA], 'readwrite');
-      const store = transaction.objectStore(STORES.PROPERTY_DATA);
-      const request = store.delete(sessionId);
-      request.onsuccess = () => {
-        console.log('Cleared property data');
-        resolve();
-      };
-      request.onerror = () => reject(request.error);
-      transaction.onerror = () => reject(transaction.error);
-    });
-    
-    // Update session metadata to mark as generated
-    if (keepSession) {
-      await new Promise((resolve, reject) => {
-        const transaction = db.transaction([STORES.SESSIONS], 'readwrite');
-        const store = transaction.objectStore(STORES.SESSIONS);
-        const request = store.get(sessionId);
-        
-        request.onsuccess = () => {
-          const session = request.result;
-          if (session) {
-            session.videosGenerated = true;
-            session.generatedAt = Date.now();
-            session.isActive = false;
-            session.lastActive = Date.now();
-            
-            const updateRequest = store.put(session);
-            updateRequest.onsuccess = () => resolve();
-            updateRequest.onerror = () => reject(updateRequest.error);
-          } else {
-            resolve();
-          }
-        };
-        request.onerror = () => reject(request.error);
-        transaction.onerror = () => reject(transaction.error);
-      });
-    } else {
-      // Delete session completely
-      await new Promise((resolve, reject) => {
-        const transaction = db.transaction([STORES.SESSIONS], 'readwrite');
-        const store = transaction.objectStore(STORES.SESSIONS);
-        const request = store.delete(sessionId);
-        request.onsuccess = () => {
-          console.log('Cleared session');
-          resolve();
-        };
-        request.onerror = () => reject(request.error);
-        transaction.onerror = () => reject(transaction.error);
-      });
-    }
-    
-    console.log(`Session ${sessionId} cleaned up successfully`);
-    return { success: true, sessionId };
-    
-  } catch (error) {
-    console.error('Error clearing session:', error);
-    return { success: false, error: error.message };
-  }
-};
-
-// Clear old sessions (older than specified days)
-export const clearOldSessions = async (daysOld = 7) => {
-  const db = await openDB();
-  const cutoffTime = Date.now() - (daysOld * 24 * 60 * 60 * 1000);
-  
-  try {
-    // Get sessions older than cutoff
-    const sessions = await new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORES.SESSIONS], 'readonly');
-      const store = transaction.objectStore(STORES.SESSIONS);
-      const index = store.index('timestamp');
-      const request = index.getAll();
-      
-      request.onsuccess = () => {
-        const allSessions = request.result;
-        const oldSessions = allSessions.filter(s => s.timestamp < cutoffTime);
-        resolve(oldSessions);
-      };
-      request.onerror = () => reject(request.error);
-      transaction.onerror = () => reject(transaction.error);
-    });
-    
-    // Delete each old session
-    const results = [];
-    for (const session of sessions) {
-      const result = await clearSessionAfterGeneration(session.sessionId, { keepSession: false });
-      results.push(result);
-    }
-    
-    console.log(`Cleared ${results.length} old sessions`);
-    return { success: true, clearedCount: results.length };
-    
-  } catch (error) {
-    console.error('Error clearing old sessions:', error);
-    return { success: false, error: error.message };
-  }
-};
-
-// Clear all data for a specific session after video generation
-export const resetSessionData = async (sessionId, preserveUserPreferences = true) => {
-  return await clearSessionAfterGeneration(sessionId, {
-    keepSession: true,
-    keepPropertyImages: preserveUserPreferences,
-    keepAvatars: preserveUserPreferences
-  });
+  autoSaveTimeouts.set(sessionId, id);
 };

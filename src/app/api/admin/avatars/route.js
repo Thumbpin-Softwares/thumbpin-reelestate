@@ -1,4 +1,4 @@
-import { PutObjectCommand, ListObjectsV2Command, DeleteObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
+import { PutObjectCommand, GetObjectCommand, ListObjectsV2Command, DeleteObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { NextResponse } from "next/server";
 import { verifyAdminSession } from "@/app/api/admin/auth/me/route";
 import { s3, BUCKET } from "@/lib/r2";
@@ -86,6 +86,35 @@ export async function POST(request) {
   }
 }
 
+// PATCH - Set thumbnail for a collection
+export async function PATCH(request) {
+  const session = await verifyAdminSession();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const { collectionId, thumbnailKey } = await request.json();
+    if (!collectionId || !thumbnailKey) {
+      return NextResponse.json({ error: "collectionId and thumbnailKey are required" }, { status: 400 });
+    }
+
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: BUCKET,
+        Key: `Avatars/meta/${collectionId}.json`,
+        Body: JSON.stringify({ thumbnailKey }),
+        ContentType: "application/json",
+      })
+    );
+
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error("[Avatar Thumbnail] Error:", err);
+    return NextResponse.json({ error: "Failed to set thumbnail" }, { status: 500 });
+  }
+}
+
 // GET - List all collections or specific collection
 export async function GET(request) {
   const session = await verifyAdminSession();
@@ -108,17 +137,17 @@ export async function GET(request) {
     // If requesting specific collection
     if (collectionId) {
       const collectionFiles = [];
-      
+
       for (const obj of objects) {
         if (obj.Key.endsWith('/')) continue;
-        
+
         try {
           const headCommand = new HeadObjectCommand({
             Bucket: BUCKET,
             Key: obj.Key,
           });
           const metadata = await s3.send(headCommand);
-          
+
           if (metadata.Metadata?.['collection-id'] === collectionId) {
             collectionFiles.push({
               id: obj.Key,
@@ -144,6 +173,23 @@ export async function GET(request) {
         Key: collectionFiles[0].key,
       }));
 
+      // Read thumbnail manifest if one exists
+      let thumbnailKey = null;
+      try {
+        const manifestRes = await s3.send(new GetObjectCommand({
+          Bucket: BUCKET,
+          Key: `Avatars/meta/${collectionId}.json`,
+        }));
+        const text = await manifestRes.Body.transformToString();
+        thumbnailKey = JSON.parse(text).thumbnailKey || null;
+      } catch {
+        // No manifest — use first file
+      }
+
+      const coverImage = thumbnailKey
+        ? `/api/admin/r2?key=${encodeURIComponent(thumbnailKey)}`
+        : collectionFiles[0].url;
+
       return NextResponse.json({
         collection: {
           id: collectionId,
@@ -151,7 +197,8 @@ export async function GET(request) {
           type: firstFileMeta.Metadata?.type || 'product',
           createdAt: firstFileMeta.Metadata?.['uploaded-at'] || new Date().toISOString(),
           fileCount: collectionFiles.length,
-          coverImage: collectionFiles[0].url,
+          coverImage,
+          thumbnailKey,
           files: collectionFiles
         }
       });
@@ -186,12 +233,32 @@ export async function GET(request) {
       }
     }
 
+    // Read thumbnail manifests for all collections in parallel
+    await Promise.all(
+      Array.from(collectionsMap.entries()).map(async ([collId, coll]) => {
+        try {
+          const manifestRes = await s3.send(new GetObjectCommand({
+            Bucket: BUCKET,
+            Key: `Avatars/meta/${collId}.json`,
+          }));
+          const text = await manifestRes.Body.transformToString();
+          const { thumbnailKey } = JSON.parse(text);
+          if (thumbnailKey) {
+            coll.coverImage = `/api/admin/r2?key=${encodeURIComponent(thumbnailKey)}`;
+            coll.thumbnailKey = thumbnailKey;
+          }
+        } catch {
+          // No manifest — keep first-file coverImage
+        }
+      })
+    );
+
     const collections = Array.from(collectionsMap.values());
     collections.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       collections,
-      total: collections.length 
+      total: collections.length
     });
   } catch (err) {
     console.error("[Avatar List] Error:", err);
@@ -242,10 +309,17 @@ export async function DELETE(request) {
     }
 
     for (const key of toDelete) {
+      await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
+    }
+
+    // Delete thumbnail manifest if one exists
+    try {
       await s3.send(new DeleteObjectCommand({
         Bucket: BUCKET,
-        Key: key,
+        Key: `Avatars/meta/${collectionId}.json`,
       }));
+    } catch {
+      // No manifest to delete
     }
 
     return NextResponse.json({
