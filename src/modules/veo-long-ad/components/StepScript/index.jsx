@@ -64,6 +64,7 @@ export function StepScript({
   // ── Chunking state ───────────────────────────────────────────────────────
   const [chunks, setChunks] = useState([]);
   const [masterVoicePrompt, setMasterVoicePrompt] = useState("");
+  const [presenterDescription, setPresenterDescription] = useState("");
   const [chunking, setChunking] = useState(false);
   const [expandedChunk, setExpandedChunk] = useState(null);
   const chunksRef = useRef(null);
@@ -143,6 +144,7 @@ export function StepScript({
 
       setChunks(data.chunks || []);
       setMasterVoicePrompt(data.masterVoicePrompt || "");
+      setPresenterDescription(data.presenterDescription || "");
       toast.success(
         `Split into ${data.totalChunks} chunk${data.totalChunks !== 1 ? "s" : ""} — ~${data.totalEstimatedDuration}s video`
       );
@@ -161,7 +163,7 @@ export function StepScript({
     if (chunks.length === 0) {
       return toast.error("Please chunk the script first.");
     }
-    onGenerate({ chunks, masterVoicePrompt, language });
+    onGenerate({ chunks, masterVoicePrompt, presenterDescription, language });
   };
 
   return (

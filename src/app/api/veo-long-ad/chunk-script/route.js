@@ -96,7 +96,7 @@ export async function POST(request) {
     };
     const langName = languageMap[language] || "English";
 
-    const MAX_CHUNKS = 10;
+    const MAX_CHUNKS = 5;
 
     const chunkingPrompt = `You are a world-class AI video director and cinematic real-estate filmmaker specializing in ultra-realistic luxury property social media ads.
 
@@ -104,14 +104,23 @@ Your goal is to generate highly believable human-centered real-estate video prom
 
 TASK:
 1. Split the provided script into natural spoken chunks.
-2. Each chunk should feel like a realistic short-form social media clip.
-3. Keep each chunk approximately 5–7 seconds long for maximum realism.
+2. Each chunk should feel like a distinct, punchy social media clip cut.
+3. Keep each chunk approximately 4–6 seconds long — shorter cuts feel more dynamic and reel-like.
 4. Never split mid-sentence or mid-thought.
 5. Combine smaller lines naturally when needed.
 6. Generate a MASTER VOICE PROMPT for consistent voice realism across all chunks.
-7. For every chunk, generate a cinematic VEO production prompt grounded in:
+7. Generate a PRESENTER DESCRIPTION (physical appearance) from the avatar reference image.
+8. For every chunk, generate a cinematic VEO production prompt grounded in:
    • the provided avatar reference image
    • the provided property reference images
+
+SHOT VARIETY RULES (MANDATORY):
+• Every chunk MUST use a DIFFERENT shot type from the previous chunk — never repeat the same angle consecutively
+• Rotate through these types: (1) Wide establishing shot, (2) Medium presenter shot, (3) Close-up presenter shot, (4) Walking/moving shot with presenter, (5) B-roll property exterior (NO presenter in frame)
+• If the script has 3 or more chunks: at least 1 chunk MUST be pure B-roll (architectural exterior, gate, landscaping — no presenter visible)
+• Chunk 1: always a dynamic wide or medium shot that introduces the presenter and property together
+• Last chunk: memorable close-up push-in or slow pull-back to end strongly
+• Think like a real Instagram reel editor — fast, visual, diverse
 
 SCRIPT:
 ---
@@ -127,7 +136,10 @@ ${MAX_CHUNKS}
 OUTPUT FORMAT:
 
 MASTER_VOICE_PROMPT:
-[One highly detailed paragraph describing realistic voice behavior, pacing, accent, microphone quality, breathing, pauses, conversational style, and emotional realism.]
+[CRITICAL: First, look at the avatar/presenter reference image. Determine the presenter's gender from the image — you MUST commit to exactly "male voice" or "female voice", never leave it ambiguous or say "male or female". Then write one highly detailed paragraph describing their voice: start with the explicit gender (e.g. "Female voice" or "Male voice"), estimated age range, accent, pitch, tone quality, pacing, breathing, microphone quality, conversational style, and emotional realism. This will be used for ALL chunks — the gender and vocal identity must be completely locked and consistent throughout.]
+
+PRESENTER_DESCRIPTION:
+[Look at the avatar/presenter reference image. Write ONE concise sentence describing their exact physical appearance: gender, approximate age, hair color and style, skin tone, and specific clothing/outfit with colors. This will be used to anchor the presenter's identity in AI video continuations. Example: "Indian woman, late 20s, long straight dark hair, warm medium-brown skin, wearing a navy blazer over a white top." If no avatar image provided, write "Presenter: appearance unknown."]
 
 CHUNKS:
 
@@ -144,7 +156,7 @@ CAMERA_DIRECTION:
 
 VEO_PROMPT:
 
-🎬 VEO 3.1 PROMPT — CHUNK 1 OF X (${langName.toUpperCase()}, 5–7 SEC)
+🎬 VEO 3.1 PROMPT — CHUNK 1 OF X (${langName.toUpperCase()}, 4–6 SEC)
 
 🎭 CHARACTER (from avatar reference image):
 • Preserve the exact identity, hairstyle, facial structure, skin tone, clothing, and overall appearance from the reference image
@@ -259,9 +271,10 @@ IMPORTANT GLOBAL RULES:
 • Avoid AI-perfect facial symmetry
 • Avoid robotic pacing or movement
 • Shots should feel naturally filmed for social media
-• Preserve continuity between chunks
+• NEVER use the same shot type twice in a row — vary every chunk
+• Preserve continuity between chunks on presenter appearance and property style
 • Use realistic environmental physics and motion
-• Return ONLY the structured out`;
+• Return ONLY the structured output`;
 
     const parts = [{ text: chunkingPrompt }];
     locationDataArr.forEach((d) => parts.push({ inlineData: d }));
@@ -278,8 +291,11 @@ IMPORTANT GLOBAL RULES:
     }
 
     // ── Parse the structured output ──────────────────────────────────────────
-    const masterVoiceMatch = rawText.match(/MASTER_VOICE_PROMPT:\s*\n([\s\S]*?)(?=\nCHUNKS:|$)/i);
+    const masterVoiceMatch = rawText.match(/MASTER_VOICE_PROMPT:\s*\n([\s\S]*?)(?=\nPRESENTER_DESCRIPTION:|CHUNKS:|$)/i);
     const masterVoicePrompt = masterVoiceMatch?.[1]?.trim() || getDefaultVoicePrompt(language);
+
+    const presenterDescMatch = rawText.match(/PRESENTER_DESCRIPTION:\s*\n([\s\S]*?)(?=\nCHUNKS:|$)/i);
+    const presenterDescription = presenterDescMatch?.[1]?.trim() || "";
 
     const chunks = [];
     const chunkRegex = /\[CHUNK\s+\d+\]([\s\S]*?)\[END_CHUNK\]/gi;
@@ -337,6 +353,7 @@ IMPORTANT GLOBAL RULES:
       success: true,
       chunks,
       masterVoicePrompt,
+      presenterDescription,
       totalChunks: chunks.length,
       totalEstimatedDuration,
     });
@@ -359,7 +376,7 @@ function getDefaultVoicePrompt(language = "english") {
     marathi: "fluent Marathi with warm Maharashtrian delivery",
   };
   const accent = accents[language] || accents.english;
-  return `Male or female, age 26–36, ${accent}, medium-high pitch with natural variation, rich warm authoritative tone, real-estate influencer delivery style — fast on highlights, softer on premium details, meaningful dramatic pauses. Pacing ~140 wpm. Recorded on dry close-mic in treated studio, zero reverb, zero echo, zero noise, warm chest resonance, natural sibilance, natural dynamic range.`;
+  return `Female voice, age 28–35, ${accent}, warm medium-high pitch with natural variation, rich authoritative tone, real-estate creator delivery style — fast on highlights, softer on premium details, meaningful pauses. Pacing ~140 wpm. Recorded on dry close-mic, zero reverb, zero echo, zero noise, warm chest resonance, natural sibilance, natural dynamic range.`;
 }
 
 function buildFallbackVeoPrompt(text, index, total, voicePrompt, langName) {
