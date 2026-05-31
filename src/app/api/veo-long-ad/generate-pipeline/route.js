@@ -78,6 +78,7 @@ export async function POST(request) {
     }
 
     const masterVoicePrompt = (formData.get("masterVoicePrompt") || "").toString();
+    const presenterDescription = (formData.get("presenterDescription") || "").toString();
     const language = (formData.get("language") || "english").toString();
     const aspectRatio = (formData.get("aspectRatio") || "9:16").toString();
 
@@ -188,18 +189,53 @@ export async function POST(request) {
               ? "Gemini encountered a transient error. Please retry in 1–2 minutes."
               : msg || "Operation failed");
           }
-          return currentOp.response;
+
+          console.log("[VeoLongAd] Operation done. Top-level keys:", currentOp ? Object.keys(currentOp) : "null");
+          const resp = currentOp.response ?? currentOp;
+          console.log("[VeoLongAd] Response keys:", resp ? Object.keys(resp) : "null");
+          try {
+            console.log("[VeoLongAd] Response (truncated):", JSON.stringify(resp)?.slice(0, 600));
+          } catch (_) {}
+
+          return resp;
         }
 
         function extractGeneratedVideo(result) {
-          return (
+          if (!result) return null;
+
+          // Direct generatedVideos array (most common SDK shape)
+          const v0 =
             result?.generatedVideos?.[0]?.video ||
-            result?.generatedVideos?.[0]?.videoResponse ||
+            result?.generatedVideos?.[0]?.videoResponse;
+          if (v0) return v0;
+
+          // Nested under response (operation wrapper shape)
+          const v1 =
             result?.response?.generatedVideos?.[0]?.video ||
-            result?.response?.generatedVideos?.[0]?.videoResponse ||
-            result?.candidates?.[0]?.content?.parts?.find((p) => p?.fileData?.fileUri)?.fileData ||
-            null
-          );
+            result?.response?.generatedVideos?.[0]?.videoResponse;
+          if (v1) return v1;
+
+          // generateVideoResponse.generatedSamples (proto REST shape)
+          const v2 =
+            result?.generateVideoResponse?.generatedSamples?.[0]?.video ||
+            result?.response?.generateVideoResponse?.generatedSamples?.[0]?.video;
+          if (v2) return v2;
+
+          // videos[] top-level (some SDK versions)
+          const v3 = result?.videos?.[0];
+          if (v3) return v3;
+
+          // Multimodal candidates fallback
+          const v4 = result?.candidates?.[0]?.content?.parts?.find((p) => p?.fileData?.fileUri)?.fileData;
+          if (v4) return v4;
+
+          console.warn("[VeoLongAd] extractGeneratedVideo: no video found. result keys:", Object.keys(result));
+          return null;
+        }
+
+        function extractVideoUri(videoObj) {
+          if (!videoObj) return null;
+          return videoObj.uri || videoObj.fileUri || videoObj.videoUri || videoObj.url || null;
         }
 
         function extractFileId(uri) {
@@ -258,20 +294,21 @@ export async function POST(request) {
 
           const firstResult = await pollOperation(genOp);
           const firstGeneratedVideo = extractGeneratedVideo(firstResult);
+          const rawVideoUri = extractVideoUri(firstGeneratedVideo);
 
-          if (!firstGeneratedVideo?.uri) {
+          if (!rawVideoUri) {
             throw new Error("Base video generation returned no video. The prompt may have been rejected or Veo returned an unexpected response shape.");
           }
-
-          const rawVideoUri = firstGeneratedVideo.uri;
           currentVideoUri = cleanVeoUri(rawVideoUri);
           console.log("[VeoLongAd] Base clip URI (clean for extension):", currentVideoUri);
 
+          const baseClipFileId = extractFileId(currentVideoUri);
           send({
             type: "chunk_done",
             chunkIndex: 0,
             totalChunks,
             estimatedDuration: chunk0.estimatedSeconds || 8,
+            clipUrl: baseClipFileId ? `/api/ai-walkthrough/video-proxy?fileId=${baseClipFileId}` : null,
             message: `✅ Base clip ready (${chunk0.estimatedSeconds || 8}s)`,
           });
 
@@ -300,7 +337,7 @@ export async function POST(request) {
               message: `🔄 Extending with chunk ${i + 1}/${totalChunks} (~${cumulativeDuration}s so far)...`,
             });
 
-            const extensionPrompt = buildExtensionPrompt(chunk, masterVoicePrompt, language);
+            const extensionPrompt = buildExtensionPrompt(chunk, masterVoicePrompt, language, presenterDescription);
 
             let extVideoUri = null;
             let lastErr;
@@ -329,7 +366,7 @@ export async function POST(request) {
 
                 const extResult = await pollOperation(extOp);
                 const extVideo = extractGeneratedVideo(extResult);
-                const rawExtUri = extVideo?.uri || extVideo?.fileUri || null;
+                const rawExtUri = extractVideoUri(extVideo);
                 extVideoUri = cleanVeoUri(rawExtUri);
 
                 if (!extVideoUri) {
@@ -379,11 +416,13 @@ export async function POST(request) {
             currentVideoUri = extVideoUri;
             cumulativeDuration += chunk.estimatedSeconds || 8;
 
+            const extClipFileId = extractFileId(extVideoUri);
             send({
               type: "chunk_done",
               chunkIndex: i,
               totalChunks,
               estimatedDuration: cumulativeDuration,
+              clipUrl: extClipFileId ? `/api/ai-walkthrough/video-proxy?fileId=${extClipFileId}` : null,
               message: `✅ Extended to ~${cumulativeDuration}s (chunk ${i + 1}/${totalChunks} done)`,
             });
           }
@@ -541,9 +580,9 @@ RULES: ONLY exterior shots. NO text, NO watermarks on screen.`;
 }
 
 /**
- * Build the EXTENSION prompt (voice + visual continuity).
+ * Build the EXTENSION prompt (action-first, face-anchored continuity).
  */
-function buildExtensionPrompt(chunk, masterVoicePrompt, language) {
+function buildExtensionPrompt(chunk, masterVoicePrompt, language, presenterDescription) {
   const langMap = {
     english: "Indian-English", hindi: "natural Hindi", hinglish: "natural Hinglish",
     marathi: "fluent Marathi", tamil: "fluent Tamil", telugu: "fluent Telugu",
@@ -552,27 +591,23 @@ function buildExtensionPrompt(chunk, masterVoicePrompt, language) {
   };
   const langLabel = langMap[language] || "Indian-English";
 
-  return `SEAMLESS CONTINUATION: Continue the SAME video with the EXACT SAME presenter and in the EXACT SAME location.
+  const presenterAnchor = presenterDescription
+    ? `PRESENTER (match this person exactly from the previous frame): ${presenterDescription}`
+    : "PRESENTER: Continue with the exact same person from the previous frame — same face, hair, skin tone, and outfit. Do not change their appearance.";
+
+  return `Next shot — seamless cut from the previous clip. Camera switches to a new angle on the same presenter at the same property.
+
+${presenterAnchor}
+
+DIALOGUE NOW: "${chunk.text}"
+LANGUAGE: ${langLabel} — perfect lip-sync to the dialogue above is mandatory.
+
+CAMERA: ${chunk.cameraDirection || "New angle — medium or close-up shot. Natural handheld gimbal feel, slight organic movement."}
+VOICE: ${masterVoicePrompt || "Match the previous clip's voice exactly — same gender, tone, and recording quality."}
 
 ${REALISM_AESTHETICS}
 
-SCENE EXTENSION:
-${chunk.veoPrompt || "Cut to a new professional angle (e.g., medium close-up or slightly different perspective) to keep the video engaging."}
+${chunk.veoPrompt ? `SCENE DIRECTION:\n${chunk.veoPrompt}` : ""}
 
-PRESENTER CONTINUITY:
-• MUST maintain the exact same person, face, and outfit as the previous shot. No variations.
-• Speaking naturally to the camera with genuine expressions.
-
-ENVIRONMENT CONTINUITY:
-• Keep the exact same property style and natural daylight from the previous shot.
-
-VOICE & LIP-SYNC:
-• Voice: ${masterVoicePrompt || "Keep the exact same voice characteristics."}
-• Speaking language: ${langLabel}.
-• EXACT LIP-SYNC: The presenter's lip movements must perfectly sync to: "${chunk.text}".
-
-CAMERA ACTION:
-• ${chunk.cameraDirection || "Cut to a different angle or smoothly follow the presenter to add visual interest."}
-
-RULES: ONLY exterior shots. NO text, NO watermarks on screen.`;
+RULES: 9:16 vertical. Exterior shots ONLY. No text overlays, no watermarks, no subtitles.`;
 }

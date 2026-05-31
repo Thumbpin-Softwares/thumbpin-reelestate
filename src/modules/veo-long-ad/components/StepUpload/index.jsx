@@ -212,7 +212,7 @@ export function StepUpload({ locationImages, setLocationImages, avatarHook, onNe
                   No RE Agents found. Upload your own presenter.
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
+                <div className="grid grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1">
                   {reAvatars.map((col) => {
                     const selected = isCollectionSelected(col.id);
                     const thumb = col.coverImage || col.images?.[0]?.url;
@@ -227,7 +227,7 @@ export function StepUpload({ locationImages, setLocationImages, avatarHook, onNe
                         }`}
                       >
                         {thumb ? (
-                          <img src={thumb} alt={col.name} className="w-full h-28 object-cover" />
+                          <img src={thumb} alt={col.name} className="w-full h-64 object-cover" />
                         ) : (
                           <div className="w-full h-28 bg-muted/30 flex items-center justify-center">
                             <User2 className="w-8 h-8 text-muted-foreground" />

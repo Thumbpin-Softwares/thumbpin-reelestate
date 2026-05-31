@@ -124,9 +124,39 @@ Write the script now. Return ONLY the spoken script text with no headers, no lab
       contents: [{ parts: [{ text: prompt }] }],
     });
 
-    const script = response.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-    if (!script || script.length < 50) {
+    const rawScript = response.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    if (!rawScript || rawScript.length < 50) {
       return NextResponse.json({ error: "Failed to generate script" }, { status: 502 });
+    }
+
+    // ── TTS normalization pass ───────────────────────────────────────────────
+    // Convert numbers, abbreviations, symbols → spoken words so Veo pronounces correctly
+    const ttsPrompt = `You are a text-to-speech normalization expert. Convert the following real estate ad script into natural spoken text that a TTS engine will pronounce correctly.
+
+RULES:
+1. Write out ALL numbers as words: "₹2.5 Cr" → "two point five crore", "4 BHK" → "four BHK", "2,500 sqft" → "two thousand five hundred square feet", "270-degree" → "two seventy degree", "24/7" → "twenty four seven"
+2. Expand ALL abbreviations: "sqft" → "square feet", "BR" → "bedroom", "yr" → "year", "yrs" → "years", "approx" → "approximately"
+3. Remove currency symbols — write them as words: "₹" → nothing (just say the number and crore/lakh), "$" → "dollars"
+4. Replace "…" with a period and line break. Replace " — " with a comma or period.
+5. Keep proper nouns, project names, and location names exactly as-is (do not change spelling of names).
+6. Keep the same language and tone — do NOT translate or rephrase content. Only fix pronunciation-unsafe characters and abbreviations.
+7. Return ONLY the cleaned script text. No labels, no headers, no explanation.
+
+SCRIPT:
+${rawScript}`;
+
+    let script = rawScript;
+    try {
+      const ttsResponse = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [{ parts: [{ text: ttsPrompt }] }],
+      });
+      const normalized = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+      if (normalized && normalized.length > 50) {
+        script = normalized;
+      }
+    } catch (ttsErr) {
+      console.warn("[VeoLongAd] TTS normalization failed, using raw script:", ttsErr.message);
     }
 
     const wordCount = script.split(/\s+/).length;

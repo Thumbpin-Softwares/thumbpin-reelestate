@@ -40,6 +40,7 @@ export function GenerationProgress({ generationParams, onReset }) {
   const {
     chunks = [],
     masterVoicePrompt = "",
+    presenterDescription = "",
     language = "english",
     locationImages = [],
     avatarImages = [],
@@ -48,6 +49,7 @@ export function GenerationProgress({ generationParams, onReset }) {
   const [status, setStatus] = useState(STATUS.IDLE);
   const [currentChunkIdx, setCurrentChunkIdx] = useState(-1);
   const [completedChunks, setCompletedChunks] = useState([]);
+  const [chunkClipUrls, setChunkClipUrls] = useState({});
   const [message, setMessage] = useState("");
   const [videoUrl, setVideoUrl] = useState(null);
   const [totalDuration, setTotalDuration] = useState(0);
@@ -79,6 +81,7 @@ export function GenerationProgress({ generationParams, onReset }) {
       const formData = new FormData();
       formData.append("chunks", JSON.stringify(chunks));
       formData.append("masterVoicePrompt", masterVoicePrompt);
+      formData.append("presenterDescription", presenterDescription);
       formData.append("language", language);
       formData.append("aspectRatio", "9:16");
 
@@ -164,6 +167,9 @@ export function GenerationProgress({ generationParams, onReset }) {
       case "chunk_done":
         setCurrentChunkIdx(event.chunkIndex ?? 0);
         setCompletedChunks((prev) => [...new Set([...prev, event.chunkIndex])]);
+        if (event.clipUrl) {
+          setChunkClipUrls((prev) => ({ ...prev, [event.chunkIndex]: event.clipUrl }));
+        }
         setMessage(event.message || "");
         break;
 
@@ -302,15 +308,28 @@ export function GenerationProgress({ generationParams, onReset }) {
                         <span className="text-[10px] font-semibold text-muted-foreground">{idx + 1}</span>
                       )}
                     </div>
-                    <span className={`text-[9px] font-medium ${
-                      chunkStatus === "done" ? "text-primary" :
-                      chunkStatus.startsWith("active") ? "text-primary" : "text-muted-foreground"
-                    }`}>
-                      {chunkStatus === "done" ? "✓" :
-                       chunkStatus.startsWith("active") ? (
-                         idx === 0 ? "Gen" : "Ext"
-                       ) : `${chunk.estimatedSeconds || 8}s`}
-                    </span>
+                    {chunkStatus === "done" && chunkClipUrls[idx] ? (
+                      <a
+                        href={chunkClipUrls[idx]}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={`Download clip ${idx + 1}`}
+                        className="text-[9px] font-medium text-primary flex items-center gap-0.5 hover:underline"
+                      >
+                        <Download className="w-2.5 h-2.5" />
+                        {idx + 1}
+                      </a>
+                    ) : (
+                      <span className={`text-[9px] font-medium ${
+                        chunkStatus === "done" ? "text-primary" :
+                        chunkStatus.startsWith("active") ? "text-primary" : "text-muted-foreground"
+                      }`}>
+                        {chunkStatus === "done" ? "✓" :
+                         chunkStatus.startsWith("active") ? (
+                           idx === 0 ? "Gen" : "Ext"
+                         ) : `${chunk.estimatedSeconds || 8}s`}
+                      </span>
+                    )}
                   </div>
                 </div>
               );
