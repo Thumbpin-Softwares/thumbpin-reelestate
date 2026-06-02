@@ -81,10 +81,10 @@ export async function POST(request) {
     }
 
     const locationDataArr = locationImages.length > 0
-      ? await Promise.all(locationImages.slice(0, 1).map(fileToBase64))
+      ? await Promise.all(locationImages.slice(0, 4).map(fileToBase64))
       : [];
     const avatarDataArr = avatarImages.length > 0
-      ? await Promise.all(avatarImages.slice(0, 1).map(fileToBase64))
+      ? await Promise.all(avatarImages.slice(0, 2).map(fileToBase64))
       : [];
 
     const ai = new GoogleGenAI({ apiKey });
@@ -136,10 +136,10 @@ ${MAX_CHUNKS}
 OUTPUT FORMAT:
 
 MASTER_VOICE_PROMPT:
-[CRITICAL: First, look at the avatar/presenter reference image. Determine the presenter's gender from the image — you MUST commit to exactly "male voice" or "female voice", never leave it ambiguous or say "male or female". Then write one highly detailed paragraph describing their voice: start with the explicit gender (e.g. "Female voice" or "Male voice"), estimated age range, accent, pitch, tone quality, pacing, breathing, microphone quality, conversational style, and emotional realism. This will be used for ALL chunks — the gender and vocal identity must be completely locked and consistent throughout.]
+[CRITICAL: Look at the avatar/presenter reference image very carefully and determine the presenter's gender with 100% certainty — commit to either "Female voice" or "Male voice" at the very start. Never write both, never say "male or female", never leave it ambiguous. Then write one highly detailed paragraph: start with "Female voice" or "Male voice", estimated age range, accent (Indian regional), pitch, tone quality, pacing, breathing, microphone quality, conversational style, and emotional realism. This prompt is used for EVERY chunk — the gender and vocal identity are completely locked. If you cannot determine gender from the image, default to "Female voice".]
 
 PRESENTER_DESCRIPTION:
-[Look at the avatar/presenter reference image. Write ONE concise sentence describing their exact physical appearance: gender, approximate age, hair color and style, skin tone, and specific clothing/outfit with colors. This will be used to anchor the presenter's identity in AI video continuations. Example: "Indian woman, late 20s, long straight dark hair, warm medium-brown skin, wearing a navy blazer over a white top." If no avatar image provided, write "Presenter: appearance unknown."]
+[Look at the avatar/presenter reference image carefully. Write ONE concise sentence: gender ("woman" or "man" — mandatory), approximate age, hair color and style, skin tone, and specific clothing/outfit with colors. Example: "Indian woman, late 20s, long straight dark hair, warm medium-brown skin, wearing a navy blazer over a white top." If no avatar image is provided, write "Presenter appearance unknown — default to female presenter."]
 
 CHUNKS:
 
@@ -158,8 +158,9 @@ VEO_PROMPT:
 
 🎬 VEO 3.1 PROMPT — CHUNK 1 OF X (${langName.toUpperCase()}, 4–6 SEC)
 
-🎭 CHARACTER (from avatar reference image):
-• Preserve the exact identity, hairstyle, facial structure, skin tone, clothing, and overall appearance from the reference image
+🎭 CHARACTER (LOCKED — match avatar reference image exactly):
+• CRITICAL: The presenter's gender, face, skin tone, hair, and outfit must match the attached SUBJECT reference image with zero deviation
+• Do NOT invent or substitute a different person — preserve the EXACT individual shown in the avatar image
 • Natural luxury property presenter casually speaking to camera
 • Authentic human appearance with realistic facial depth, natural asymmetry, blinking, breathing, and relaxed body posture
 • Minimal expressions and subtle conversational emotion only
@@ -207,25 +208,15 @@ Avoid:
 • over-stabilized floating shots
 • aggressive cinematic orbit shots
 
-🏠 VISUAL CONTEXT:
-Ground visuals strictly in the provided property reference images.
+🏠 PROPERTY ANCHOR (from all provided location reference images):
+CRITICAL: Your description must be grounded in the ACTUAL property shown in the location reference images — not a generic luxury home. Look at ALL provided location images and describe:
+• The specific architectural style and facade of this exact property (shape, color, materials, unique design elements)
+• Specific visible features: gate design, driveway material, balcony style, landscaping plants, wall texture
+• Realistic lighting conditions visible in the reference images
+• Environmental surroundings (trees, neighboring structures, sky conditions)
+• Any distinctive visual markers that identify this specific property
 
-Describe:
-• modern luxury architecture
-• exterior facade
-• driveway
-• entrance gate
-• balcony
-• landscaping
-• natural outdoor materials
-• realistic reflections and shadows
-• environmental motion like leaves, fabric, or hair movement
-
-Use:
-• realistic golden hour lighting
-• documentary-style realism
-• natural dynamic range
-• believable exterior environment
+Do NOT describe a generic "luxury property" — describe THIS property's actual appearance from the reference images. This is the most important part — wrong property visuals break the entire ad.
 
 ⚠️ STRICT RULES:
 • ONLY exterior shots
