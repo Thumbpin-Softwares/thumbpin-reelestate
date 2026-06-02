@@ -541,23 +541,33 @@ export async function POST(request) {
  */
 const REALISM_AESTHETICS = `REALISTIC PROFESSIONAL REAL ESTATE SHOOT: This should look like a high-quality, real-life property tour. Avoid overly glossy or fake "studio" lighting. Use natural daylight and realistic shadows. The footage should feel 100% authentic, with a slight touch of natural imperfection (like a subtle natural breeze or slight handheld realism) to make it feel genuinely real rather than CGI.`;
 
+const LANG_MAP = {
+  english:   "Indian-English accent — clear, confident, with natural Indian intonation. NOT a Western or neutral accent.",
+  hindi:     "fluent native Hindi — authentic Indian phonetics throughout. Words like 'Gurugram', 'naya', 'ghar', 'sapna' must use proper Hindi pronunciation, not Anglicized. Sounds like a native Hindi speaker from North India.",
+  hinglish:  "natural Hinglish — a native Indian speaker seamlessly mixing Hindi and English. Hindi words use authentic Hindi phonetics (e.g. 'Gurugram' not 'Goo-roo-gram', 'naya' not 'nigh-ya'). English words use Indian-English pronunciation. NOT a foreign or Anglicized accent on Hindi words.",
+  marathi:   "fluent native Marathi — authentic Marathi phonetics. Sounds like a native Marathi speaker from Maharashtra.",
+  tamil:     "fluent native Tamil — authentic Tamil phonetics and intonation. NOT Anglicized Tamil words.",
+  telugu:    "fluent native Telugu — authentic Telugu phonetics. Sounds like a native Telugu speaker.",
+  kannada:   "fluent native Kannada — authentic Kannada phonetics and intonation.",
+  malayalam: "fluent native Malayalam — authentic Kerala pronunciation and intonation.",
+  bengali:   "fluent native Bengali — authentic Bengali phonetics. Sounds like a native speaker from West Bengal.",
+  gujarati:  "fluent native Gujarati — authentic Gujarati phonetics and intonation.",
+  punjabi:   "fluent native Punjabi — authentic Punjabi phonetics. Sounds like a native speaker from Punjab.",
+  urdu:      "fluent native Urdu — authentic Urdu phonetics with natural Nastaliq intonation.",
+  odia:      "fluent native Odia — authentic Odia phonetics and intonation.",
+};
+
 /**
  * Build the prompt for the FIRST Veo clip.
  */
 function buildFirstClipPrompt(chunk, masterVoicePrompt, language) {
-  const langMap = {
-    english: "Indian-English", hindi: "natural Hindi", hinglish: "natural Hinglish",
-    marathi: "fluent Marathi", tamil: "fluent Tamil", telugu: "fluent Telugu",
-    kannada: "fluent Kannada", malayalam: "fluent Malayalam", bengali: "fluent Bengali",
-    gujarati: "fluent Gujarati", punjabi: "fluent Punjabi", urdu: "fluent Urdu", odia: "fluent Odia",
-  };
-  const langLabel = langMap[language] || "Indian-English";
+  const langLabel = LANG_MAP[language] || "Indian-English";
 
   return `Realistic real estate video ad in 9:16 portrait format. Natural daylight, lifelike textures, and authentic environment styling.
 
 ${REALISM_AESTHETICS}
 
-SCENE 1:
+SCENE:
 ${chunk.veoPrompt || "Smooth, professional establishing shot of the presenter at the property exterior."}
 
 PRESENTER IDENTITY:
@@ -569,9 +579,10 @@ ENVIRONMENT:
 • Keep lighting natural and realistic.
 
 VOICE & LIP-SYNC:
-• Voice: ${masterVoicePrompt || "Natural, clear, authoritative real estate presenter tone. No background music."}
-• Speaking language: ${langLabel}.
+• Voice: ${masterVoicePrompt || "Natural, clear, authoritative Indian real estate presenter. Confident native Indian accent. No background music."}
+• Speaking language: ${langLabel}
 • EXACT LIP-SYNC: The presenter's lip movements must perfectly sync to: "${chunk.text}".
+• PRONUNCIATION: All words must be pronounced exactly as a native Indian speaker would say them — no foreign, Western, or Anglicized accent on any word.
 
 CAMERA ACTION:
 • ${chunk.cameraDirection || "Smooth tracking shot introducing the presenter."}
@@ -580,34 +591,24 @@ RULES: ONLY exterior shots. NO text, NO watermarks on screen.`;
 }
 
 /**
- * Build the EXTENSION prompt (action-first, face-anchored continuity).
+ * Build the EXTENSION prompt — keep it short so Veo continues rather than re-interprets.
  */
 function buildExtensionPrompt(chunk, masterVoicePrompt, language, presenterDescription) {
-  const langMap = {
-    english: "Indian-English", hindi: "natural Hindi", hinglish: "natural Hinglish",
-    marathi: "fluent Marathi", tamil: "fluent Tamil", telugu: "fluent Telugu",
-    kannada: "fluent Kannada", malayalam: "fluent Malayalam", bengali: "fluent Bengali",
-    gujarati: "fluent Gujarati", punjabi: "fluent Punjabi", urdu: "fluent Urdu", odia: "fluent Odia",
-  };
-  const langLabel = langMap[language] || "Indian-English";
+  const langLabel = LANG_MAP[language] || "Indian-English";
 
-  const presenterAnchor = presenterDescription
-    ? `PRESENTER (match this person exactly from the previous frame): ${presenterDescription}`
-    : "PRESENTER: Continue with the exact same person from the previous frame — same face, hair, skin tone, and outfit. Do not change their appearance.";
+  const presenterLine = presenterDescription
+    ? `Same presenter as previous frame: ${presenterDescription}. Do not change their face, hair, skin tone, or outfit.`
+    : "Continue with the exact same presenter from the previous frame — no appearance changes.";
 
-  return `Next shot — seamless cut from the previous clip. Camera switches to a new angle on the same presenter at the same property.
-
-${presenterAnchor}
-
-DIALOGUE NOW: "${chunk.text}"
-LANGUAGE: ${langLabel} — perfect lip-sync to the dialogue above is mandatory.
-
-CAMERA: ${chunk.cameraDirection || "New angle — medium or close-up shot. Natural handheld gimbal feel, slight organic movement."}
-VOICE: ${masterVoicePrompt || "Match the previous clip's voice exactly — same gender, tone, and recording quality."}
-
-${REALISM_AESTHETICS}
-
-${chunk.veoPrompt ? `SCENE DIRECTION:\n${chunk.veoPrompt}` : ""}
-
-RULES: 9:16 vertical. Exterior shots ONLY. No text overlays, no watermarks, no subtitles.`;
+  return [
+    `Continue the real estate video. Same presenter, same property, same natural lighting — seamless continuity from the last frame.`,
+    presenterLine,
+    `DIALOGUE: "${chunk.text}"`,
+    `LANGUAGE: ${langLabel} — lip-sync precisely to the dialogue above. All words pronounced as a native Indian speaker — no Anglicized or foreign accent.`,
+    `CAMERA: ${chunk.cameraDirection || "Medium shot, natural handheld feel, slight organic movement."}`,
+    `VOICE: ${masterVoicePrompt || "Match the previous clip's voice exactly — same gender, same native Indian accent, same tone and recording quality."}`,
+    chunk.veoPrompt ? `SCENE: ${chunk.veoPrompt}` : "",
+    `FORMAT: 9:16 vertical. Exterior only. No text, no subtitles, no watermarks.`,
+  ].filter(Boolean).join("\n\n");
 }
+
