@@ -19,6 +19,7 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { LANGUAGES, TONES } from "@/utils/constants";
+import { compressImage } from "@/utils/compress-image";
 
 const MAX_CHUNKS = 10;
 const MIN_SCRIPT_WORDS = 20;
@@ -125,15 +126,20 @@ export function StepScript({
       formData.append("script", activeScript);
       formData.append("language", language);
 
-      locationImages.slice(0, 5).forEach((img, i) => {
-        if (img.file) formData.append(`locationImage_${i}`, img.file);
-      });
-      avatarImages.slice(0, 3).forEach((av, i) => {
-        if (av.file) formData.append(`avatarImage_${i}`, av.file);
-        else if (av.url) {
-          // URL-only avatars: skip (can't send as File; prompts will use text description)
-        }
-      });
+      await Promise.all(
+        locationImages.slice(0, 5).map(async (img, i) => {
+          if (!img.file) return;
+          const compressed = await compressImage(img.file);
+          formData.append(`locationImage_${i}`, compressed);
+        })
+      );
+      await Promise.all(
+        avatarImages.slice(0, 3).map(async (av, i) => {
+          if (!av.file) return;
+          const compressed = await compressImage(av.file);
+          formData.append(`avatarImage_${i}`, compressed);
+        })
+      );
 
       const res = await fetch("/api/veo-long-ad/chunk-script", {
         method: "POST",

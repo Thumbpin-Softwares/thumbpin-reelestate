@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { compressImage, compressBlob } from "@/utils/compress-image";
 
 const STATUS = {
   IDLE: "idle",
@@ -100,24 +101,28 @@ export function GenerationProgress({ generationParams, onReset }) {
       formData.append("language", language);
       formData.append("aspectRatio", "9:16");
 
-      locationImages.slice(0, 5).forEach((img, i) => {
-        if (img.file) formData.append(`locationImage_${i}`, img.file);
-      });
+      await Promise.all(
+        locationImages.slice(0, 5).map(async (img, i) => {
+          if (!img.file) return;
+          const compressed = await compressImage(img.file);
+          formData.append(`locationImage_${i}`, compressed);
+        })
+      );
 
       // Avatar images: prebuilt avatars have file=null but a valid URL.
       // Fetch those URLs and convert to Blob so the backend receives them.
-      const avatarSlice = avatarImages.slice(0, 3);
       await Promise.all(
-        avatarSlice.map(async (av, i) => {
+        avatarImages.slice(0, 3).map(async (av, i) => {
           if (av.file) {
-            formData.append(`avatarImage_${i}`, av.file);
+            const compressed = await compressImage(av.file);
+            formData.append(`avatarImage_${i}`, compressed);
           } else if (av.url) {
             try {
               const resp = await fetch(av.url);
               if (resp.ok) {
                 const blob = await resp.blob();
-                const ext = blob.type.includes("png") ? "png" : "jpg";
-                formData.append(`avatarImage_${i}`, blob, `avatar_${i}.${ext}`);
+                const compressed = await compressBlob(blob);
+                formData.append(`avatarImage_${i}`, compressed);
               }
             } catch (_) {
               console.warn(`[GenerationProgress] Could not fetch avatar ${i} from URL:`, av.url);
