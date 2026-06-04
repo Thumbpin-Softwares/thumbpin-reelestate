@@ -75,19 +75,25 @@ export async function POST(request) {
       if (single) avatarImages.push(single);
     }
 
-    async function fileToBase64(file) {
+    const ai = new GoogleGenAI({ apiKey });
+
+    async function uploadImageToGemini(file) {
       const buf = Buffer.from(await file.arrayBuffer());
-      return { data: buf.toString("base64"), mimeType: file.type || "image/jpeg" };
+      const mimeType = file.type || "image/jpeg";
+      const blob = new Blob([buf], { type: mimeType });
+      const uploaded = await ai.files.upload({
+        file: blob,
+        config: { mimeType, displayName: file.name || "image.jpg" },
+      });
+      return { uri: uploaded.uri, mimeType: uploaded.mimeType || mimeType };
     }
 
     const locationDataArr = locationImages.length > 0
-      ? await Promise.all(locationImages.slice(0, 4).map(fileToBase64))
+      ? await Promise.all(locationImages.slice(0, 4).map(uploadImageToGemini))
       : [];
     const avatarDataArr = avatarImages.length > 0
-      ? await Promise.all(avatarImages.slice(0, 2).map(fileToBase64))
+      ? await Promise.all(avatarImages.slice(0, 2).map(uploadImageToGemini))
       : [];
-
-    const ai = new GoogleGenAI({ apiKey });
 
     const languageMap = {
       english: "English", hindi: "Hindi", hinglish: "Hinglish", marathi: "Marathi",
@@ -165,8 +171,8 @@ NEGATIVE PROMPT: No robotic motion, no exaggerated gestures, no excessive head m
         ---`;
 
     const parts = [{ text: chunkingPrompt }];
-    locationDataArr.forEach((d) => parts.push({ inlineData: d }));
-    avatarDataArr.forEach((d) => parts.push({ inlineData: d }));
+    locationDataArr.forEach((d) => parts.push({ fileData: { fileUri: d.uri, mimeType: d.mimeType } }));
+    avatarDataArr.forEach((d) => parts.push({ fileData: { fileUri: d.uri, mimeType: d.mimeType } }));
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
