@@ -96,176 +96,38 @@ export async function POST(request) {
     };
     const langName = languageMap[language] || "English";
 
-    const MAX_CHUNKS = 5;
+    const MAX_CHUNKS = 3;
 
-    const chunkingPrompt = `You are a world-class AI video director and cinematic real-estate filmmaker specializing in ultra-realistic luxury property social media ads.
+    const UGC_AESTHETICS = `QUALITY REQUIREMENTS: Ultra-realistic luxury real estate UGC. Maximum realism. Prioritize realistic lip synchronization over complex movement. Natural human behavior: natural blinking, natural facial expressions, natural breathing.
+CAMERA: Single continuous gimbal shot, 35mm lens, slow smooth movement, natural handheld micro-movements.
+NEGATIVE PROMPT (AVOID THESE STRICTLY): No robotic motion, no exaggerated gestures, no excessive head movement, no identity drift, no AI artifacts, no sudden camera cuts while speaking, no rushed speech, no background sound effects.`;
 
-Your goal is to generate highly believable human-centered real-estate video prompts that feel naturally filmed rather than AI-generated.
+    const chunkingPrompt = `You are an expert AI video director specializing in ultra-realistic luxury real estate UGC.
+        I have provided images of a real estate location and a person (avatar).
 
-TASK:
-1. Split the provided script into natural spoken chunks.
-2. Each chunk should feel like a distinct, punchy social media clip cut.
-3. Keep each chunk approximately 4–6 seconds long — shorter cuts feel more dynamic and reel-like.
-4. Never split mid-sentence or mid-thought.
-5. Combine smaller lines naturally when needed.
-6. Generate a MASTER VOICE PROMPT for consistent voice realism across all chunks.
-7. Generate a PRESENTER DESCRIPTION (physical appearance) from the avatar reference image.
-8. For every chunk, generate a cinematic VEO production prompt grounded in:
-   • the provided avatar reference image
-   • the provided property reference images
+        Write a highly detailed, 3-part sequential video prompt for a Google Veo generation pipeline.
+        The spoken language for the dialogue MUST be ${language}.
+        CRUCIAL: For Indian languages, you MUST write the dialogue in ROMAN TRANSLITERATION (e.g., "Yeh property sach mein...").
+        NARRATIVE ARC & TIMING RULES:
+        - The video must feel like a continuous high-end luxury vlog with hard camera cuts only occurring between the 3 parts.
+        - Cuts MUST ONLY happen when the avatar has completely finished speaking. Never cut mid-sentence.
 
-SHOT VARIETY RULES (MANDATORY):
-• Every chunk MUST use a DIFFERENT shot type from the previous chunk — never repeat the same angle consecutively
-• Rotate through these types: (1) Wide establishing shot, (2) Medium presenter shot, (3) Close-up presenter shot, (4) Walking/moving shot with presenter, (5) B-roll property exterior (NO presenter in frame)
-• If the script has 3 or more chunks: at least 1 chunk MUST be pure B-roll (architectural exterior, gate, landscaping — no presenter visible)
-• Chunk 1: always a dynamic wide or medium shot that introduces the presenter and property together
-• Last chunk: memorable close-up push-in or slow pull-back to end strongly
-• Think like a real Instagram reel editor — fast, visual, diverse
+        PART 1 (Arrival & Hook):
+        - Visual: A luxury SUV is parked in front of the location. The avatar exits the vehicle naturally, closes the door, looks at the property with a small authentic smile, and walks 2-3 steps forward.
+        - Audio: Avatar begins speaking slowly, introducing the property.
+        PART 2 (The Balcony/Interior):
+        - Visual: Start this prompt with the words "HARD CAMERA CUT:". The avatar is now standing at a balcony or a premium spot at the location.
+        - Audio: Avatar speaks about the architecture and premium feel.
+        PART 3 (Final CTA):
+        - Visual: Start this prompt with the words "HARD CAMERA CUT:". The avatar is at one final beautiful spot in the location.
+        - Audio: Delivers a warm, slow Call to Action.
+         REQUIREMENTS FOR JSON OUTPUT:
+        - "voice_profile": Define voice. State: "Voice direction: Female luxury real estate consultant, 22-25 years old. Warm, trustworthy, soft confidence. Speech speed 70% of normal pace. Speaking fluent ${language}. Clean voiceover ONLY. No background SFX."
+        - "part1": Describe exact visual actions (car, stepping out) and EXACT dialogue in quotes. Append: "${UGC_AESTHETICS}"
+        - "part2": Must start with "HARD CAMERA CUT: New perspective from the balcony." Include EXACT dialogue. Append: "MAINTAIN EXACT SAME PRESENTER IDENTITY. ${UGC_AESTHETICS}"
+        - "part3": Must start with "HARD CAMERA CUT: Final location." Include EXACT dialogue. Append: "MAINTAIN EXACT SAME PRESENTER IDENTITY. ${UGC_AESTHETICS}"
 
-SCRIPT:
----
-${script}
----
-
-LANGUAGE:
-${langName}
-
-MAXIMUM CHUNKS:
-${MAX_CHUNKS}
-
-OUTPUT FORMAT:
-
-MASTER_VOICE_PROMPT:
-[CRITICAL: Look at the avatar/presenter reference image very carefully and determine the presenter's gender with 100% certainty — commit to either "Female voice" or "Male voice" at the very start. Never write both, never say "male or female", never leave it ambiguous. Then write one highly detailed paragraph: start with "Female voice" or "Male voice", estimated age range, accent (Indian regional), pitch, tone quality, pacing, breathing, microphone quality, conversational style, and emotional realism. This prompt is used for EVERY chunk — the gender and vocal identity are completely locked. If you cannot determine gender from the image, default to "Female voice".]
-
-PRESENTER_DESCRIPTION:
-[Look at the avatar/presenter reference image carefully. Write ONE concise sentence: gender ("woman" or "man" — mandatory), approximate age, hair color and style, skin tone, and specific clothing/outfit with colors. Example: "Indian woman, late 20s, long straight dark hair, warm medium-brown skin, wearing a navy blazer over a white top." If no avatar image is provided, write "Presenter appearance unknown — default to female presenter."]
-
-CHUNKS:
-
-[CHUNK 1]
-
-TEXT:
-[Exact spoken text]
-
-ESTIMATED_SECONDS:
-[Estimated duration]
-
-CAMERA_DIRECTION:
-[One-line natural camera movement summary]
-
-VEO_PROMPT:
-
-🎬 VEO 3.1 PROMPT — CHUNK 1 OF X (${langName.toUpperCase()}, 4–6 SEC)
-
-🎭 CHARACTER (LOCKED — match avatar reference image exactly):
-• CRITICAL: The presenter's gender, face, skin tone, hair, and outfit must match the attached SUBJECT reference image with zero deviation
-• Do NOT invent or substitute a different person — preserve the EXACT individual shown in the avatar image
-• Natural luxury property presenter casually speaking to camera
-• Authentic human appearance with realistic facial depth, natural asymmetry, blinking, breathing, and relaxed body posture
-• Minimal expressions and subtle conversational emotion only
-• Avoid influencer behavior, model posing, exaggerated confidence, or commercial acting
-• Avoid over-smoothed skin, artificial sharpness, CGI textures, or synthetic beauty aesthetics
-• Slight natural imperfections and candid body language encouraged
-• Natural lip-sync aligned to realistic speech pacing
-
-🗣️ DIALOGUE:
-"[Exact dialogue from this chunk]"
-
-🎙️ HUMAN PERFORMANCE STYLE:
-• Delivery should feel naturally spoken in one take
-• Conversational pacing instead of presenter pacing
-• Small pauses and natural breathing allowed
-• Slight vocal variation and realistic rhythm changes
-• Casual authentic delivery, not overly polished
-• Eye contact should feel imperfect and natural
-• Small natural head movement and subtle posture shifts
-• Minimal hand gestures only when realistic
-
-🎥 CAMERA & SHOT:
-[Describe ONE continuous realistic shot]
-
-Include:
-• shot type
-• framing
-• camera distance
-• realistic camera movement
-• environmental movement
-• natural lighting behavior
-
-Camera should behave like:
-• handheld gimbal footage
-• luxury Instagram reel filming
-• human-operated camera
-• subtle movement inertia
-• tiny framing imperfections
-• realistic focus behavior
-• slight handheld micro-jitter
-
-Avoid:
-• robotic tracking
-• impossible camera movement
-• over-stabilized floating shots
-• aggressive cinematic orbit shots
-
-🏠 PROPERTY ANCHOR (from all provided location reference images):
-CRITICAL: Your description must be grounded in the ACTUAL property shown in the location reference images — not a generic luxury home. Look at ALL provided location images and describe:
-• The specific architectural style and facade of this exact property (shape, color, materials, unique design elements)
-• Specific visible features: gate design, driveway material, balcony style, landscaping plants, wall texture
-• Realistic lighting conditions visible in the reference images
-• Environmental surroundings (trees, neighboring structures, sky conditions)
-• Any distinctive visual markers that identify this specific property
-
-Do NOT describe a generic "luxury property" — describe THIS property's actual appearance from the reference images. This is the most important part — wrong property visuals break the entire ad.
-
-⚠️ STRICT RULES:
-• ONLY exterior shots
-• NO interiors
-• NO text overlays
-• NO subtitles
-• NO logos
-• NO watermarks
-• 9:16 vertical framing
-• Ultra-realistic cinematic quality
-• Documentary-commercial hybrid realism
-• Maintain believable proportions and realistic human motion
-• Prioritize realism over cinematic perfection
-• Avoid uncanny valley behavior entirely
-
-🎞️ VISUAL REALISM STYLE:
-• Authentic luxury real-estate Instagram reel aesthetic
-• Feels filmed on a high-end cinema camera with handheld stabilization
-• Realistic motion blur and natural exposure adaptation
-• Organic environmental movement
-• Natural lighting falloff
-• Soft realistic shadows
-• Real-world texture response
-• Avoid hyper-detailed CGI look
-• Avoid “AI influencer” aesthetics
-• Preserve believable human movement and timing
-
-🎙️ VOICE DIRECTION:
-• Language: ${langName}
-• Tone: Calm, conversational, aspirational
-• Energy: Controlled and believable
-• Pace: Natural human speaking rhythm
-• Recording Style: Premium wireless mic or smartphone creator setup
-• Avoid announcer voice or commercial narration tone
-
-[END_CHUNK]
-
-IMPORTANT GLOBAL RULES:
-• Prioritize believable realism over cinematic perfection
-• Keep movement subtle and physically believable
-• Human behavior should feel candid, not performed
-• Do not over-direct expressions
-• Avoid AI-perfect facial symmetry
-• Avoid robotic pacing or movement
-• Shots should feel naturally filmed for social media
-• NEVER use the same shot type twice in a row — vary every chunk
-• Preserve continuity between chunks on presenter appearance and property style
-• Use realistic environmental physics and motion
-• Return ONLY the structured output`;
+        Output MUST be valid JSON with exact keys: "voice_profile", "part1", "part2", "part3". No markdown wrappers.`;
 
     const parts = [{ text: chunkingPrompt }];
     locationDataArr.forEach((d) => parts.push({ inlineData: d }));
@@ -281,39 +143,26 @@ IMPORTANT GLOBAL RULES:
       return NextResponse.json({ error: "Failed to generate chunk prompts" }, { status: 502 });
     }
 
-    // ── Parse the structured output ──────────────────────────────────────────
-    const masterVoiceMatch = rawText.match(/MASTER_VOICE_PROMPT:\s*\n([\s\S]*?)(?=\nPRESENTER_DESCRIPTION:|CHUNKS:|$)/i);
-    const masterVoicePrompt = masterVoiceMatch?.[1]?.trim() || getDefaultVoicePrompt(language);
-
-    const presenterDescMatch = rawText.match(/PRESENTER_DESCRIPTION:\s*\n([\s\S]*?)(?=\nCHUNKS:|$)/i);
-    const presenterDescription = presenterDescMatch?.[1]?.trim() || "";
-
+    // ── Parse the JSON response: { voice_profile, part1, part2, part3 } ────────
+    let masterVoicePrompt = getDefaultVoicePrompt(language);
+    let presenterDescription = "";
     const chunks = [];
-    const chunkRegex = /\[CHUNK\s+\d+\]([\s\S]*?)\[END_CHUNK\]/gi;
-    let match;
 
-    while ((match = chunkRegex.exec(rawText)) !== null) {
-      const block = match[1];
-
-      const textMatch = block.match(/TEXT:\s*(.+?)(?=\nESTIMATED_SECONDS:|$)/is);
-      const secondsMatch = block.match(/ESTIMATED_SECONDS:\s*(\d+)/i);
-      const cameraMatch = block.match(/CAMERA_DIRECTION:\s*(.+?)(?=\nVEO_PROMPT:|$)/is);
-      const veoMatch = block.match(/VEO_PROMPT:\s*([\s\S]+?)$/i);
-
-      const text = textMatch?.[1]?.trim().replace(/^["']|["']$/g, "") || "";
-      const estimatedSeconds = parseInt(secondsMatch?.[1] || "8");
-      const cameraDirection = cameraMatch?.[1]?.trim() || "";
-      const veoPrompt = veoMatch?.[1]?.trim() || "";
-
-      if (text) {
-        chunks.push({
-          index: chunks.length,
-          text,
-          estimatedSeconds,
-          cameraDirection,
-          veoPrompt,
+    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        const parsed = JSON.parse(jsonMatch[0]);
+        if (parsed.voice_profile) masterVoicePrompt = parsed.voice_profile;
+        [parsed.part1, parsed.part2, parsed.part3].filter(Boolean).forEach((prompt, i) => {
+          chunks.push({
+            index: i,
+            text: "",
+            veoPrompt: prompt,
+            estimatedSeconds: 8,
+            cameraDirection: "",
+          });
         });
-      }
+      } catch (_) {}
     }
 
     if (chunks.length === 0) {

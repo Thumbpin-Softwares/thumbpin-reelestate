@@ -6,26 +6,31 @@ import Asset from "@/models/Asset";
 import dbConnect from "@/lib/mongodb";
 import { uploadToR2, buildUserKey } from "@/lib/r2-upload";
 import { consumeCreditsForAction, refundCreditsForAction } from "@/lib/credit-system";
+import { pendingJobs } from "@/lib/veo-pending-jobs";
 
 /**
  * POST /api/veo-long-ad/generate-pipeline
  *
  * Core SSE pipeline:
- * 1. Generate first 8s clip (Veo 3.1 generateVideos with reference images)
- * 2. For each subsequent chunk, extend using Veo 3.1 extend (video: { uri })
- * 3. Return final extended video URL
+ * 1. Emit script_requires_approval — user can edit chunks for 10s before auto-approve
+ * 2. Generate first 8s clip (Veo 3.1 generateVideos with reference images)
+ * 3. For each subsequent chunk, extend using Veo 3.1 extend (video: { uri })
+ * 4. Upload final video to R2 and save to Asset Library
  *
  * Input (FormData):
  * chunks: JSON string (array of chunk objects from /chunk-script)
  * masterVoicePrompt: string
+ * presenterDescription: string
  * locationImages[]: File[]
  * avatarImages[]: File[]
  * language: string
  * aspectRatio: "9:16" | "16:9"
  *
  * SSE events:
+ * { type: "script_requires_approval", jobId, chunks, masterVoicePrompt, presenterDescription, message }
+ * { type: "script_approved", message }
  * { type: "progress", chunkIndex, totalChunks, status, message }
- * { type: "chunk_done", chunkIndex, totalChunks, estimatedDuration }
+ * { type: "chunk_done", chunkIndex, totalChunks, estimatedDuration, clipUrl, message }
  * { type: "uploading", message }
  * { type: "video_ready", videoUrl, totalChunks, totalDuration }
  * { type: "error", message, failedChunkIndex? }
@@ -59,7 +64,6 @@ export async function POST(request) {
 
     const formData = await request.formData();
 
-    // Parse chunks JSON
     const chunksRaw = formData.get("chunks");
     if (!chunksRaw) {
       return NextResponse.json({ error: "chunks is required" }, { status: 400 });
@@ -73,8 +77,8 @@ export async function POST(request) {
     if (!Array.isArray(chunks) || chunks.length === 0) {
       return NextResponse.json({ error: "At least 1 chunk required" }, { status: 400 });
     }
-    if (chunks.length > 10) {
-      return NextResponse.json({ error: "Maximum 10 chunks allowed" }, { status: 400 });
+    if (chunks.length > 3) {
+      return NextResponse.json({ error: "Maximum 3 chunks allowed" }, { status: 400 });
     }
 
     const masterVoicePrompt = (formData.get("masterVoicePrompt") || "").toString();
@@ -104,7 +108,7 @@ export async function POST(request) {
       if (single) avatarImages.push(single);
     }
 
-    // Debit credits (for first generation)
+    // Debit credits
     const creditResult = await consumeCreditsForAction({
       userId,
       action: "real_estate_video",
@@ -146,11 +150,11 @@ export async function POST(request) {
     const referenceImages = [
       ...avatarImgs.slice(0, avatarSlots).map((img) => ({
         image: img,
-        referenceType: "SUBJECT", // 🎯 Tells Veo this is the primary human character
+        referenceType: "SUBJECT",
       })),
       ...locationImgs.slice(0, locationSlots).map((img) => ({
         image: img,
-        referenceType: "STYLE", // 🎯 Tells Veo this is the background environment/style
+        referenceType: "STYLE",
       })),
     ];
     console.log(`[VeoLongAd] Total referenceImages: ${referenceImages.length}`);
@@ -203,29 +207,24 @@ export async function POST(request) {
         function extractGeneratedVideo(result) {
           if (!result) return null;
 
-          // Direct generatedVideos array (most common SDK shape)
           const v0 =
             result?.generatedVideos?.[0]?.video ||
             result?.generatedVideos?.[0]?.videoResponse;
           if (v0) return v0;
 
-          // Nested under response (operation wrapper shape)
           const v1 =
             result?.response?.generatedVideos?.[0]?.video ||
             result?.response?.generatedVideos?.[0]?.videoResponse;
           if (v1) return v1;
 
-          // generateVideoResponse.generatedSamples (proto REST shape)
           const v2 =
             result?.generateVideoResponse?.generatedSamples?.[0]?.video ||
             result?.response?.generateVideoResponse?.generatedSamples?.[0]?.video;
           if (v2) return v2;
 
-          // videos[] top-level (some SDK versions)
           const v3 = result?.videos?.[0];
           if (v3) return v3;
 
-          // Multimodal candidates fallback
           const v4 = result?.candidates?.[0]?.content?.parts?.find((p) => p?.fileData?.fileUri)?.fileData;
           if (v4) return v4;
 
@@ -244,20 +243,57 @@ export async function POST(request) {
           return match?.[1] || null;
         }
 
-        /**
-         * Strip :download?alt=media (and any query params) from the Veo URI.
-         */
         function cleanVeoUri(uri) {
           if (!uri) return uri;
           return uri.replace(/:download.*$/, "").replace(/\?.*$/, "");
         }
 
-        let currentVideoUri = null;
-        const totalChunks = chunks.length;
+        // Working copies — updated after script approval
+        let workChunks = [...chunks];
+        let workVoicePrompt = masterVoicePrompt;
+        let workPresenterDesc = presenterDescription;
 
         try {
+          // ── Script Approval ───────────────────────────────────────────────
+          const jobId = Date.now().toString();
+
+          send({
+            type: "script_requires_approval",
+            jobId,
+            message: "Review your script — auto-approving in 10 seconds...",
+            chunks: workChunks,
+            masterVoicePrompt: workVoicePrompt,
+            presenterDescription: workPresenterDesc,
+          });
+
+          const pingInterval = setInterval(() => send({ type: "ping" }), 3000);
+
+          const approved = await new Promise((resolve) => {
+            pendingJobs.set(jobId, { resolve });
+            setTimeout(() => {
+              if (pendingJobs.has(jobId)) {
+                pendingJobs.get(jobId).resolve({
+                  chunks: workChunks,
+                  masterVoicePrompt: workVoicePrompt,
+                  presenterDescription: workPresenterDesc,
+                });
+                pendingJobs.delete(jobId);
+              }
+            }, 10000);
+          });
+
+          clearInterval(pingInterval);
+          workChunks = approved.chunks;
+          workVoicePrompt = approved.masterVoicePrompt;
+          workPresenterDesc = approved.presenterDescription;
+
+          send({ type: "script_approved", message: "Script approved! Starting video generation..." });
+
           // ── Step 1: Generate first 8-second clip ─────────────────────────
-          const chunk0 = chunks[0];
+          const totalChunks = workChunks.length;
+          let currentVideoUri = null;
+
+          const chunk0 = workChunks[0];
 
           send({
             type: "progress",
@@ -267,7 +303,7 @@ export async function POST(request) {
             message: `🎬 Generating base clip (1/${totalChunks}) — this takes 2–3 minutes...`,
           });
 
-          const firstPrompt = buildFirstClipPrompt(chunk0, masterVoicePrompt, language);
+          const firstPrompt = buildFirstClipPrompt(chunk0, workVoicePrompt);
 
           const genOp = await ai.models.generateVideos({
             model: "veo-3.1-generate-preview",
@@ -315,7 +351,7 @@ export async function POST(request) {
           // ── Step 2: Extend for each subsequent chunk ──────────────────────
           let cumulativeDuration = chunk0.estimatedSeconds || 8;
 
-          if (chunks.length > 1) {
+          if (workChunks.length > 1) {
             send({
               type: "progress",
               chunkIndex: 0,
@@ -326,8 +362,8 @@ export async function POST(request) {
             await new Promise((r) => setTimeout(r, 15000));
           }
 
-          for (let i = 1; i < chunks.length; i++) {
-            const chunk = chunks[i];
+          for (let i = 1; i < workChunks.length; i++) {
+            const chunk = workChunks[i];
 
             send({
               type: "progress",
@@ -337,7 +373,7 @@ export async function POST(request) {
               message: `🔄 Extending with chunk ${i + 1}/${totalChunks} (~${cumulativeDuration}s so far)...`,
             });
 
-            const extensionPrompt = buildExtensionPrompt(chunk, masterVoicePrompt, language, presenterDescription);
+            const extensionPrompt = buildExtensionPrompt(chunk);
 
             let extVideoUri = null;
             let lastErr;
@@ -463,7 +499,7 @@ export async function POST(request) {
                 videoUri: currentVideoUri,
                 source: "veo-long-ad",
                 totalChunks,
-                totalDuration: chunks.reduce((s, c) => s + (c.estimatedSeconds || 8), 0),
+                totalDuration: workChunks.reduce((s, c) => s + (c.estimatedSeconds || 8), 0),
                 context: "veo-long-ad",
               },
             });
@@ -471,7 +507,7 @@ export async function POST(request) {
             console.error("[VeoLongAd] DB save error:", dbErr);
           }
 
-          const totalDuration = chunks.reduce((s, c) => s + (c.estimatedSeconds || 8), 0);
+          const totalDuration = workChunks.reduce((s, c) => s + (c.estimatedSeconds || 8), 0);
 
           send({
             type: "video_ready",
@@ -536,79 +572,11 @@ export async function POST(request) {
   }
 }
 
-/**
- * Highly realistic aesthetic instructions.
- */
-const REALISM_AESTHETICS = `REALISTIC PROFESSIONAL REAL ESTATE SHOOT: This should look like a high-quality, real-life property tour. Avoid overly glossy or fake "studio" lighting. Use natural daylight and realistic shadows. The footage should feel 100% authentic, with a slight touch of natural imperfection (like a subtle natural breeze or slight handheld realism) to make it feel genuinely real rather than CGI.`;
-
-const LANG_MAP = {
-  english:   "Indian-English accent — clear, confident, with natural Indian intonation. NOT a Western or neutral accent.",
-  hindi:     "fluent native Hindi — authentic Indian phonetics throughout. Words like 'Gurugram', 'naya', 'ghar', 'sapna' must use proper Hindi pronunciation, not Anglicized. Sounds like a native Hindi speaker from North India.",
-  hinglish:  "natural Hinglish — a native Indian speaker seamlessly mixing Hindi and English. Hindi words use authentic Hindi phonetics (e.g. 'Gurugram' not 'Goo-roo-gram', 'naya' not 'nigh-ya'). English words use Indian-English pronunciation. NOT a foreign or Anglicized accent on Hindi words.",
-  marathi:   "fluent native Marathi — authentic Marathi phonetics. Sounds like a native Marathi speaker from Maharashtra.",
-  tamil:     "fluent native Tamil — authentic Tamil phonetics and intonation. NOT Anglicized Tamil words.",
-  telugu:    "fluent native Telugu — authentic Telugu phonetics. Sounds like a native Telugu speaker.",
-  kannada:   "fluent native Kannada — authentic Kannada phonetics and intonation.",
-  malayalam: "fluent native Malayalam — authentic Kerala pronunciation and intonation.",
-  bengali:   "fluent native Bengali — authentic Bengali phonetics. Sounds like a native speaker from West Bengal.",
-  gujarati:  "fluent native Gujarati — authentic Gujarati phonetics and intonation.",
-  punjabi:   "fluent native Punjabi — authentic Punjabi phonetics. Sounds like a native speaker from Punjab.",
-  urdu:      "fluent native Urdu — authentic Urdu phonetics with natural Nastaliq intonation.",
-  odia:      "fluent native Odia — authentic Odia phonetics and intonation.",
-};
-
-/**
- * Build the prompt for the FIRST Veo clip.
- */
-function buildFirstClipPrompt(chunk, masterVoicePrompt, language) {
-  const langLabel = LANG_MAP[language] || "Indian-English";
-
-  return `Realistic real estate video ad in 9:16 portrait format. Natural daylight, lifelike textures, and authentic environment styling.
-
-${REALISM_AESTHETICS}
-
-SCENE:
-${chunk.veoPrompt || "Smooth, professional establishing shot of the presenter at the property exterior."}
-
-PRESENTER IDENTITY:
-• CRITICAL: Match the provided SUBJECT reference image EXACTLY (gender, age, face, hair, body, clothing). Ignore any conflicting terms in the prompt.
-• The presenter is speaking naturally to the camera with lifelike, relaxed expressions and body language.
-
-ENVIRONMENT:
-• Strictly match the architectural style of the STYLE reference images.
-• Keep lighting natural and realistic.
-
-VOICE & LIP-SYNC:
-• Voice: ${masterVoicePrompt || "Natural, clear, authoritative Indian real estate presenter. Confident native Indian accent. No background music."}
-• Speaking language: ${langLabel}
-• EXACT LIP-SYNC: The presenter's lip movements must perfectly sync to: "${chunk.text}".
-• PRONUNCIATION: All words must be pronounced exactly as a native Indian speaker would say them — no foreign, Western, or Anglicized accent on any word.
-
-CAMERA ACTION:
-• ${chunk.cameraDirection || "Smooth tracking shot introducing the presenter."}
-
-RULES: ONLY exterior shots. NO text, NO watermarks on screen.`;
+function buildFirstClipPrompt(chunk, masterVoicePrompt) {
+  const voiceSection = masterVoicePrompt ? `${masterVoicePrompt}\n\n` : "";
+  return `${voiceSection}${chunk.veoPrompt || "Ultra-realistic luxury real estate UGC video. Presenter at property exterior. PRESENTER: Match SUBJECT reference image exactly."}`;
 }
 
-/**
- * Build the EXTENSION prompt — keep it short so Veo continues rather than re-interprets.
- */
-function buildExtensionPrompt(chunk, masterVoicePrompt, language, presenterDescription) {
-  const langLabel = LANG_MAP[language] || "Indian-English";
-
-  const presenterLine = presenterDescription
-    ? `Same presenter as previous frame: ${presenterDescription}. Do not change their face, hair, skin tone, or outfit.`
-    : "Continue with the exact same presenter from the previous frame — no appearance changes.";
-
-  return [
-    `Continue the real estate video. Same presenter, same property, same natural lighting — seamless continuity from the last frame.`,
-    presenterLine,
-    `DIALOGUE: "${chunk.text}"`,
-    `LANGUAGE: ${langLabel} — lip-sync precisely to the dialogue above. All words pronounced as a native Indian speaker — no Anglicized or foreign accent.`,
-    `CAMERA: ${chunk.cameraDirection || "Medium shot, natural handheld feel, slight organic movement."}`,
-    `VOICE: ${masterVoicePrompt || "Match the previous clip's voice exactly — same gender, same native Indian accent, same tone and recording quality."}`,
-    chunk.veoPrompt ? `SCENE: ${chunk.veoPrompt}` : "",
-    `FORMAT: 9:16 vertical. Exterior only. No text, no subtitles, no watermarks.`,
-  ].filter(Boolean).join("\n\n");
+function buildExtensionPrompt(chunk) {
+  return chunk.veoPrompt || "Continue the real estate video. MAINTAIN EXACT SAME PRESENTER IDENTITY. Seamless continuation from the last frame.";
 }
-

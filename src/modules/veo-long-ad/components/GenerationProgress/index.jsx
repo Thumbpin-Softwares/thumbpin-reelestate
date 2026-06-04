@@ -12,13 +12,14 @@ import {
   ExternalLink,
   Play,
   Pause,
-  Sparkles,
+  FileEdit,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
 const STATUS = {
   IDLE: "idle",
+  AWAITING_APPROVAL: "awaiting_approval",
   GENERATING_BASE: "generating_base",
   EXTENDING: "extending",
   UPLOADING: "uploading",
@@ -56,8 +57,16 @@ export function GenerationProgress({ generationParams, onReset }) {
   const [error, setError] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
 
+  // Script approval state
+  const [pendingJobId, setPendingJobId] = useState(null);
+  const [editedChunks, setEditedChunks] = useState([]);
+  const [editedVoicePrompt, setEditedVoicePrompt] = useState("");
+  const [pendingPresenterDesc, setPendingPresenterDesc] = useState("");
+  const [approvalCountdown, setApprovalCountdown] = useState(10);
+
   const videoRef = useRef(null);
   const hasStarted = useRef(false);
+  const countdownRef = useRef(null);
 
   const totalChunks = chunks.length;
 
@@ -69,8 +78,14 @@ export function GenerationProgress({ generationParams, onReset }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    };
+  }, []);
+
   const startPipeline = async () => {
-    setStatus(STATUS.GENERATING_BASE);
+    setStatus(STATUS.IDLE);
     setCurrentChunkIdx(0);
     setCompletedChunks([]);
     setVideoUrl(null);
@@ -157,10 +172,36 @@ export function GenerationProgress({ generationParams, onReset }) {
 
   const handleEvent = (event) => {
     switch (event.type) {
+      case "script_requires_approval":
+        setPendingJobId(event.jobId);
+        setEditedChunks(event.chunks.map((c) => ({ ...c })));
+        setEditedVoicePrompt(event.masterVoicePrompt || "");
+        setPendingPresenterDesc(event.presenterDescription || "");
+        setApprovalCountdown(10);
+        setStatus(STATUS.AWAITING_APPROVAL);
+        setMessage(event.message || "");
+
+        countdownRef.current = setInterval(() => {
+          setApprovalCountdown((prev) => {
+            if (prev <= 1) {
+              clearInterval(countdownRef.current);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+        break;
+
+      case "script_approved":
+        clearInterval(countdownRef.current);
+        setStatus(STATUS.GENERATING_BASE);
+        setMessage(event.message || "Starting video generation...");
+        break;
+
       case "progress":
         setCurrentChunkIdx(event.chunkIndex ?? 0);
         setMessage(event.message || "");
-        if (event.status === "generating") setStatus(STATUS.GENERATING_BASE);
+        if (event.status === "generating" || event.status === "rendering") setStatus(STATUS.GENERATING_BASE);
         else if (event.status === "extending") setStatus(STATUS.EXTENDING);
         break;
 
@@ -189,7 +230,6 @@ export function GenerationProgress({ generationParams, onReset }) {
 
       case "error":
         if (event.partial) {
-          // Partial failure — video up to failedChunkIndex - 1 is available
           toast.warning(`Extension stopped at chunk ${(event.failedChunkIndex ?? 0) + 1}. Saving partial video.`, {
             duration: 6000,
           });
@@ -207,6 +247,35 @@ export function GenerationProgress({ generationParams, onReset }) {
       default:
         break;
     }
+  };
+
+  const handleApprove = async () => {
+    if (!pendingJobId) return;
+    clearInterval(countdownRef.current);
+
+    try {
+      const res = await fetch("/api/veo-long-ad/approve-script", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jobId: pendingJobId,
+          chunks: editedChunks,
+          masterVoicePrompt: editedVoicePrompt,
+          presenterDescription: pendingPresenterDesc,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to approve");
+      }
+    } catch (err) {
+      toast.error("Approval failed", { description: err.message });
+    }
+  };
+
+  const updateChunkPrompt = (idx, veoPrompt) => {
+    setEditedChunks((prev) => prev.map((c, i) => (i === idx ? { ...c, veoPrompt } : c)));
   };
 
   // ── Download ──────────────────────────────────────────────────────────────
@@ -238,6 +307,7 @@ export function GenerationProgress({ generationParams, onReset }) {
 
   // ── Status label ─────────────────────────────────────────────────────────
   const statusLabel = () => {
+    if (status === STATUS.AWAITING_APPROVAL) return `Review script — auto-approving in ${approvalCountdown}s`;
     if (status === STATUS.GENERATING_BASE) return "Generating base clip…";
     if (status === STATUS.EXTENDING) return `Extending clip ${currentChunkIdx + 1}/${totalChunks}…`;
     if (status === STATUS.UPLOADING) return "Saving to cloud…";
@@ -251,17 +321,89 @@ export function GenerationProgress({ generationParams, onReset }) {
       {/* Header */}
       <div className="text-center space-y-1">
         <h2 className="text-2xl font-bold font-heading tracking-tight">
-          {status === STATUS.DONE ? "🎬 Your Long-Form Ad is Ready!" : "Generating Long-Form Ad"}
+          {status === STATUS.DONE
+            ? "🎬 Your Long-Form Ad is Ready!"
+            : status === STATUS.AWAITING_APPROVAL
+            ? "Review Your Script"
+            : "Generating Long-Form Ad"}
         </h2>
         <p className="text-sm text-muted-foreground">
           {status === STATUS.DONE
             ? `${totalDuration}s property video — saved to your Asset Library`
+            : status === STATUS.AWAITING_APPROVAL
+            ? "Edit dialogue or camera notes below. Auto-approves in a few seconds."
             : `${totalChunks} clips chaining with Veo 3.1 · ~${Math.round(totalChunks * 2.5)} min total`}
         </p>
       </div>
 
+      {/* ── Script Approval Panel ─────────────────────────────────────────── */}
+      {status === STATUS.AWAITING_APPROVAL && (
+        <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileEdit className="w-4 h-4 text-primary" />
+              <span className="text-sm font-semibold">Script Ready — Review & Approve</span>
+            </div>
+            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full transition-colors ${
+              approvalCountdown <= 3
+                ? "bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400"
+                : "bg-primary/10 text-primary"
+            }`}>
+              {approvalCountdown}s
+            </span>
+          </div>
+
+          {/* Voice Profile */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+              Voice Profile
+            </label>
+            <textarea
+              value={editedVoicePrompt}
+              onChange={(e) => setEditedVoicePrompt(e.target.value)}
+              rows={3}
+              className="w-full text-xs rounded-xl border border-border/50 bg-background/80 px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-primary/50"
+            />
+          </div>
+
+          {/* Chunk editors */}
+          <div className="space-y-3">
+            {editedChunks.map((chunk, i) => (
+              <div key={i} className="rounded-xl border border-border/40 bg-background/60 p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-primary/10 text-primary">
+                    Scene {i + 1}
+                  </span>
+                  {chunk.cameraDirection && (
+                    <span className="text-[10px] text-muted-foreground truncate flex-1">{chunk.cameraDirection}</span>
+                  )}
+                  <span className="text-[10px] text-muted-foreground shrink-0">{chunk.estimatedSeconds || 8}s</span>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] text-muted-foreground font-medium">Scene prompt</label>
+                  <textarea
+                    value={chunk.veoPrompt || ""}
+                    onChange={(e) => updateChunkPrompt(i, e.target.value)}
+                    rows={5}
+                    className="w-full text-xs rounded-lg border border-border/40 bg-background px-2.5 py-1.5 resize-none focus:outline-none focus:ring-1 focus:ring-primary/50"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <Button
+            onClick={handleApprove}
+            className="w-full gradient-bg text-white hover:opacity-90 shadow-md gap-2"
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            Approve & Generate Video
+          </Button>
+        </div>
+      )}
+
       {/* ── Progress bar ─────────────────────────────────────────────────── */}
-      {status !== STATUS.DONE && status !== STATUS.ERROR && (
+      {status !== STATUS.DONE && status !== STATUS.ERROR && status !== STATUS.AWAITING_APPROVAL && (
         <div className="space-y-2">
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground font-medium">{statusLabel()}</span>
@@ -278,7 +420,7 @@ export function GenerationProgress({ generationParams, onReset }) {
       )}
 
       {/* ── Chunk rail ───────────────────────────────────────────────────── */}
-      {totalChunks > 0 && (
+      {totalChunks > 0 && status !== STATUS.AWAITING_APPROVAL && (
         <div className="relative">
           <div className="flex items-center gap-0 overflow-x-auto pb-2">
             {chunks.map((chunk, idx) => {
@@ -338,8 +480,8 @@ export function GenerationProgress({ generationParams, onReset }) {
         </div>
       )}
 
-      {/* ── Status message (non-error, non-done) ─────────────────────────── */}
-      {status !== STATUS.DONE && status !== STATUS.ERROR && (
+      {/* ── Status message (non-error, non-done, non-approval) ───────────── */}
+      {status !== STATUS.DONE && status !== STATUS.ERROR && status !== STATUS.AWAITING_APPROVAL && (
         <div className="rounded-2xl border border-border/50 bg-muted/20 p-4 flex gap-3">
           <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
             <Clapperboard className="w-4 h-4 text-primary" />
