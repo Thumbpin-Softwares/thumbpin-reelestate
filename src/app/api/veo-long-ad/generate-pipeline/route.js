@@ -77,8 +77,8 @@ export async function POST(request) {
     if (!Array.isArray(chunks) || chunks.length === 0) {
       return NextResponse.json({ error: "At least 1 chunk required" }, { status: 400 });
     }
-    if (chunks.length > 3) {
-      return NextResponse.json({ error: "Maximum 3 chunks allowed" }, { status: 400 });
+    if (chunks.length > 5) {
+      return NextResponse.json({ error: "Maximum 5 chunks allowed" }, { status: 400 });
     }
 
     const masterVoicePrompt = (formData.get("masterVoicePrompt") || "").toString();
@@ -311,7 +311,7 @@ export async function POST(request) {
             config: {
               aspectRatio,
               resolution: "720p",
-              durationSeconds: 8,
+              durationSeconds: chunk0.estimatedSeconds || 8,
               referenceImages,
             },
           });
@@ -373,7 +373,7 @@ export async function POST(request) {
               message: `🔄 Extending with chunk ${i + 1}/${totalChunks} (~${cumulativeDuration}s so far)...`,
             });
 
-            const extensionPrompt = buildExtensionPrompt(chunk);
+            const extensionPrompt = buildExtensionPrompt(chunk, workVoicePrompt);
 
             let extVideoUri = null;
             let lastErr;
@@ -387,6 +387,7 @@ export async function POST(request) {
                   config: {
                     aspectRatio,
                     resolution: "720p",
+                    durationSeconds: chunk.estimatedSeconds || 8,
                   },
                 });
 
@@ -577,6 +578,7 @@ function buildFirstClipPrompt(chunk, masterVoicePrompt) {
   return `${voiceSection}${chunk.veoPrompt || "Ultra-realistic luxury real estate UGC video. Presenter at property exterior. PRESENTER: Match SUBJECT reference image exactly."}`;
 }
 
-function buildExtensionPrompt(chunk) {
-  return chunk.veoPrompt || "Continue the real estate video. MAINTAIN EXACT SAME PRESENTER IDENTITY. Seamless continuation from the last frame.";
+function buildExtensionPrompt(chunk, masterVoicePrompt) {
+  const voiceSection = masterVoicePrompt ? `VOICE: ${masterVoicePrompt}\n\n` : "";
+  return `${voiceSection}${chunk.veoPrompt || "Continue the real estate video. MAINTAIN EXACT SAME PRESENTER IDENTITY. Seamless continuation from the last frame."}`;
 }

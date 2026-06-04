@@ -96,38 +96,65 @@ export async function POST(request) {
     };
     const langName = languageMap[language] || "English";
 
-    const MAX_CHUNKS = 3;
+    const MAX_CHUNKS = 5;
 
-    const UGC_AESTHETICS = `QUALITY REQUIREMENTS: Ultra-realistic luxury real estate UGC. Maximum realism. Prioritize realistic lip synchronization over complex movement. Natural human behavior: natural blinking, natural facial expressions, natural breathing.
+    const UGC_AESTHETICS = `QUALITY REQUIREMENTS: Ultra-realistic luxury real estate UGC. Maximum realism. Prioritize realistic lip synchronization over complex movement. Natural human behavior: natural blinking, natural facial expressions, natural breathing. Soft natural ambient sound of the environment only.
 CAMERA: Single continuous gimbal shot, 35mm lens, slow smooth movement, natural handheld micro-movements.
-NEGATIVE PROMPT (AVOID THESE STRICTLY): No robotic motion, no exaggerated gestures, no excessive head movement, no identity drift, no AI artifacts, no sudden camera cuts while speaking, no rushed speech, no background sound effects.`;
+NEGATIVE PROMPT: No robotic motion, no exaggerated gestures, no excessive head movement, no identity drift, no AI artifacts.`;
 
-    const chunkingPrompt = `You are an expert AI video director specializing in ultra-realistic luxury real estate UGC.
-        I have provided images of a real estate location and a person (avatar).
+    const chunkingPrompt = `You are an expert AI video director for ultra-realistic luxury real estate UGC.
+        I have provided images of a real estate property and a presenter (avatar), plus a script below.
 
-        Write a highly detailed, 3-part sequential video prompt for a Google Veo generation pipeline.
-        The spoken language for the dialogue MUST be ${language}.
-        CRUCIAL: For Indian languages, you MUST write the dialogue in ROMAN TRANSLITERATION (e.g., "Yeh property sach mein...").
-        NARRATIVE ARC & TIMING RULES:
-        - The video must feel like a continuous high-end luxury vlog with hard camera cuts only occurring between the 3 parts.
-        - Cuts MUST ONLY happen when the avatar has completely finished speaking. Never cut mid-sentence.
+        STEP 1 — READ THE SCRIPT AND DECIDE HOW MANY PARTS ARE NEEDED:
+        Do NOT default to a fixed number. Analyze the script's natural story beats:
+        - Short script (1 main message): 2 parts
+        - Medium script (location + 1-2 features): 3 parts
+        - Full script (arrival + design + amenities + CTA): 4-5 parts
+        Maximum is ${MAX_CHUNKS} parts. Minimum is 2. Choose the smallest number that covers the full script naturally.
 
-        PART 1 (Arrival & Hook):
-        - Visual: A luxury SUV is parked in front of the location. The avatar exits the vehicle naturally, closes the door, looks at the property with a small authentic smile, and walks 2-3 steps forward.
-        - Audio: Avatar begins speaking slowly, introducing the property.
-        PART 2 (The Balcony/Interior):
-        - Visual: Start this prompt with the words "HARD CAMERA CUT:". The avatar is now standing at a balcony or a premium spot at the location.
-        - Audio: Avatar speaks about the architecture and premium feel.
-        PART 3 (Final CTA):
-        - Visual: Start this prompt with the words "HARD CAMERA CUT:". The avatar is at one final beautiful spot in the location.
-        - Audio: Delivers a warm, slow Call to Action.
-         REQUIREMENTS FOR JSON OUTPUT:
-        - "voice_profile": Define voice. State: "Voice direction: Female luxury real estate consultant, 22-25 years old. Warm, trustworthy, soft confidence. Speech speed 70% of normal pace. Speaking fluent ${language}. Clean voiceover ONLY. No background SFX."
-        - "part1": Describe exact visual actions (car, stepping out) and EXACT dialogue in quotes. Append: "${UGC_AESTHETICS}"
-        - "part2": Must start with "HARD CAMERA CUT: New perspective from the balcony." Include EXACT dialogue. Append: "MAINTAIN EXACT SAME PRESENTER IDENTITY. ${UGC_AESTHETICS}"
-        - "part3": Must start with "HARD CAMERA CUT: Final location." Include EXACT dialogue. Append: "MAINTAIN EXACT SAME PRESENTER IDENTITY. ${UGC_AESTHETICS}"
+        STEP 2 — TIMING RULE (CRITICAL):
+        Each part is ONE continuous video clip. A real person speaking at a calm natural pace delivers ~2 words per second.
+        Count your dialogue words and assign duration_seconds accordingly:
+        - 8-10 words → duration_seconds: 6
+        - 11-14 words → duration_seconds: 8
+        Never assign more than 8 seconds. Never assign less than 6 seconds.
+        DIALOGUE MUST BE MAX 14 WORDS PER PART. Count every word. Cut if over.
 
-        Output MUST be valid JSON with exact keys: "voice_profile", "part1", "part2", "part3". No markdown wrappers.`;
+        STEP 3 — ONE ACTION PER PART:
+        Each part has ONE physical action only. The avatar is mostly still while speaking.
+        Never stack "exits car AND closes door AND walks AND looks" — pick ONE.
+        Never use "HARD CAMERA CUT" or any cut/transition language in the prompts.
+
+        SCENE STRUCTURE:
+        - First part always: Avatar steps out of a parked luxury SUV, pauses, takes in the property.
+        - Middle parts: Avatar standing at different spots (entrance, balcony, key amenity). ONE spot per part.
+        - Last part always: Avatar faces camera directly, delivers the CTA with a warm smile.
+
+        DIALOGUE RULES:
+        - Spoken language: ${language}. For Indian languages, ROMAN TRANSLITERATION only (e.g., "Yeh property sach mein...").
+        - Write dialogue the way a real person talks to a friend — not a TV presenter.
+        - Pick the single most memorable line from the script for each part. Short punchy phrases.
+        - MAX 14 words. Count them. If over, trim.
+
+        OUTPUT — valid JSON only, no markdown wrappers:
+        {
+          "voice_profile": "A young woman in her mid-20s speaks directly to camera in fluent ${language}, like sharing an exciting discovery with a close friend. Warm, unhurried, genuinely enthusiastic. Natural breathing between phrases. No performance voice — real conversation energy.",
+          "parts": [
+            { "prompt": "full Veo scene prompt", "duration_seconds": 8 },
+            { "prompt": "full Veo scene prompt", "duration_seconds": 6 }
+          ]
+        }
+
+        FOR EACH PART'S "prompt":
+        - Describe: the location, the ONE action, the EXACT dialogue in quotes.
+        - For the first part: no prefix needed.
+        - For all other parts: prefix with "MAINTAIN EXACT SAME PRESENTER IDENTITY. New scene: [location]."
+        - Append at the very end of every prompt: "${UGC_AESTHETICS}"
+
+        THE SCRIPT TO ADAPT:
+        ---
+        ${script}
+        ---`;
 
     const parts = [{ text: chunkingPrompt }];
     locationDataArr.forEach((d) => parts.push({ inlineData: d }));
@@ -153,15 +180,17 @@ NEGATIVE PROMPT (AVOID THESE STRICTLY): No robotic motion, no exaggerated gestur
       try {
         const parsed = JSON.parse(jsonMatch[0]);
         if (parsed.voice_profile) masterVoicePrompt = parsed.voice_profile;
-        [parsed.part1, parsed.part2, parsed.part3].filter(Boolean).forEach((prompt, i) => {
-          chunks.push({
-            index: i,
-            text: "",
-            veoPrompt: prompt,
-            estimatedSeconds: 8,
-            cameraDirection: "",
+        if (Array.isArray(parsed.parts)) {
+          parsed.parts.slice(0, MAX_CHUNKS).forEach((part, i) => {
+            chunks.push({
+              index: i,
+              text: "",
+              veoPrompt: part.prompt || "",
+              estimatedSeconds: Math.min(Math.max(part.duration_seconds || 8, 6), 8),
+              cameraDirection: "",
+            });
           });
-        });
+        }
       } catch (_) {}
     }
 
@@ -207,16 +236,7 @@ NEGATIVE PROMPT (AVOID THESE STRICTLY): No robotic motion, no exaggerated gestur
 }
 
 function getDefaultVoicePrompt(language = "english") {
-  const accents = {
-    english: "polished Indian-English accent with confident urban inflection",
-    hindi: "natural North Indian Hindi with smooth warm delivery",
-    kannada: "fluent Kannada with calm confident real-estate creator energy",
-    tamil: "fluent Tamil with natural Chennai cadence and smooth delivery",
-    telugu: "smooth Telugu with warm confident delivery",
-    marathi: "fluent Marathi with warm Maharashtrian delivery",
-  };
-  const accent = accents[language] || accents.english;
-  return `Female voice, age 28–35, ${accent}, warm medium-high pitch with natural variation, rich authoritative tone, real-estate creator delivery style — fast on highlights, softer on premium details, meaningful pauses. Pacing ~140 wpm. Recorded on dry close-mic, zero reverb, zero echo, zero noise, warm chest resonance, natural sibilance, natural dynamic range.`;
+  return `A young woman in her mid-20s speaks directly to camera in fluent ${language}, like she is sharing an exciting discovery with a close friend. Her voice is warm, unhurried, and genuinely enthusiastic. She breathes naturally between phrases and pauses to let the beauty of the property sink in. No performance voice, no announcement tone — real conversation energy.`;
 }
 
 function buildFallbackVeoPrompt(text, index, total, voicePrompt, langName) {
