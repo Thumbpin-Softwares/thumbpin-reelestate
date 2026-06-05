@@ -53,7 +53,7 @@ export default function Hero() {
       </h1>
 
       <p className="w-xl z-10 text-md text-center">
-        In 15 minutes, we{"\'"}ll turn your product URL into live ads, clone a
+        In 15 minutes, we{"\'"}ll turn your real estate idea into social media ads, clone a
         competitor creative, and show you what{"\'"}s winning in your niche.
       </p>
 

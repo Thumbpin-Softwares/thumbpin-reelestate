@@ -28,7 +28,7 @@ export function Navbar() {
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-[#f7f5e8] border-b border-b-neutral-200">
       <div className="flex items-center justify-center bg-black py-2">
-        <h1 className="text-white text-sm">Your next winning ad? We'll build it. <Link href="/" className="underline underline-offset-4">Work with us</Link></h1>
+        <h1 className="text-white text-sm">Your next winning ad? We{"\'"}ll build it. <Link href="/" className="underline underline-offset-4">Work with us</Link></h1>
       </div>
         <div className="flex">
             <div className="h-1 bg-linear-to-r from-purple-500 via-yellow-500 to-green-500 w-full"></div>
