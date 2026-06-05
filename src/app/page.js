@@ -4,16 +4,13 @@ import { Features } from "@/components/landing/features";
 import { HowItWorks } from "@/components/landing/how-it-works";
 import { Testimonials } from "@/components/landing/testimonials";
 import { Pricing } from "@/components/landing/pricing";
-import { Footer } from "@/components/landing/footer";
-
-import Showcase from "@/modules/home/components/showcase";
+import Footer from "@/modules/common/layout/footer";
 
 export default function LandingPage() {
   return (
     <main className="min-h-screen bg-[#f7f5e8]">
       <Navbar />
       <Hero />
-      <Showcase />
       <Features />
       <HowItWorks />
       <Testimonials />
