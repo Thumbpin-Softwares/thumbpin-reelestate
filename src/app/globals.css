@@ -298,3 +298,18 @@
   background-color: #dbff30;
   color: black;
 }
+
+/* custom css added by Sohan Rout */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(calc(-50% - 12px));
+  }
+}
+
+.animate-marquee {
+  animation: marquee 25s linear infinite;
+}

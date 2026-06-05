@@ -27,7 +27,8 @@ export const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL || null;
  * - User assets → presigned URL valid for `expiresIn` seconds (default 1 hour)
  */
 export async function getAssetUrl(key, expiresIn = 3600) {
-  if (R2_PUBLIC_URL && key.startsWith("Avatars/")) {
+  const PUBLIC_PREFIXES = ["Avatars/", "web-assets/"];
+  if (R2_PUBLIC_URL && PUBLIC_PREFIXES.some((p) => key.startsWith(p))) {
     return `${R2_PUBLIC_URL}/${key}`;
   }
   const command = new GetObjectCommand({ Bucket: BUCKET, Key: key });

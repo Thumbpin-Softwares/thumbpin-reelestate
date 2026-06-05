@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { compressImage } from "@/utils/compress-image";
 import { toast } from "sonner";
 import {
   Upload,
@@ -304,10 +305,13 @@ function UploadModal({ onClose, onUploaded }) {
 
     setUploading(true);
     const fd = new FormData();
-    
-    files.forEach(file => {
-      fd.append("files", file);
-    });
+
+    await Promise.all(
+      files.map(async (file) => {
+        const compressed = await compressImage(file, 1200, 0.82);
+        fd.append("files", compressed);
+      })
+    );
     fd.append("type", type);
     if (collectionName) fd.append("name", collectionName);
 

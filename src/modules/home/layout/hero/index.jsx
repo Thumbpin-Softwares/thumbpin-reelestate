@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import Video from "../../components/video-carousal";
 
 const texts = ["Real Estate Ads", "Realistic Videos", "Idea to Video"];
 
@@ -17,7 +18,7 @@ export default function Hero() {
   }, []);
 
   return (
-    <main className="relative h-[70vh] bg-[#f5efe8] flex flex-col gap-2 items-center justify-center overflow-hidden">
+    <main className="relative bg-[#f5efe8] pt-32 flex flex-col gap-2 items-center justify-center overflow-hidden">
       <div
         className="absolute inset-0 opacity-30"
         style={{
@@ -66,6 +67,10 @@ export default function Hero() {
         <span className="text-xs z-10 text-neutral-400">
           No credit card · Free to start
         </span>
+      </div>
+
+      <div className="z-10">
+        <Video />
       </div>
     </main>
   );
