@@ -1,3 +1,5 @@
+export const maxDuration = 300;
+
 import { NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { getServerSession } from "next-auth";
@@ -159,6 +161,12 @@ export async function POST(request) {
     ];
     console.log(`[VeoLongAd] Total referenceImages: ${referenceImages.length}`);
 
+    // Avatar-only references reused on every extension to lock outfit/identity
+    const avatarReferenceImages = avatarImgs.slice(0, avatarSlots).map((img) => ({
+      image: img,
+      referenceType: "SUBJECT",
+    }));
+
     // ── SSE stream ────────────────────────────────────────────────────────────
     const encoder = new TextEncoder();
 
@@ -177,6 +185,7 @@ export async function POST(request) {
           while (currentOp && !currentOp.done) {
             if (Date.now() > deadline) throw new Error("Video generation timed out");
             await new Promise((r) => setTimeout(r, 10000));
+            send({ type: "ping" }); // keep SSE connection alive during long polls
 
             const nextOp = await ai.operations.getVideosOperation({ operation: currentOp });
             if (!nextOp) {
@@ -388,6 +397,7 @@ export async function POST(request) {
                     aspectRatio,
                     resolution: "720p",
                     durationSeconds: chunk.estimatedSeconds || 8,
+                    ...(avatarReferenceImages.length > 0 && { referenceImages: avatarReferenceImages }),
                   },
                 });
 
