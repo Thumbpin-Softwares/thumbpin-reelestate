@@ -33,7 +33,7 @@ const cards = [
     point: "4",
     tag: "Voiceover",
     title: "Lip-Sync Technology",
-    images: [],
+    images: ["lip.mp4"],
     description:
       "State-of-the-art AI lip-sync. Your avatars speak naturally with perfect mouth movements.",
     outcome: "Human-like presenters without filming or retakes.",

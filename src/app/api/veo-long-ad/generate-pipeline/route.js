@@ -197,10 +197,20 @@ export async function POST(request) {
 
           if (!currentOp) throw new Error("Operation lost during polling");
           if (currentOp.error) {
-            const msg = currentOp.error.message || "";
-            throw new Error(msg.includes("internal server issue")
-              ? "Gemini encountered a transient error. Please retry in 1–2 minutes."
-              : msg || "Operation failed");
+            const rawMsg = currentOp.error.message || "";
+            const lc = rawMsg.toLowerCase();
+            const isVeoTransient =
+              lc.includes("internal server") ||
+              lc.includes("internal_server") ||
+              lc.includes("transient") ||
+              lc.includes("unavailable") ||
+              lc.includes("resource_exhausted") ||
+              lc.includes("resource exhausted") ||
+              lc.includes("503") ||
+              lc.includes("429");
+            throw new Error(isVeoTransient
+              ? `Veo transient error — ${rawMsg}`
+              : rawMsg || "Operation failed");
           }
 
           console.log("[VeoLongAd] Operation done. Top-level keys:", currentOp ? Object.keys(currentOp) : "null");
@@ -364,7 +374,10 @@ export async function POST(request) {
               const msg = (err.message || "").toLowerCase();
               const isTransient =
                 msg.includes("internal server") ||
+                msg.includes("internal_server") ||
                 msg.includes("transient") ||
+                msg.includes("unavailable") ||
+                msg.includes("resource_exhausted") ||
                 msg.includes("timeout") ||
                 msg.includes("429") ||
                 msg.includes("503");
@@ -404,6 +417,12 @@ export async function POST(request) {
 
           for (let i = 1; i < workChunks.length; i++) {
             const chunk = workChunks[i];
+
+            // Give Veo time to fully index the previous clip before extending.
+            // This reduces audio artifacts at join points — 8s between extensions.
+            if (i > 1) {
+              await new Promise((r) => setTimeout(r, 8000));
+            }
 
             send({
               type: "progress",
@@ -455,18 +474,20 @@ export async function POST(request) {
                 const msg = (err.message || "").toLowerCase();
                 const isTransient =
                   msg.includes("internal server") ||
+                  msg.includes("internal_server") ||
                   msg.includes("transient") ||
+                  msg.includes("unavailable") ||
+                  msg.includes("resource_exhausted") ||
                   msg.includes("timeout") ||
                   msg.includes("429") ||
                   msg.includes("503") ||
-                  msg.includes("not processed") ||
-                  msg.includes("invalid_argument");
+                  msg.includes("not processed");
 
-                if (!isTransient || attempt === 2) throw err;
+                if (!isTransient) throw err; // hard error (bad params etc) — abort pipeline
 
-                const delay = (msg.includes("not processed") || msg.includes("invalid_argument"))
-                  ? 30000 * (attempt + 1)
-                  : 90000; // Veo says "retry in 1–2 minutes" — flat 90s matches that window
+                if (attempt === 2) break; // exhausted retries — fall through to partial save
+
+                const delay = msg.includes("not processed") ? 30000 * (attempt + 1) : 90000;
 
                 send({
                   type: "progress",

@@ -128,6 +128,7 @@ export async function POST(request) {
         STEP 3 — ONE ACTION PER PART:
         - Each part has ONE physical action only. The avatar is mostly still while speaking.
         - Never stack multiple actions. Never use "HARD CAMERA CUT" or any cut/transition language.
+        - For parts 2 and beyond: the clip must open with 1 second of silent natural movement (she turns, steps into position, or glances around) BEFORE any dialogue begins. No speech in the first second.
 
         SCENE STRUCTURE:
         - First part (SUV arrival): A luxury SUV is already parked, door already open. The avatar is mid-exit — one leg out, stepping onto the ground. She straightens up and pauses, looking at the property. That is the only action. She does NOT close the door, does NOT walk, does NOT gesture. She simply steps out and pauses.
