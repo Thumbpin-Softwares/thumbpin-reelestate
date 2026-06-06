@@ -1,8 +1,5 @@
 import { Navbar } from "@/modules/home/components/navbar";
 import Hero from "@/modules/home/layout/hero";
-import { Features } from "@/components/landing/features";
-import { HowItWorks } from "@/components/landing/how-it-works";
-import { Testimonials } from "@/components/landing/testimonials";
 import About from "@/modules/home/layout/about";
 import Footer from "@/modules/common/layout/footer";
 import Cta from "@/modules/home/layout/cta";
@@ -12,10 +9,7 @@ export default function LandingPage() {
     <main className="min-h-screen bg-[#f7f5e8]">
       <Navbar />
       <Hero />
-      <Features />
-      <HowItWorks />
-      <Testimonials />
-      <div className="bg-[#f5f6f0] pb-12">
+      <div className="bg-[#f5f6f0] py-12">
         <About />
       </div>
       <div className="bg-white pb-12">
