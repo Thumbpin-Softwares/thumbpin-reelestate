@@ -42,7 +42,7 @@ export default function DashboardPage() {
     {
       title: "Real Estate",
       description: "Property walkthroughs",
-      href: "/app/ai-walkthrough",
+      href: "/app/veo-long-ad",
       icon: Sparkles,
       color: "bg-amber-50 text-amber-600",
     },
