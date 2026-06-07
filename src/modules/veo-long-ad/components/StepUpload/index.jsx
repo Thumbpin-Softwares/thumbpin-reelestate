@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import {
   Upload,
   X,
@@ -10,9 +10,11 @@ import {
   ChevronRight,
   Loader2,
   Info,
+  Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 /**
  * StepUpload — Step 1 for the Long-Form Veo Ad pipeline.
@@ -24,6 +26,13 @@ import { Button } from "@/components/ui/button";
  */
 export function StepUpload({ locationImages, setLocationImages, avatarHook, onNext, isValid }) {
   const [draggingLocation, setDraggingLocation] = useState(false);
+
+  // ── Collection upload state (Upload Presenter tab) ─────────────────────────
+  const [uploadItems, setUploadItems] = useState([]);
+  const [collectionName, setCollectionName] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
+  const MAX_COLLECTION = 4;
 
   // ── My Assets (user uploaded avatars + presenter collections) ─────────────
   const [myAssets, setMyAssets] = useState([]);
@@ -89,8 +98,7 @@ export function StepUpload({ locationImages, setLocationImages, avatarHook, onNe
   };
 
   // ── Avatar section ────────────────────────────────────────────────────────
-  const { reAvatars, reAvatarsLoading, selectedAvatars, selectCollection, isCollectionSelected,
-    uploadedAvatarFiles, removeUploadedAvatar } = avatarHook;
+  const { reAvatars, reAvatarsLoading, selectedAvatars, selectCollection, isCollectionSelected } = avatarHook;
 
   const selectedCollectionAvatarData = reAvatars.find((col) =>
     isCollectionSelected(col.id)
@@ -283,65 +291,102 @@ export function StepUpload({ locationImages, setLocationImages, avatarHook, onNe
             </div>
           )}
 
-          {/* Upload avatars */}
+          {/* Upload avatars — collection flow */}
           {avatarHook.avatarMode === "upload" && (
-            <div className="space-y-2">
-              <label className="block">
-                <div className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all ${
-                  uploadedAvatarFiles.length > 0
-                    ? "border-border/30"
-                    : "border-border hover:border-primary/50 bg-muted/10"
-                }`}>
-                  <Upload className="w-5 h-5 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-sm font-medium">Upload Presenter Photo</p>
-                  <p className="text-[11px] text-muted-foreground">Clear face photo, front-facing</p>
-                </div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    if (e.target.files?.[0]) avatarHook.handleUploadFile(e.target.files[0]);
-                  }}
-                />
-              </label>
-
-              {uploadedAvatarFiles.length > 0 && (
-                <div className="grid grid-cols-3 gap-2">
-                  {uploadedAvatarFiles.map((f) => {
-                    const isSelected = selectedAvatars.some(
-                      (a) => a.key === f.id || a.url === f.url
-                    );
-                    return (
-                      <div key={f.id} className="relative group">
-                        <button
-                          onClick={() => avatarHook.toggleUploadedAvatar(f)}
-                          className={`relative w-full aspect-square rounded-xl overflow-hidden border-2 transition-all ${
-                            isSelected ? "border-primary ring-2 ring-primary/30" : "border-border/40"
-                          }`}
-                        >
-                          <img src={f.url} alt={f.name} className="w-full h-full object-cover" />
-                          {f.isUploading && (
-                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                              <Loader2 className="w-4 h-4 animate-spin text-white" />
-                            </div>
-                          )}
-                          {isSelected && !f.isUploading && (
-                            <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
-                              <CheckCircle2 className="w-3 h-3 text-white" />
-                            </div>
-                          )}
-                        </button>
-                        <button
-                          onClick={() => removeUploadedAvatar(f.id)}
-                          className="absolute -top-1 -left-1 w-4 h-4 rounded-full bg-destructive text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                        >
-                          <X className="w-2.5 h-2.5" />
-                        </button>
+            <div className="space-y-3">
+              {/* Image grid — up to 4 slots */}
+              <div className="grid grid-cols-2 gap-2">
+                {uploadItems.map((item, idx) => (
+                  <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden border border-border/40">
+                    <img src={item.preview} alt={`Presenter ${idx + 1}`} className="w-full h-full object-cover" />
+                    {uploading && (
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                        <Loader2 className="w-4 h-4 animate-spin text-white" />
                       </div>
-                    );
-                  })}
-                </div>
+                    )}
+                    {!uploading && (
+                      <button
+                        onClick={() => setUploadItems((prev) => prev.filter((_, i) => i !== idx))}
+                        className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+
+                {uploadItems.length < MAX_COLLECTION && (
+                  <label className={`aspect-square rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-all hover:border-primary/50 hover:bg-primary/5 ${
+                    uploadItems.length === 0 ? "col-span-2 py-8 border-border" : "border-border/50"
+                  }`}>
+                    <Plus className="w-5 h-5 text-muted-foreground" />
+                    {uploadItems.length === 0 && (
+                      <>
+                        <p className="text-sm font-medium">Add presenter photos</p>
+                        <p className="text-[11px] text-muted-foreground">Up to 4 images per collection</p>
+                      </>
+                    )}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => {
+                        const picked = Array.from(e.target.files || []);
+                        const remaining = MAX_COLLECTION - uploadItems.length;
+                        const toAdd = picked.slice(0, remaining).map((f) => ({
+                          file: f,
+                          preview: URL.createObjectURL(f),
+                        }));
+                        setUploadItems((prev) => [...prev, ...toAdd]);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                )}
+              </div>
+
+              {uploadItems.length > 0 && (
+                <>
+                  <Input
+                    placeholder="Collection name (optional)"
+                    value={collectionName}
+                    onChange={(e) => setCollectionName(e.target.value)}
+                    className="text-sm h-9"
+                  />
+                  <Button
+                    size="sm"
+                    className="w-full gradient-bg text-white hover:opacity-90 gap-2"
+                    disabled={uploading}
+                    onClick={async () => {
+                      setUploading(true);
+                      try {
+                        const fd = new FormData();
+                        uploadItems.forEach((item, i) => fd.append(`presenterImage_${i}`, item.file));
+                        fd.append("name", collectionName.trim() || `My Presenter — ${new Date().toLocaleDateString()}`);
+                        const res = await fetch("/api/veo-long-ad/presenter/upload", { method: "POST", body: fd });
+                        const data = await res.json();
+                        if (!res.ok) throw new Error(data.error || "Upload failed");
+                        toast.success(`Collection "${data.name}" saved!`);
+                        avatarHook.selectCollection({
+                          id: data.assetId,
+                          name: data.name,
+                          coverImage: data.urls[0],
+                          images: data.urls.map((url) => ({ url, key: url })),
+                        });
+                        setUploadItems([]);
+                        setCollectionName("");
+                      } catch (err) {
+                        toast.error("Upload failed", { description: err.message });
+                      } finally {
+                        setUploading(false);
+                      }
+                    }}
+                  >
+                    {uploading ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Uploading…</> : <><Upload className="w-3.5 h-3.5" /> Upload as Collection</>}
+                  </Button>
+                </>
               )}
             </div>
           )}

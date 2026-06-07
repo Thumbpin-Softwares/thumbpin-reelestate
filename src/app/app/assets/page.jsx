@@ -130,10 +130,10 @@ function PresenterCollectionCard({ asset, onRename, onDelete, deleting }) {
 }
 
 // ─── Avatar Collection Upload Modal ──────────────────────────────────────────
-function AvatarCollectionModal({ open, onClose, onUploaded, uploadAsset }) {
+function AvatarCollectionModal({ open, onClose, onUploaded }) {
   const [items, setItems] = useState([]);
+  const [collectionName, setCollectionName] = useState("");
   const [uploading, setUploading] = useState(false);
-  const [uploadedCount, setUploadedCount] = useState(0);
   const inputRef = useRef(null);
   const MAX = 4;
 
@@ -149,7 +149,6 @@ function AvatarCollectionModal({ open, onClose, onUploaded, uploadAsset }) {
     const next = incoming.map((f) => ({
       file: f,
       preview: URL.createObjectURL(f),
-      name: f.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " "),
     }));
     setItems((prev) => [...prev, ...next].slice(0, MAX));
   }
@@ -164,24 +163,22 @@ function AvatarCollectionModal({ open, onClose, onUploaded, uploadAsset }) {
   async function handleUpload() {
     if (!items.length) return;
     setUploading(true);
-    setUploadedCount(0);
-    let ok = 0;
+    try {
+      const fd = new FormData();
+      items.forEach((item, i) => fd.append(`presenterImage_${i}`, item.file));
+      fd.append("name", collectionName.trim() || `My Avatars — ${new Date().toLocaleDateString()}`);
 
-    for (const item of items) {
-      const res = await uploadAsset(item.file, item.name, "avatar", "avatars");
-      if (res.success) {
-        ok++;
-        setUploadedCount((n) => n + 1);
-      }
-    }
+      const res = await fetch("/api/veo-long-ad/presenter/upload", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Upload failed");
 
-    setUploading(false);
-    if (ok > 0) {
-      toast.success(`${ok} avatar${ok > 1 ? "s" : ""} uploaded!`);
+      toast.success(`Collection "${data.name}" saved!`);
       onUploaded();
       handleClose();
-    } else {
-      toast.error("Upload failed — please try again");
+    } catch (err) {
+      toast.error("Upload failed", { description: err.message });
+    } finally {
+      setUploading(false);
     }
   }
 
@@ -189,7 +186,7 @@ function AvatarCollectionModal({ open, onClose, onUploaded, uploadAsset }) {
     if (uploading) return;
     items.forEach((it) => URL.revokeObjectURL(it.preview));
     setItems([]);
-    setUploadedCount(0);
+    setCollectionName("");
     onClose();
   }
 
@@ -199,14 +196,15 @@ function AvatarCollectionModal({ open, onClose, onUploaded, uploadAsset }) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ImagePlus className="w-4 h-4" />
-            Upload Your Avatar Set
+            Upload Avatar Collection
           </DialogTitle>
           <DialogDescription>
-            Add up to 4 photos — used as presenter reference images in ad generation
+            Group up to 4 photos of the same person — saved as one collection for use in ad generation
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Drop zone */}
           {items.length < MAX && (
             <div
               className="border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-colors"
@@ -230,14 +228,12 @@ function AvatarCollectionModal({ open, onClose, onUploaded, uploadAsset }) {
             </div>
           )}
 
+          {/* Preview grid */}
           {items.length > 0 && (
             <div className="grid grid-cols-4 gap-2">
               {items.map((item, i) => (
-                <div
-                  key={i}
-                  className="relative aspect-square rounded-lg overflow-hidden border border-border group"
-                >
-                  <img src={item.preview} alt={item.name} className="w-full h-full object-cover" />
+                <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-border group">
+                  <img src={item.preview} alt="" className="w-full h-full object-cover" />
                   {!uploading && (
                     <button
                       className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
@@ -246,12 +242,7 @@ function AvatarCollectionModal({ open, onClose, onUploaded, uploadAsset }) {
                       <X className="w-3 h-3 text-white" />
                     </button>
                   )}
-                  {uploading && uploadedCount > i && (
-                    <div className="absolute inset-0 bg-green-500/40 flex items-center justify-center">
-                      <CheckCircle className="w-5 h-5 text-white" />
-                    </div>
-                  )}
-                  {uploading && uploadedCount === i && (
+                  {uploading && (
                     <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
                       <Loader2 className="w-4 h-4 text-white animate-spin" />
                     </div>
@@ -259,6 +250,16 @@ function AvatarCollectionModal({ open, onClose, onUploaded, uploadAsset }) {
                 </div>
               ))}
             </div>
+          )}
+
+          {/* Collection name */}
+          {items.length > 0 && (
+            <Input
+              placeholder="Collection name (e.g. Johns Photos)"
+              value={collectionName}
+              onChange={(e) => setCollectionName(e.target.value)}
+              disabled={uploading}
+            />
           )}
 
           <Button
@@ -269,13 +270,12 @@ function AvatarCollectionModal({ open, onClose, onUploaded, uploadAsset }) {
             {uploading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Uploading {uploadedCount}/{items.length}...
+                Uploading collection...
               </>
             ) : (
               <>
                 <Upload className="w-4 h-4 mr-2" />
-                Upload {items.length > 0 ? `${items.length} ` : ""}
-                Avatar{items.length !== 1 ? "s" : ""}
+                Save as Collection{items.length > 0 ? ` (${items.length} photo${items.length !== 1 ? "s" : ""})` : ""}
               </>
             )}
           </Button>
@@ -506,13 +506,10 @@ export default function AssetLibraryPage() {
           </Button>
           <Button
             className="cursor-pointer bg-neutral-900 text-[#c7f038] shadow-lg"
-            onClick={() => {
-              setAssetType("avatar");
-              fileInputRef.current?.click();
-            }}
+            onClick={() => setAvatarCollectionOpen(true)}
           >
             <Upload className="w-4 h-4 mr-2" />
-            Add Avatar
+            Add Avatar Collection
           </Button>
         </div>
       </div>
@@ -573,7 +570,7 @@ export default function AssetLibraryPage() {
                 <div className="text-center space-y-1">
                   <p className="text-sm font-medium">No avatars yet</p>
                   <p className="text-xs text-muted-foreground max-w-xs">
-                    Upload your first set of avatar photos to use them as presenter reference images in ad generation
+                    Upload a set of photos of the same person — they are grouped as a collection and used as presenter reference images in ad generation
                   </p>
                 </div>
                 <Button
@@ -582,7 +579,7 @@ export default function AssetLibraryPage() {
                   onClick={() => setAvatarCollectionOpen(true)}
                 >
                   <ImagePlus className="w-3.5 h-3.5 mr-1.5" />
-                  Upload Your First Avatars
+                  Upload Your First Collection
                 </Button>
               </div>
             ) : (
@@ -672,7 +669,6 @@ export default function AssetLibraryPage() {
         open={avatarCollectionOpen}
         onClose={() => setAvatarCollectionOpen(false)}
         onUploaded={() => refetch()}
-        uploadAsset={uploadAsset}
       />
     </div>
   );
