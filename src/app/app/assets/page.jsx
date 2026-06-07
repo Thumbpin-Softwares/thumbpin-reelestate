@@ -295,10 +295,13 @@ export default function AssetLibraryPage() {
     productImages,
     videos,
     loading,
+    loadingMore,
+    hasMore,
     uploading,
     fetchError,
     uploadAsset,
     deleteAsset,
+    loadMore,
     refetch,
   } = useAssets();
 
@@ -522,6 +525,11 @@ export default function AssetLibraryPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
+        {hasMore && search && (
+          <p className="text-xs text-muted-foreground mt-1.5 pl-1">
+            Searching loaded assets only — load more below to expand results
+          </p>
+        )}
       </div>
 
       {fetchError && (
@@ -621,7 +629,21 @@ export default function AssetLibraryPage() {
         </Tabs>
       )}
 
-      
+      {hasMore && !loading && (
+        <div className="flex justify-center py-6">
+          <Button variant="outline" onClick={loadMore} disabled={loadingMore} className="cursor-pointer">
+            {loadingMore ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Loading...
+              </>
+            ) : (
+              "Load more assets"
+            )}
+          </Button>
+        </div>
+      )}
+
       {/* Preview Modal */}
       <Dialog open={!!previewAsset} onOpenChange={(open) => !open && setPreviewAsset(null)}>
         <DialogContent className="max-w-4xl p-0 overflow-hidden bg-black/95 border-border/50">

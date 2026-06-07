@@ -1,26 +1,46 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 
-/**
- * Hook to manage all user assets (avatars, product images, backgrounds, etc.)
- * Interacts with MongoDB/local storage via /api/assets
- */
+const LIMIT = 24;
+
+function mapAsset(a) {
+  return {
+    id: a._id,
+    name: a.name,
+    url: a.url,
+    type: a.type,
+    is_custom: true,
+    metadata: a.metadata || {},
+    image_url: a.url,
+    ethnicity: a.metadata?.ethnicity || "Custom",
+  };
+}
+
 export function useAssets(typeFilter = null) {
   const [assets, setAssets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [fetchError, setFetchError] = useState(null);
+  const pageRef = useRef(1);
+
+  const buildUrl = useCallback(
+    (page) => {
+      let url = `/api/assets?page=${page}&limit=${LIMIT}`;
+      if (typeFilter) url += `&type=${typeFilter}`;
+      return url;
+    },
+    [typeFilter]
+  );
 
   const fetchData = useCallback(async () => {
+    setLoading(true);
+    pageRef.current = 1;
     try {
-      let url = "/api/assets";
-      if (typeFilter) url += `?type=${typeFilter}`;
-
-      const res = await fetch(url);
+      const res = await fetch(buildUrl(1));
       const data = await res.json();
-
-      console.log("[useAssets] GET /api/assets →", res.status, data);
 
       if (!res.ok) {
         setFetchError(`${res.status}: ${data.error || "Failed to fetch assets"}`);
@@ -28,33 +48,43 @@ export function useAssets(typeFilter = null) {
       }
 
       setFetchError(null);
-      const fetchedAssets = (data.assets || []).map(a => ({
-        id: a._id,
-        name: a.name,
-        url: a.url,
-        type: a.type,
-        is_custom: true,
-        metadata: a.metadata || {},
-        image_url: a.url,
-        ethnicity: a.metadata?.ethnicity || "Custom",
-      }));
-
-      setAssets(fetchedAssets);
+      setAssets((data.assets || []).map(mapAsset));
+      setHasMore(data.hasMore || false);
     } catch (error) {
-      console.warn("[useAssets] Fetch failed:", error.message);
       setFetchError(error.message);
     } finally {
       setLoading(false);
     }
-  }, [typeFilter]);
+  }, [buildUrl]);
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    const nextPage = pageRef.current + 1;
+    pageRef.current = nextPage;
+    try {
+      const res = await fetch(buildUrl(nextPage));
+      const data = await res.json();
+
+      if (!res.ok) {
+        setFetchError(`${res.status}: ${data.error || "Failed to fetch assets"}`);
+        return;
+      }
+
+      setFetchError(null);
+      setAssets((prev) => [...prev, ...(data.assets || []).map(mapAsset)]);
+      setHasMore(data.hasMore || false);
+    } catch (error) {
+      setFetchError(error.message);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [buildUrl, hasMore, loadingMore]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  /** 
-   * Upload any file as an asset 
-   */
   async function uploadAsset(file, name, type = "general", category = "general") {
     setUploading(true);
     try {
@@ -71,10 +101,6 @@ export function useAssets(typeFilter = null) {
 
       const uploadData = await uploadRes.json();
       if (!uploadRes.ok) throw new Error(uploadData.error);
-
-      // Second, save the asset reference in MongoDB (upload API does this too for avatars, but let's be explicit if needed)
-      // Actually, my src/app/api/avatars/upload/route.js already saves to MongoDB if type is avatar.
-      // Let's check that route to see if it handles other types.
 
       await fetchData();
       return { success: true, asset: uploadData.asset };
@@ -98,29 +124,30 @@ export function useAssets(typeFilter = null) {
 
   return {
     assets,
-    avatars: assets.filter(a => a.type === "avatar" || a.type === "presenter"),
-    customAvatars: assets.filter(a => a.type === "avatar" || a.type === "presenter"),
+    avatars: assets.filter((a) => a.type === "avatar" || a.type === "presenter"),
+    customAvatars: assets.filter((a) => a.type === "avatar" || a.type === "presenter"),
     libraryAvatars: [],
-    productImages: assets.filter(a => a.type === "product" || a.type === "image"),
-    backgrounds: assets.filter(a => a.type === "background"),
-    composites: assets.filter(a => a.type === "composite"),
-    videos: assets.filter(a => a.type === "video" || a.type === "clip"),
+    productImages: assets.filter((a) => a.type === "product" || a.type === "image"),
+    backgrounds: assets.filter((a) => a.type === "background"),
+    composites: assets.filter((a) => a.type === "composite"),
+    videos: assets.filter((a) => a.type === "video" || a.type === "clip"),
     voices: [],
     loading,
+    loadingMore,
+    hasMore,
     uploading,
     fetchError,
     uploadAsset,
     deleteAsset,
+    loadMore,
     refetch: fetchData,
   };
 }
 
-/** 
- * Legacy wrapper for backward compatibility 
- */
 export function useAvatarsAndVoices() {
-  const { avatars, customAvatars, loading, uploading, uploadAsset, deleteAsset, refetch } = useAssets("avatar");
-  
+  const { avatars, customAvatars, loading, uploading, uploadAsset, deleteAsset, refetch } =
+    useAssets("avatar");
+
   return {
     avatars,
     customAvatars,

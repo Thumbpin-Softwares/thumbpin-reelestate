@@ -22,17 +22,50 @@ export const useAvatars = () => {
   // User's saved avatar library from MongoDB
   const [library, setLibrary] = useState([]);
 
-  // Fetch RE avatars (admin collections) + user library
+  // Fetch RE avatars via SSE — collections appear one by one as they're resolved
   const fetchReAvatars = async () => {
     setReAvatarsLoading(true);
     setReAvatarsError(null);
+    setReAvatars([]);
+
     try {
       const res = await fetch("/api/avatars/re");
-      const data = await res.json();
-      setReAvatars(data.avatars ?? []);
-      setLibrary(data.library ?? []);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const blocks = buffer.split("\n\n");
+        buffer = blocks.pop() ?? "";
+
+        for (const block of blocks) {
+          for (const line of block.split("\n")) {
+            if (!line.startsWith("data: ")) continue;
+            try {
+              const event = JSON.parse(line.slice(6));
+              if (event.type === "avatar") {
+                setReAvatars((prev) => [...prev, event.avatar]);
+                setReAvatarsLoading(false); // hide spinner on first card
+              } else if (event.type === "library") {
+                setLibrary(event.library ?? []);
+              } else if (event.type === "done") {
+                setReAvatarsLoading(false);
+              } else if (event.type === "error") {
+                setReAvatarsError(event.message || "Failed to load avatars");
+                setReAvatarsLoading(false);
+              }
+            } catch (_) {}
+          }
+        }
+      }
     } catch (err) {
-      console.error("[RE Avatars] fetch error:", err);
+      console.error("[RE Avatars] stream error:", err);
       setReAvatarsError("Failed to load avatars");
     } finally {
       setReAvatarsLoading(false);

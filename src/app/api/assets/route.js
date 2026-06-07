@@ -18,8 +18,21 @@ export async function GET(request) {
     const query = { userId };
     if (type) query.type = type;
 
-    const assets = await Asset.find(query).sort({ createdAt: -1 }).allowDiskUse(true);
-    return NextResponse.json({ assets });
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
+    const limit = Math.min(Math.max(1, parseInt(searchParams.get("limit") || "24")), 50);
+    const skip = (page - 1) * limit;
+
+    const [assets, total] = await Promise.all([
+      Asset.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).allowDiskUse(true),
+      Asset.countDocuments(query),
+    ]);
+
+    return NextResponse.json({
+      assets,
+      total,
+      page,
+      hasMore: skip + assets.length < total,
+    });
   } catch (error) {
     console.error("[GET /api/assets] Error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });

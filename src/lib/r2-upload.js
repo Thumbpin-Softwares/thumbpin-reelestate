@@ -1,5 +1,5 @@
 import { PutObjectCommand } from "@aws-sdk/client-s3";
-import { s3, BUCKET } from "./r2";
+import { s3, BUCKET, R2_PUBLIC_URL } from "./r2";
 import crypto from "crypto";
 
 /**
@@ -19,6 +19,9 @@ export async function uploadToR2(buffer, key, contentType = "application/octet-s
       ContentType: contentType,
     })
   );
+  if (R2_PUBLIC_URL) {
+    return `${R2_PUBLIC_URL}/${key}`;
+  }
   return `/api/r2?key=${encodeURIComponent(key)}`;
 }
 
