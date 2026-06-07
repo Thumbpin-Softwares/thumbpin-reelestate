@@ -583,7 +583,7 @@ export function StepUpload({
         <Button
           onClick={onNext}
           disabled={!isValid}
-          className="gradient-bg text-white hover:opacity-90 disabled:opacity-40 shadow-lg gap-2 px-6"
+          className="bg-neutral-900 text-[#c7f038] hover:opacity-90 hover:bg-neutral-900 disabled:opacity-70 shadow-lg gap-2 px-6"
         >
           Continue to Script
           <ChevronRight className="w-4 h-4" />

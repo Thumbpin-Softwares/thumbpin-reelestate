@@ -34,7 +34,7 @@ export default function Hero() {
 
       <div className="relative z-10 flex flex-col items-center px-4 sm:px-6">
         {/* Rotating Badge */}
-        <div className="overflow-hidden py-2">
+        <div className="overflow-hidden py-6 sm:py-4">
           <AnimatePresence mode="wait">
             <motion.div
               key={texts[current]}
