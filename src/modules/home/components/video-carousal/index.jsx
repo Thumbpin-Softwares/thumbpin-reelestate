@@ -2,18 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 
-export default function Video() {
+export default function Video({ initialVideos = [] }) {
   const containerRef = useRef(null);
   const trackRef = useRef(null);
   const [shouldAnimate, setShouldAnimate] = useState(false);
-  const [videos, setVideos] = useState([]);
-
-  useEffect(() => {
-    fetch("/api/web-assets")
-      .then((r) => r.json())
-      .then((data) => setVideos((data.videos ?? []).map((v) => v.url)))
-      .catch(() => {});
-  }, []);
 
   useEffect(() => {
     const checkOverflow = () => {
@@ -26,12 +18,12 @@ export default function Video() {
     checkOverflow();
     window.addEventListener("resize", checkOverflow);
     return () => window.removeEventListener("resize", checkOverflow);
-  }, [videos]);
+  }, [initialVideos]);
 
-  if (videos.length === 0) return null;
+  if (initialVideos.length === 0) return null;
 
   const renderVideos = () =>
-    videos.map((src, index) => (
+    initialVideos.map((src, index) => (
       <div
         key={`${src}-${index}`}
         className="shrink-0 w-55 h-90 rounded-3xl overflow-hidden border border-neutral-800"

@@ -7,7 +7,7 @@ import Video from "../../components/video-carousal";
 
 const texts = ["Real Estate Ads", "Realistic Videos", "Idea to Video"];
 
-export default function Hero() {
+export default function Hero({ videos = [] }) {
   const [current, setCurrent] = useState(0);
 
   useEffect(() => {
@@ -79,7 +79,7 @@ export default function Hero() {
 
         {/* Videos */}
         <div className="w-full mt-10">
-          <Video />
+          <Video initialVideos={videos} />
         </div>
       </div>
     </main>

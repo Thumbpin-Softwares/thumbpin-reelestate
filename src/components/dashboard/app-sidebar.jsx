@@ -15,7 +15,7 @@ import {
   User,
   Sparkles,
   LogOut,
-  ChevronDown,
+  MapPin,
 } from "lucide-react";
 import {
   Sidebar,
@@ -38,6 +38,7 @@ const mainNav = [
   { title: "Real Estate", href: "/app/ai-walkthrough", icon: PersonStanding },
   { title: "UGC Script", href: "/app/ugc-creator", icon: PenTool },
   { title: "Product Video", href: "/app/product-to-video", icon: ShoppingBag },
+  { title: "Site View", href: "/app/site-view", icon: MapPin },
 ];
 
 const libraryNav = [
