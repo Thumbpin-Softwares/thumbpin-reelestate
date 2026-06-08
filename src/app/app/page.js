@@ -1,21 +1,75 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useUser } from "@/hooks/use-user";
 import {
-  Video,
-  Building,
-  ShoppingBag,
-  ArrowRight,
-  Plus,
-} from "lucide-react";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useUser } from "@/hooks/use-user";
+import { Video, Building, ShoppingBag, ArrowRight, Plus } from "lucide-react";
+
+const REAL_ESTATE_TEMPLATES = [
+  {
+    title: "Model exiting a luxury vehicle",
+    href: "/app/veo-long-ad",
+    video: "https://content.thumbpin.in/templates/modelLuxuryVehicle.mp4",
+  },
+];
+
+function TemplateCard({ template, onClick }) {
+  const videoRef = useRef(null);
+
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => videoRef.current?.play()}
+      onMouseLeave={() => {
+        if (videoRef.current) {
+          videoRef.current.pause();
+          videoRef.current.currentTime = 0;
+        }
+      }}
+      className="group flex flex-col rounded-2xl border border-neutral-200 overflow-hidden bg-white hover:border-neutral-400 hover:shadow-xl transition-all duration-300 text-left"
+    >
+      <div className="relative w-full" style={{ aspectRatio: "9/16" }}>
+        <video
+          ref={videoRef}
+          src={template.video}
+          muted
+          loop
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300 bg-neutral-900"
+        />
+        <div className="absolute inset-0 flex items-center justify-center group-hover:opacity-0 transition-opacity duration-200">
+          <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+            <svg
+              className="w-4 h-4 text-white ml-0.5"
+              fill="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          </div>
+        </div>
+      </div>
+      <div className="p-3">
+        <h4 className="font-semibold text-sm">{template.title}</h4>
+      </div>
+    </button>
+  );
+}
 
 export default function DashboardPage() {
-  const { profile, loading: userLoading } = useUser();
+  const { profile } = useUser();
   const [videos, setVideos] = useState([]);
   const [loadingVideos, setLoadingVideos] = useState(true);
+  const [templateModalOpen, setTemplateModalOpen] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     async function fetchRecentVideos() {
@@ -39,8 +93,9 @@ export default function DashboardPage() {
   const actions = [
     {
       title: "Real Estate",
-      description: "Build stunning real estate social media post that grabs users attentiton.",
-      href: "/app/veo-long-ad",
+      description:
+        "Build stunning real estate social media post that grabs users attentiton.",
+      href: null,
       icon: Building,
       color: "bg-amber-50 text-amber-600",
     },
@@ -97,9 +152,7 @@ export default function DashboardPage() {
               </div>
               <div className="text-center flex flex-col gap-2">
                 <h3 className="font-semibold">{action.title}</h3>
-                <p className="text-sm text-neutral-500">
-                  {action.description}
-                </p>
+                <p className="text-sm text-neutral-500">{action.description}</p>
               </div>
 
               {isComingSoon && (
@@ -112,7 +165,19 @@ export default function DashboardPage() {
             </div>
           );
 
-          if (isComingSoon) return <div key={action.href}>{content}</div>;
+          if (isComingSoon) return <div key={action.title}>{content}</div>;
+
+          if (action.title === "Real Estate") {
+            return (
+              <button
+                key={action.title}
+                className="group text-left w-full"
+                onClick={() => setTemplateModalOpen(true)}
+              >
+                {content}
+              </button>
+            );
+          }
 
           return (
             <Link key={action.href} href={action.href} className="group">
@@ -121,6 +186,41 @@ export default function DashboardPage() {
           );
         })}
       </section>
+
+      {/* Real Estate Template Modal */}
+      <Dialog open={templateModalOpen} onOpenChange={setTemplateModalOpen}>
+        <DialogContent
+          className="max-w-6xl! w-[95vw] h-[90vh] flex flex-col rounded-3xl p-0 gap-0 overflow-hidden"
+          onWheel={(e) => e.stopPropagation()}
+        >
+          <DialogHeader className="px-8 py-6 border-b shrink-0">
+            <DialogTitle className="text-2xl font-bold">
+              Select a Template
+            </DialogTitle>
+
+            <p className="text-sm text-neutral-500">
+              Hover to preview, Click to get started
+            </p>
+          </DialogHeader>
+
+          <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide overscroll-contain">
+            <div className="p-8">
+              <div className="grid grid-cols-2 md:grid-cols-5 xl:grid-cols-5 gap-5">
+                {REAL_ESTATE_TEMPLATES.map((template) => (
+                  <TemplateCard
+                    key={template.href}
+                    template={template}
+                    onClick={() => {
+                      setTemplateModalOpen(false);
+                      router.push(template.href);
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Elegant Recents */}
       <section className="space-y-6">
