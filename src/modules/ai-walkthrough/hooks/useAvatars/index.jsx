@@ -50,7 +50,11 @@ export const useAvatars = () => {
             try {
               const event = JSON.parse(line.slice(6));
               if (event.type === "avatar") {
-                setReAvatars((prev) => [...prev, event.avatar]);
+                setReAvatars((prev) =>
+                  prev.some((a) => a.id === event.avatar.id)
+                    ? prev
+                    : [...prev, event.avatar]
+                );
                 setReAvatarsLoading(false); // hide spinner on first card
               } else if (event.type === "library") {
                 setLibrary(event.library ?? []);
