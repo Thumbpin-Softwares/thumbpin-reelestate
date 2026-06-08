@@ -12,12 +12,6 @@ export default function DashboardLayout({ children }) {
           {children}
         </div>
       </main>
-
-      {/* Admin Floating Tool */}
-      <div className="fixed bottom-6 right-6">
-        <AdminModal />
-      </div>
-
       <Footer />
     </div>
   );

@@ -220,7 +220,7 @@ export default function DashboardPage() {
             Recent Creations
           </h2>
           <Link
-            href="/app/history"
+            href="/app/assets"
             className="text-sm font-semibold shadow-xl text-[#c7f038] bg-neutral-900 px-4 py-2 rounded-full flex items-center gap-2"
           >
             View All <ArrowRight className="w-3.5 h-3.5" />

@@ -88,7 +88,7 @@ function VeoLongAdContent() {
       </div>
 
       {/* Main content card */}
-      <div className="rounded-3xl border border-border/60 bg-card/85 backdrop-blur-md p-5 sm:p-6 lg:p-7 shadow-lg shadow-black/5">
+      <div className="p-2 sm:p-6 lg:p-7">
         {step === 0 && (
           <StepUpload
             locationImages={locationImages}
