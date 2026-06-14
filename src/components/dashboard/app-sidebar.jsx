@@ -16,6 +16,7 @@ import {
   Sparkles,
   LogOut,
   MapPin,
+  Clapperboard,
 } from "lucide-react";
 import {
   Sidebar,
@@ -39,6 +40,7 @@ const mainNav = [
   { title: "UGC Script", href: "/app/ugc-creator", icon: PenTool },
   { title: "Product Video", href: "/app/product-to-video", icon: ShoppingBag },
   { title: "Site View", href: "/app/site-view", icon: MapPin },
+  { title: "Seedance Reel", href: "/app/seedance-reel", icon: Clapperboard },
 ];
 
 const libraryNav = [

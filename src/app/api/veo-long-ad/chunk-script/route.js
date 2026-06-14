@@ -75,7 +75,7 @@ export async function POST(request) {
     };
     const langName = langMap[language] || "English";
 
-    const beatPlanPrompt = `You are a senior Indian real estate Instagram reel director. Design a HYBRID BEAT PLAN for a 55-65 second vertical reel that follows this EXACT 3-act structure.
+    const beatPlanPrompt = `You are a senior Indian real estate Instagram reel director. Design a HYBRID BEAT PLAN for a 45-55 second vertical reel that follows this EXACT 3-act structure.
 
 ═══════════════════════════════════════════════════
 ACT 1 — AVATAR INTRO  (beats 0-2, target 18-20 seconds)

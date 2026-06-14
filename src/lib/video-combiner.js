@@ -154,16 +154,35 @@ export async function combineVideos(videoUrls, options = {}) {
           ]);
           internalLog(`Image ${i + 1} converted to static video.`);
         } else {
-          // Strip audio from Kling/Hailuo clips — ElevenLabs voiceover is the only audio source.
+          // Strip audio from Hailuo/animated clips.
+          // If durations[i] is set (proportional B-roll mode), loop the clip to fill the
+          // target duration — Hailuo clips are typically 5–8s but Part 2 audio can be 30–40s.
           await ffmpeg.writeFile(`raw${i}.mp4`, data);
-          internalLog(`Stripping audio from clip ${i + 1}...`);
-          await ffmpeg.exec([
-            "-i", `raw${i}.mp4`,
-            "-c:v", "copy",
-            "-an",
-            `input${i}.mp4`,
-          ]);
-          internalLog(`Wrote input${i}.mp4 (audio stripped, ${data.length || data.byteLength} bytes raw)`);
+          const targetDur = durations?.[i];
+          if (targetDur) {
+            internalLog(`Looping clip ${i + 1} to fill ${targetDur}s...`);
+            // -stream_loop -1 loops indefinitely; -t stops at targetDur; re-encode for clean timestamps
+            await ffmpeg.exec([
+              "-stream_loop", "-1",
+              "-i", `raw${i}.mp4`,
+              "-t", String(targetDur),
+              "-c:v", "libx264",
+              "-preset", "ultrafast",
+              "-pix_fmt", "yuv420p",
+              "-an",
+              `input${i}.mp4`,
+            ]);
+            internalLog(`Clip ${i + 1} looped to ${targetDur}s.`);
+          } else {
+            internalLog(`Stripping audio from clip ${i + 1}...`);
+            await ffmpeg.exec([
+              "-i", `raw${i}.mp4`,
+              "-c:v", "copy",
+              "-an",
+              `input${i}.mp4`,
+            ]);
+            internalLog(`Wrote input${i}.mp4 (audio stripped).`);
+          }
         }
       } catch (fetchErr) {
         internalLog(`CRITICAL: Failed to download clip ${i + 1}: ${fetchErr.message}`);
@@ -326,6 +345,77 @@ export async function combineVideos(videoUrls, options = {}) {
     try { await ffmpeg.deleteFile("output.mp4"); } catch {}
     try { await ffmpeg.deleteFile("concat.txt"); } catch {}
     ffmpeg.terminate?.(); // If available in this version
+  }
+}
+
+/**
+ * Concatenate multiple pre-processed videos that ALL have audio tracks.
+ * Unlike combineVideos, this does NOT strip audio — it preserves each clip's
+ * existing audio (e.g. Seedance-baked voice for Part 1, ElevenLabs for Part 2).
+ *
+ * @param {string[]} videoUrls  - Array of video URLs (https or blob:)
+ * @param {object}   options
+ * @param {function} options.onProgress
+ * @param {function} options.onLog
+ * @returns {Promise<{ blobUrl: string, blob: Blob }>}
+ */
+export async function concatWithAudio(videoUrls, options = {}) {
+  const { onProgress, onLog } = options;
+
+  if (!videoUrls || videoUrls.length === 0) throw new Error("No video URLs");
+
+  if (videoUrls.length === 1) {
+    onProgress?.("Fetching single clip…");
+    const res = await fetch(videoUrls[0]);
+    if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+    const blob = await res.blob();
+    return { blobUrl: URL.createObjectURL(blob), blob };
+  }
+
+  onProgress?.("Loading FFmpeg for final concat…");
+  const ffmpeg = await loadFreshFFmpeg(onLog ? (msg) => onLog(msg) : undefined);
+
+  try {
+    for (let i = 0; i < videoUrls.length; i++) {
+      onProgress?.(`Downloading clip ${i + 1}/${videoUrls.length}…`);
+      const data = await fetchFile(videoUrls[i]);
+      await ffmpeg.writeFile(`concat_in${i}.mp4`, data);
+    }
+
+    const concatList = videoUrls.map((_, i) => `file 'concat_in${i}.mp4'`).join("\n");
+    await ffmpeg.writeFile("concat_audio.txt", new TextEncoder().encode(concatList));
+
+    onProgress?.("Concatenating with audio…");
+    try {
+      await ffmpeg.exec([
+        "-f", "concat", "-safe", "0", "-i", "concat_audio.txt",
+        "-c", "copy",
+        "-movflags", "+faststart",
+        "concat_out.mp4",
+      ]);
+    } catch {
+      // Re-encode fallback (handles mismatched codecs or SAR)
+      onProgress?.("Re-encoding for codec compatibility…");
+      await ffmpeg.exec([
+        "-f", "concat", "-safe", "0", "-i", "concat_audio.txt",
+        "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+        "-c:a", "aac", "-b:a", "128k",
+        "-movflags", "+faststart",
+        "concat_out.mp4",
+      ]);
+    }
+
+    const outputData = await ffmpeg.readFile("concat_out.mp4");
+    const blob = new Blob([outputData.buffer], { type: "video/mp4" });
+    onProgress?.("Done!");
+    return { blobUrl: URL.createObjectURL(blob), blob };
+  } finally {
+    for (let i = 0; i < videoUrls.length; i++) {
+      try { await ffmpeg.deleteFile(`concat_in${i}.mp4`); } catch {}
+    }
+    try { await ffmpeg.deleteFile("concat_audio.txt"); } catch {}
+    try { await ffmpeg.deleteFile("concat_out.mp4"); } catch {}
+    ffmpeg.terminate?.();
   }
 }
 
