@@ -1,0 +1,147 @@
+Photo Avatar
+Generate avatar from static image
+
+This section outlines the steps to upload images, generate avatars, and create new looks for use in HeyGen videos.
+
+Steps to Use the Photo Avatar API
+Upload Existing Photos (via Upload Asset API) or Generate New AI Avatar Photos: You can upload a set of your own photos or generate new AI photos.
+Create an Avatar Group: Create an Avatar Group by grouping photos of the same subject.
+Train the Avatar Group: Once your Avatar Group is created, you can train the model to recognize the subject's unique features, expressions, and other elements to ensure it generates realistic avatars.
+Create New Looks for the Avatar: You can use prompts to generate various "looks" for the avatar, such as different clothing, scenes, or poses. This is done within the trained Avatar Group, giving you diverse outputs.
+Once you've created the photo avatar you can use these avatars in video generation.
+
+Design Avatar Using a Prompt
+Create personalized AI avatars with customizable features
+
+Learn how to create customized AI avatar photos using HeyGen. These avatars can be personalized with attributes such as age, gender, ethnicity, pose, style, and appearance. Once generated, these avatars can be used to create new groups or looks for further customization.
+
+Generate AI Avatar Photo
+Use the Generate Photo Avatar Photos endpoint to generate AI photo avatars with customizable attributes. The following attributes are required to define the avatar's look: name,age, gender, ethnicity,orientation, pose, appearance. For example, the following request creates a realistic AI avatar of a young woman walking through a city street using these parameters.
+
+Request
+Response
+
+curl --request POST 'https://api.heygen.com/v2/photo_avatar/photo/generate' \
+--header 'Accept: application/json' \
+--header 'Content-Type: application/json' \
+--header 'X-Api-Key: <your-api-key>' \
+--data '{
+  "name": "Lina",
+  "age": "Young Adult",
+  "gender": "Woman",
+  "ethnicity": "Asian American",
+  "orientation": "horizontal",
+  "pose": "half_body",
+  "style": "Realistic",
+  "appearance": "A stylish East Asian Woman in casual attire walking through a bustling city street"
+}'
+For complete details on all request parameters and response fields, see the Generate Photo Avatar Photos API reference.
+
+Check Generation Status
+Track the progress of your avatar photo generation using the Check Photo/Look Generation Status endpoint, using the generation_id provided in the response of the Generate Photo Avatar API.
+
+The response will include a status field that indicates the current state of the generation process. You can view complete status response examples on the right-side Response panel of the API Reference page - open the Examples dropdown to view responses for different video statuses. You can select any example to preview the corresponding response body.
+
+Status Descriptions
+in_progress
+The look is still being generated.
+
+success
+The look has been successfully generated and includes the generated image URLs.
+
+failed
+The generation process did not complete successfully.
+
+We have generated our AI Avatar photos, now we can use the image_key to create new avatar groups and looks.
+
+
+Train Photo Avatar
+Create and train photo avatar groups for personalized AI avatar
+
+Avatar Groups enable consistent AI avatar generation with multiple looks and styles. This guide walks you through the process of creating and training photo avatar groups.
+
+1. Create Photo Avatar Group
+This API enables the creation of a photo avatar group. The photo avatars can either be AI generated or uploaded by the user.
+
+📘
+Note:
+
+Each uploaded or generated photo automatically creates an Avatar Group in HeyGen's interface. Additional looks or avatars can later be added to this group.
+
+For AI Generated Photo Avatars: Pass the name , generation_id, and the image_key of the generated avatar. The generation_id parameter is optional . Refer to the Generate AI Avatar Photos guide for detailed steps.
+For User-Uploaded Photos: First, upload the image via the Upload Asset API. Use the returned image_key when creating the photo avatar group.
+Request
+Response
+
+curl --location 'https://api.heygen.com/v2/photo_avatar/avatar_group/create' \
+--header 'accept: application/json' \
+--header 'Content-Type: application/json' \
+--header 'X-Api-Key: <your-api-key>' \
+--data '{
+    "name": "Sylvia",
+    "image_key": "image/47b2367366d94ee79894ed1f692b33ae/original"
+}'
+For a complete list of supported parameters and example responses, see detailed API Reference: Create Photo Avatar Group
+
+📘
+The image URL you get will expire in 7 days. 📆
+You can observe this expiration in the URL parameters. To retain access, you should either download and store the image locally before it Expires or regenerate a new URL by calling the same endpoint again with the same parameters..
+
+2. Add Looks to Avatar Group
+You can enhance the avatar group by adding more looks using the Add Looks to Photo Avatar Group API. Pass an array of image_keys to add multiple photos.
+
+📘
+Note:
+
+For AI avatars, the generation_id parameter is optional. For uploaded photos, no generation_id is required.
+
+
+📘
+Ideal Photo Selection:
+
+Choose recent, high-resolution images that authentically represent the subject.
+Capture a diverse range of angles, expressions (smiling, neutral, serious), and outfit styles.
+Aim for a mix of close-up and full-body shots that reflect the individual's current appearance.
+Consistent lighting, clear facial features, and minimal background distractions will enhance avatar group training quality and consistency.
+
+3. Train the Photo Avatar Group
+Once the avatar group is created and looks are added, you can train the photo avatar group by providing group_id to the Train Photo Avatar Group API. This helps maintain better consistency across looks.
+
+You can check the status of the training job for the avatar group using the Get Training Job Status API.
+
+4. Generate Photo Avatar Looks
+To generate looks for the photo avatar, you can use the Generate Photo Avatar Looks API. In this example, we are providing a concise description in the prompt field, as well as the orientation, pose, and style.
+
+Request
+Response
+
+curl --request POST \
+     --url https://api.heygen.com/v2/photo_avatar/look/generate \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --header 'x-api-key: <your_api_key>' \
+     --data '
+{
+  "group_id": "0711b7c97f844dda9fa8acab475beda0",
+  "prompt": "White shirt front-facing",
+  "orientation": "square",
+  "pose": "half_body",
+  "style": "Realistic"
+}
+'
+You can check the status of the look generation using the generation_id in the Check Photo/Look Generation Status API. The response will include a status field that indicates the current state of the generation process.You can view complete status response examples on the right-side Response panel of the API Reference page - open the Examples dropdown to view responses for different video statuses. You can select any example to preview the corresponding response body.
+
+Status Descriptions
+in_progress
+The look is still being generated.
+
+success
+The look has been successfully generated and includes the generated image URLs.
+
+failed
+The generation process did not complete successfully.
+
+📘
+Note:
+
+These image_keys can then be used in the Add Looks to Photo Avatar Group API to attach the new AI-generated looks to an existing avatar group.

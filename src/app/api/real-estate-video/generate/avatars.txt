@@ -1,0 +1,753 @@
+Create Photo Avatar Group
+post
+https://api.heygen.com/v2/photo_avatar/avatar_group/create
+
+Creates an avatar group, which can include both AI-generated and user-uploaded photos of the avatar.
+
+Recent Requests
+Log in to see full request history
+Time	Status	User Agent	
+Make a request to see history.
+0 Requests This Month
+
+Learn more: generated photo avatar
+
+Body Params
+name
+string
+required
+Name of the avatar group.
+
+image_key
+string
+required
+Image key of the AI-generated avatar/uploaded photo. For AI-generated photos, this can be retrieved from the Check Photo/Look Generation Status endpoint. For user-uploaded photos, this can be retrieved from the Upload Asset endpoint.
+
+generation_id
+string
+Unique identifier of the AI-generated avatar. Can be retrieved from the Generate Photo Avatar Photos endpoint. Applies only to the AI-generated avatars.
+
+Response
+
+200
+Avatar group created successfully - Expand to view the detailed response schema.
+
+Updated 2 months ago
+
+Create Photo Avatar
+Add Looks to Photo Avatar Group
+Did this page help you?
+Language
+
+Shell
+
+Node
+
+Ruby
+
+PHP
+
+Python
+Credentials
+Header
+<your-api-key>
+
+1
+curl --request POST \
+2
+     --url https://api.heygen.com/v2/photo_avatar/avatar_group/create \
+3
+     --header 'accept: application/json' \
+4
+     --header 'content-type: application/json' \
+5
+     --header 'x-api-key: <your-api-key>'
+
+Try It!
+Response
+Click Try It! to start a request and see the response here! Or choose an example:
+application/json
+
+
+
+Add Looks to Photo Avatar Group
+post
+https://api.heygen.com/v2/photo_avatar/avatar_group/add
+
+Adds additional looks (images) to an existing photo avatar group.
+
+Recent Requests
+Log in to see full request history
+Time	Status	User Agent	
+Make a request to see history.
+0 Requests This Month
+
+📘
+Note:
+
+The image_url field returns a time-limited link that expires after 7 days. The image itself does not get deleted, only the link expires. To ensure continuous access, you have two options:
+Download the Image: Save the image locally within the 7-day window.
+Regenerate the URL: Call the endpoint again whenever you need to access the image. Each time you call the endpoint, the Expires and related query parameters in the URL are regenerated, reflecting the new expiration time.
+Scroll down to the Response section below and expand the status code(s) to view the detailed response schema.
+Refer to the RESPONSE section on the right and choose an example to see how the API response appears for each status code.
+Body Params
+group_id
+string
+required
+Unique identifier of the avatar group to which the new looks will be added. Can be retrieved from the Create Photo Avatar Group endpoint.
+
+image_keys
+array of strings
+required
+Image key(s) of the AI-generated avatar(s)/uploaded photo(s) to add to the avatar group. For AI-generated avatars, this can be retrieved from the Check Photo/Look Generation Status endpoint. For user-uploaded photos, this can be retrieved from the Upload Asset endpoint. A maximum of 4 images can be added at a time.
+
+
+ADD string
+name
+string
+required
+Name of the look.
+
+generation_id
+string
+Unique identifier of the AI-generated avatar. Can be retrieved from the Generate Photo Avatar Photos endpoint. Applies only to the AI avatar photos.
+
+Response
+
+200
+Look added successfully - Expand to view the detailed response schema.
+
+Updated 2 months ago
+
+Create Photo Avatar Group
+Generate Photo Avatar Looks
+Did this page help you?
+Language
+
+Shell
+
+Node
+
+Ruby
+
+PHP
+
+Python
+Credentials
+Header
+<your-api-key>
+
+1
+curl --request POST \
+2
+     --url https://api.heygen.com/v2/photo_avatar/avatar_group/add \
+3
+     --header 'accept: application/json' \
+4
+     --header 'content-type: application/json' \
+5
+     --header 'x-api-key: <your-api-key>'
+
+Try It!
+Response
+Click Try It! to start a request and see the response here! Or choose an example:
+application/json
+
+
+Generate Photo Avatar Looks
+post
+https://api.heygen.com/v2/photo_avatar/look/generate
+
+Generates additional looks (images) for a trained avatar group.
+
+Recent Requests
+Log in to see full request history
+Time	Status	User Agent	
+Make a request to see history.
+0 Requests This Month
+
+📘
+Note:
+
+The avatar group must be trained to use this endpoint. Refer to the Train Photo Avatar Group endpoint for more details on training the avatar group.
+Scroll down to the Response section below and expand the status code(s) to view the detailed response schema.
+Refer to the RESPONSE section on the right and choose an example to see how the API response appears for each status code.
+Body Params
+group_id
+string
+required
+Unique identifier of the avatar group to which the new look will be added. Can be retrieved from the Create Photo Avatar Group endpoint.
+
+prompt
+string
+required
+Text prompt describing the look's appearance, such as clothing, mood, lightning, etc. Maximum 1000 characters.
+
+orientation
+string
+enum
+required
+Image orientation for the generated look.
+
+
+square
+Allowed:
+
+square
+
+horizontal
+
+vertical
+pose
+string
+enum
+required
+Framing or body coverage in the look.
+
+
+half_body
+Allowed:
+
+half_body
+
+close_up
+
+full_body
+style
+string
+enum
+required
+Visual or artistic style of the generated look.
+
+
+Realistic
+Allowed:
+
+Realistic
+
+Pixar
+
+Cinematic
+
+Vintage
+
+Noir
+
+Cyberpunk
+
+Unspecified
+Response
+
+200
+Looks generation initiated successfully - Expand to view the detailed response schema.
+
+Updated 2 months ago
+
+Add Looks to Photo Avatar Group
+Get Photo/Look Generation Status
+Did this page help you?
+Language
+
+Shell
+
+Node
+
+Ruby
+
+PHP
+
+Python
+Credentials
+Header
+<your-api-key>
+
+1
+curl --request POST \
+2
+     --url https://api.heygen.com/v2/photo_avatar/look/generate \
+3
+     --header 'accept: application/json' \
+4
+     --header 'content-type: application/json' \
+5
+     --header 'x-api-key: <your-api-key>'
+
+Try It!
+Response
+Click Try It! to start a request and see the response here! Or choose an example:
+application/json
+
+
+
+Get Photo/Look Generation Status
+get
+https://api.heygen.com/v2/photo_avatar/generation/{generation_id}
+
+
+Retrieves the current status and details of an avatar or look by its ID.
+
+Recent Requests
+Log in to see full request history
+Time	Status	User Agent	
+Make a request to see history.
+0 Requests This Month
+
+📘
+Note:
+
+Scroll down to the Response section below and expand the status code(s) to view the detailed response schema.
+Refer to the RESPONSE panel on the right and choose an example to explore different photo/look generation statuses (such as in progress or success) and see how each status appears in the API response examples.
+Path Params
+generation_id
+string
+required
+Unique identifier of the generated avatar/look. For AI-generated avatars, this can be retrieved from the Generate Photo Avatar Photos endpoint. For AI-generated looks, this can be retrieved from the Generate Photo Avatar Looks endpoint.
+
+Response
+
+200
+Status retrieved successfully - Expand to view the detailed response schema.
+
+Updated 2 months ago
+
+Generate Photo Avatar Looks
+Photo Avatar Details
+Did this page help you?
+Language
+
+Shell
+
+Node
+
+Ruby
+
+PHP
+
+Python
+Credentials
+Header
+<your-api-key>
+
+1
+curl --request GET \
+2
+     --url https://api.heygen.com/v2/photo_avatar/generation/generation_id \
+3
+     --header 'accept: application/json' \
+4
+     --header 'x-api-key: <your-api-key>'
+
+Try It!
+Response
+Click Try It! to start a request and see the response here! Or choose an example:
+application/json
+
+
+Photo Avatar Details
+get
+https://api.heygen.com/v2/photo_avatar/{id}
+
+Retrieves detailed information about an avatar or look using its ID.
+
+Recent Requests
+Log in to see full request history
+Time	Status	User Agent	
+Make a request to see history.
+0 Requests This Month
+
+📘
+Note:
+
+Scroll down to the Response section below and expand the status code(s) to view the detailed response schema.
+Refer to the RESPONSE section on the right and choose an example to see how the API response appears for each status code.
+Path Params
+id
+string
+required
+Unique identifier of the avatar/look. For avatars, this ID can be retrieved from Create Photo Avatar Group endpoint. For looks, this ID can be retrieved from Add Looks to Photo Avatar Group endpoint
+
+Response
+
+200
+Avatar/Look details retrieved successfully - Expand to view the detailed response schema.
+
+Updated 2 months ago
+
+Get Photo/Look Generation Status
+Train Photo Avatar Group
+Did this page help you?
+Language
+
+Shell
+
+Node
+
+Ruby
+
+PHP
+
+Python
+Credentials
+Header
+<your-api-key>
+
+1
+curl --request GET \
+2
+     --url https://api.heygen.com/v2/photo_avatar/id \
+3
+     --header 'accept: application/json' \
+4
+     --header 'x-api-key: <your-api-key>'
+
+Try It!
+Response
+Click Try It! to start a request and see the response here! Or choose an example:
+application/json
+
+
+Train Photo Avatar Group
+post
+https://api.heygen.com/v2/photo_avatar/train
+
+Initiates the training process for a photo avatar group. This endpoint builds an AI model for the specified avatar group. The trained model enables consistent avatar generation across multiple looks of the same subject.
+
+Recent Requests
+Log in to see full request history
+Time	Status	User Agent	
+Make a request to see history.
+0 Requests This Month
+
+📘
+Note:
+
+Scroll down to the Response section below and expand the status code(s) to view the detailed response schema.
+Refer to the RESPONSE section on the right and choose an example to see how the API response appears for each status code.
+Body Params
+group_id
+string
+required
+Unique identifier of the avatar group. Can be retrieved from the Create Photo Avatar Group endpoint.
+
+Response
+
+200
+Training process initiated successfully - Expand to view the detailed response schema.
+
+Updated 2 months ago
+
+Photo Avatar Details
+Get Training Job Status
+Did this page help you?
+Language
+
+Shell
+
+Node
+
+Ruby
+
+PHP
+
+Python
+Credentials
+Header
+<your-api-key>
+
+1
+curl --request POST \
+2
+     --url https://api.heygen.com/v2/photo_avatar/train \
+3
+     --header 'accept: application/json' \
+4
+     --header 'content-type: application/json' \
+5
+     --header 'x-api-key: <your-api-key>'
+
+Try It!
+Response
+Click Try It! to start a request and see the response here! Or choose an example:
+application/json
+
+
+Get Training Job Status
+get
+https://api.heygen.com/v2/photo_avatar/train/status/{group_id}
+
+Retrieves the current training status and details of the training job.
+
+Recent Requests
+Log in to see full request history
+Time	Status	User Agent	
+Make a request to see history.
+0 Requests This Month
+
+📘
+Note:
+
+Scroll down to the Response section below and expand the status code(s) to view the detailed response schema.
+Refer to the RESPONSE panel on the right and choose an example to explore different training statuses (such as pending or ready) and see how each status appears in the API response examples.
+Path Params
+group_id
+string
+required
+Unique identifier of the avatar group. Can be retrieved from the Create Photo Avatar Group endpoint.
+
+Response
+
+200
+Status retrieved successfully - Expand to view the detailed response schema.
+
+Updated 2 months ago
+
+Train Photo Avatar Group
+Add Motion
+Did this page help you?
+Language
+
+Shell
+
+Node
+
+Ruby
+
+PHP
+
+Python
+Credentials
+Header
+<your-api-key>
+
+1
+curl --request GET \
+2
+     --url https://api.heygen.com/v2/photo_avatar/train/status/group_id \
+3
+     --header 'accept: application/json' \
+4
+     --header 'x-api-key: <your-api-key>'
+
+Try It!
+Response
+Click Try It! to start a request and see the response here! Or choose an example:
+application/json
+
+
+Add Motion
+post
+https://api.heygen.com/v2/photo_avatar/add_motion
+
+Adds natural motion or animation to an existing avatar or look, turning a still image into a moving, lifelike one.
+
+Recent Requests
+Log in to see full request history
+Time	Status	User Agent	
+Make a request to see history.
+0 Requests This Month
+
+📘
+Note:
+
+Scroll down to the Response section below and expand the status code(s) to view the detailed response schema.
+Refer to the RESPONSE section on the right and choose an example to see how the API response appears for each status code.
+Body Params
+id
+string
+required
+Unique identifier of the avatar/look. For avatars, this ID can be retrieved from Create Photo Avatar Group endpoint. For looks, this ID can be retrieved from Add Looks to Photo Avatar Group endpoint
+
+prompt
+string
+Text prompt describing the avatar's movement or desired animation. Used to guide motion generation.
+
+motion_type
+string
+enum
+Defaults to consistent
+Motion engine to use for adding movement.
+
+
+consistent
+Allowed:
+
+expressive
+
+consistent
+
+consistent_gen_3
+
+hailuo_2
+
+veo2
+
+seedance_lite
+
+kling
+Response
+
+200
+Motion added successfully - Expand to view the detailed response schema.
+
+Updated 2 months ago
+
+Get Training Job Status
+Delete Photo Avatar
+Did this page help you?
+Language
+
+Shell
+
+Node
+
+Ruby
+
+PHP
+
+Python
+Credentials
+Header
+<your-api-key>
+
+1
+curl --request POST \
+2
+     --url https://api.heygen.com/v2/photo_avatar/add_motion \
+3
+     --header 'accept: application/json' \
+4
+     --header 'content-type: application/json' \
+5
+     --header 'x-api-key: <your-api-key>'
+
+Try It!
+Response
+Click Try It! to start a request and see the response here! Or choose an example:
+application/json
+
+Delete Photo Avatar
+delete
+https://api.heygen.com/v2/photo_avatar/{avatar_id}
+
+Deletes an avatar/look by its ID.
+
+Recent Requests
+Log in to see full request history
+Time	Status	User Agent	
+Make a request to see history.
+0 Requests This Month
+
+📘
+Note:
+
+Scroll down to the Responses section below and expand the status code(s) to view the detailed response schema.
+Refer to the RESPONSE section on the right and choose an example to see how the API response appears for each status code.
+Path Params
+avatar_id
+string
+required
+Unique identifier of the avatar/look. For avatars, this ID can be retrieved from Create Photo Avatar Group endpoint. For looks, this ID can be retrieved from Add Looks to Photo Avatar Group endpoint
+
+Responses
+
+200
+
+404
+Photo Avatar Not Found
+
+Updated 2 months ago
+
+Add Motion
+Delete Photo Avatar Group
+Did this page help you?
+Language
+
+Shell
+
+Node
+
+Ruby
+
+PHP
+
+Python
+Credentials
+Header
+<your-api-key>
+
+1
+curl --request DELETE \
+2
+     --url https://api.heygen.com/v2/photo_avatar/avatar_id \
+3
+     --header 'accept: application/json' \
+4
+     --header 'x-api-key: <your-api-key>'
+
+Try It!
+Response
+Click Try It! to start a request and see the response here! Or choose an example:
+application/json
+
+
+Delete Photo Avatar Group
+delete
+https://api.heygen.com/v2/photo_avatar_group/{avatar_group_id}
+
+
+Deletes an avatar group by its ID. Once deleted, all avatars/looks within the group are removed permanently and cannot be recovered.
+
+Recent Requests
+Log in to see full request history
+Time	Status	User Agent	
+Make a request to see history.
+0 Requests This Month
+
+📘
+Note:
+
+Scroll down to the Response section below and expand the status code(s) to view the detailed response schema.
+Refer to the RESPONSE section on the right and choose an example to see how the API response appears for each status code.
+Path Params
+avatar_group_id
+string
+required
+Unique identifier of the avatar group. Can be retrieved from Create Photo Avatar Group endpoint.
+
+Response
+
+200
+Updated 2 months ago
+
+Delete Photo Avatar
+Create Digital Twin
+Did this page help you?
+Language
+
+Shell
+
+Node
+
+Ruby
+
+PHP
+
+Python
+Credentials
+Header
+<your-api-key>
+
+1
+curl --request DELETE \
+2
+     --url https://api.heygen.com/v2/photo_avatar_group/avatar_group_id \
+3
+     --header 'accept: application/json' \
+4
+     --header 'x-api-key: <your-api-key>'
+
+Try It!
+Response
+Click Try It! to start a request and see the response here! Or choose an example:
+application/json
+

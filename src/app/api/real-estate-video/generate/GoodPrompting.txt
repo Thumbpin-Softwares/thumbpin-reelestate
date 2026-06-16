@@ -1,0 +1,1914 @@
+MASTER SOP + PROMPT SYSTEM
+
+One-step-at-a-time system for everything we do
+This is the master operating document for the full workflow we use to go from a raw brand brief to final ad assets.
+It combines:
+strategy and campaign thinking
+customer and angle clarity
+ad format selection
+scriptwriting
+storyboard development
+face and identity lock
+character bible creation
+base image prompt generation
+start and end image generation
+video prompt generation
+voice prompt generation
+image ad prompt generation
+quality control
+packaging and storage
+The system is designed to be simple to run:
+Fill → Paste → Get Output → Choose → Paste Next Prompt
+Each step is designed so the user can get the next usable output in one or two actions.
+
+HOW TO USE THIS DOCUMENT
+Core Rule
+Do not skip steps.
+Each prompt depends on the output from the previous step.
+Workflow logic
+Fill the Brand Brief
+Paste Prompt 1
+Review the options
+Choose one option
+Paste the next prompt using the selected output
+Keep moving until final deliverables are complete
+What this system should produce by the end
+brand brief
+ad DNA
+customer avatar
+campaign role
+message map
+shortlisted marketing angles
+selected ad format
+final script
+storyboard
+character bible / face lock
+scene-wise base image prompts
+start and end image prompts
+scene-wise video prompts
+voice prompt / voiceover direction
+static image ad prompts
+QC notes
+final delivery structure
+
+STAGE 0 — BRAND BRIEF
+Purpose
+This is the context block for the entire workflow.
+Every later step uses this as the source of truth.
+Fill this first
+BRAND BRIEF TEMPLATE
+Brand Name:
+What does the brand sell?:
+Product / Service Type:
+Price Range:
+Target Audience:
+Main Customer Problem:
+Main Desired Outcome:
+Top 3 Product / Service Benefits:
+What makes it different?:
+Proof / Trust Signals:
+Brand Tone / Personality:
+Where will this ad be used?:
+Ad Goal:
+Preferred Ad Style (if any):
+Any visual references / competitor references?:
+Any mandatory things to include?:
+Any things to avoid?:
+
+STAGE 1 — AD DNA
+Purpose
+Turn the raw brief into 3 sharp ad foundations.
+How to use
+Paste the filled Brand Brief above this prompt.
+PROMPT 1 — AD DNA GENERATOR
+You are a direct-response advertising strategist.
+
+Your job is to convert the Brand Brief into 3 distinct Ad DNA options that can be used immediately for performance ad development.
+
+Use the Brand Brief above as the only source of truth.
+
+Task:
+Generate 3 strategically different Ad DNA options.
+
+For each option, provide:
+1. Audience
+2. Emotional state
+3. Core problem
+4. Desired outcome
+5. Main promise
+6. Proof or trust anchor
+7. Urgency trigger, if any
+8. CTA direction
+9. One-line Ad DNA statement
+
+Rules:
+- Make each option genuinely different in audience psychology or message framing
+- Be specific and commercially useful
+- Avoid vague language, generic claims, and brand-fluff phrasing
+- Write for ad strategy, not brand poetry
+- Keep every bullet concise and sharp
+
+Output format:
+OPTION 1
+- Audience:
+- Emotional state:
+- Problem:
+- Desired outcome:
+- Promise:
+- Proof:
+- Urgency:
+- CTA direction:
+- One-line Ad DNA:
+
+OPTION 2
+- Audience:
+- Emotional state:
+- Problem:
+- Desired outcome:
+- Promise:
+- Proof:
+- Urgency:
+- CTA direction:
+- One-line Ad DNA:
+
+OPTION 3
+- Audience:
+- Emotional state:
+- Problem:
+- Desired outcome:
+- Promise:
+- Proof:
+- Urgency:
+- CTA direction:
+- One-line Ad DNA:
+
+At the end, add this section exactly:
+FINAL SELECTION READY
+- Best option for performance marketing:
+- Why:
+
+What to do next
+Choose the strongest Ad DNA option and paste it into Prompt 2.
+Copy-paste connector
+I have selected Ad DNA Option [X]. Use it exactly as the strategic foundation for the next step. Do not rewrite it broadly. Build the next output directly from it.
+
+Standard handoff format to paste into Prompt 2
+SELECTED AD DNA
+[PASTE FINAL SELECTED AD DNA HERE]
+
+
+STAGE 2 — CUSTOMER AVATAR
+Purpose
+Turn the selected Ad DNA into a vivid, emotionally real customer.
+PROMPT 2 — CUSTOMER AVATAR BUILDER
+You are a customer psychology strategist.
+
+Your job is to turn the selected Ad DNA into 3 emotionally believable customer avatars for advertising.
+
+Use only the selected Ad DNA below.
+
+Selected Ad DNA:
+[PASTE SELECTED AD DNA HERE]
+
+Task:
+Create 3 possible customer avatars this ad could target.
+
+For each avatar, provide:
+1. Profile
+2. Lifestyle
+3. Current struggle
+4. Secret desire
+5. Fear if they do nothing
+6. Biggest objection
+7. Emotional tone
+8. Internal monologue in 1 to 2 lines
+
+Rules:
+- Make each avatar feel like a real person
+- Focus on emotional and commercial relevance
+- Avoid broad demographic stereotypes
+- Do not repeat the same avatar three times with minor wording changes
+- Keep the internal monologue natural and usable for hooks and scripts later
+
+Output format:
+AVATAR 1
+- Profile:
+- Lifestyle:
+- Current struggle:
+- Secret desire:
+- Fear:
+- Biggest objection:
+- Emotional tone:
+- Internal monologue:
+
+AVATAR 2
+- Profile:
+- Lifestyle:
+- Current struggle:
+- Secret desire:
+- Fear:
+- Biggest objection:
+- Emotional tone:
+- Internal monologue:
+
+AVATAR 3
+- Profile:
+- Lifestyle:
+- Current struggle:
+- Secret desire:
+- Fear:
+- Biggest objection:
+- Emotional tone:
+- Internal monologue:
+
+At the end, add this section exactly:
+FINAL SELECTION READY
+- Best avatar for this ad:
+- Why:
+
+What to do next
+Choose the strongest avatar and paste it into Prompt 3.
+Copy-paste connector
+I have selected Avatar [X]. Use this exact avatar as the customer for the next step. Keep the emotional tension, objection, and internal monologue intact.
+
+Standard handoff format to paste into Prompt 3
+SELECTED AVATAR
+[PASTE FINAL SELECTED AVATAR HERE]
+
+SELECTED AD DNA
+[PASTE FINAL SELECTED AD DNA HERE]
+
+
+STAGE 3 — CAMPAIGN ROLE + MESSAGE MAP
+Purpose
+Decide what job this ad must do in the funnel and what belief shift it must create.
+PROMPT 3 — CAMPAIGN ROLE + MESSAGE MAP
+You are a campaign strategist.
+
+Your job is to define what role this ad should play in the funnel and what belief shift it must create.
+
+Use only the selected avatar and selected Ad DNA below.
+
+Selected Avatar:
+[PASTE SELECTED AVATAR HERE]
+
+Selected Ad DNA:
+[PASTE SELECTED AD DNA HERE]
+
+Task:
+Define the campaign role and build a simple message map.
+
+Provide:
+1. Campaign stage: Awareness, Consideration, or Conversion
+2. Current customer belief
+3. Main doubt or resistance
+4. New belief this ad must create
+5. One job of this ad
+6. What this ad should not try to do
+7. Message map with:
+   - Pain
+   - Desire
+   - Objection
+   - Promise
+   - Proof
+   - CTA
+
+Rules:
+- One ad should do one main job
+- Keep the belief shift realistic
+- Keep the message map tight and performance-focused
+- Avoid bloated messaging
+
+Output format:
+- Campaign stage:
+- Current belief:
+- Main doubt:
+- New belief required:
+- One job of this ad:
+- What this ad should not try to do:
+
+MESSAGE MAP
+- Pain:
+- Desire:
+- Objection:
+- Promise:
+- Proof:
+- CTA:
+
+At the end, add this section exactly:
+NEXT STEP READY
+- Main campaign constraint for angle generation:
+- One sentence summary of the message map:
+
+What to do next
+Paste the output into Prompt 4.
+Copy-paste connector
+Use the campaign role and message map below as the strategic constraint for angle generation. Do not create generic angles. Every angle must directly respond to this campaign role.
+
+Standard handoff format to paste into Prompt 4
+CAMPAIGN ROLE
+[PASTE CAMPAIGN STAGE + BELIEF SHIFT HERE]
+
+MESSAGE MAP
+[PASTE PAIN / DESIRE / OBJECTION / PROMISE / PROOF / CTA HERE]
+
+
+STAGE 4 — MARKETING ANGLES
+Purpose
+Generate angle options and shortlist the strongest ones for video and image.
+PROMPT 4 — MARKETING ANGLES GENERATOR
+You are a performance creative strategist.
+
+Your job is to generate strong, distinct ad angles based on the campaign role and message map below.
+
+[PASTE CAMPAIGN ROLE + MESSAGE MAP HERE]
+
+Task:
+Generate:
+- 2 pain-led angles
+- 2 desire-led angles
+- 2 objection-led angles
+- 2 mechanism-led angles
+- 2 social-proof-led angles
+
+For each angle, provide:
+1. Angle name
+2. Core idea
+3. Why it would work
+4. Best use case: video, image, or both
+
+Then shortlist:
+- Best angle for video ads
+- Best angle for image ads
+
+Rules:
+- Make each angle clearly different
+- Write like a strategist, not a motivational speaker
+- Prioritize scroll-stopping clarity and ad utility
+- Avoid generic concepts that could apply to any brand
+
+Output format:
+PAIN-LED
+1.
+- Angle name:
+- Core idea:
+- Why it would work:
+- Best use case:
+2.
+- Angle name:
+- Core idea:
+- Why it would work:
+- Best use case:
+
+DESIRE-LED
+1.
+- Angle name:
+- Core idea:
+- Why it would work:
+- Best use case:
+2.
+- Angle name:
+- Core idea:
+- Why it would work:
+- Best use case:
+
+OBJECTION-LED
+1.
+- Angle name:
+- Core idea:
+- Why it would work:
+- Best use case:
+2.
+- Angle name:
+- Core idea:
+- Why it would work:
+- Best use case:
+
+MECHANISM-LED
+1.
+- Angle name:
+- Core idea:
+- Why it would work:
+- Best use case:
+2.
+- Angle name:
+- Core idea:
+- Why it would work:
+- Best use case:
+
+SOCIAL PROOF-LED
+1.
+- Angle name:
+- Core idea:
+- Why it would work:
+- Best use case:
+2.
+- Angle name:
+- Core idea:
+- Why it would work:
+- Best use case:
+
+SHORTLIST
+- Best video angle:
+- Why:
+- Best image angle:
+- Why:
+
+NEXT STEP READY
+- Best angle to test in video first:
+- Best angle to test in image first:
+
+What to do next
+Paste the shortlisted angle(s) into Prompt 5.
+Copy-paste connector
+Use the shortlisted angle below to determine the most effective ad format. Prioritize clarity, feasibility, and performance potential.
+
+Standard handoff format to paste into Prompt 5
+SELECTED VIDEO ANGLE
+[PASTE BEST VIDEO ANGLE HERE]
+
+SELECTED IMAGE ANGLE
+[PASTE BEST IMAGE ANGLE HERE]
+
+MESSAGE MAP
+[PASTE MESSAGE MAP HERE]
+
+
+STAGE 5 — AD FORMAT DECISION
+Purpose
+Choose the right execution format.
+PROMPT 5 — FORMAT SELECTOR
+You are a creative director.
+
+Your job is to choose the most effective ad format based on the selected angle, brand context, and message map below.
+
+[PASTE RELEVANT OUTPUTS HERE]
+
+Compare these formats:
+1. UGC direct-to-camera
+2. UGC lifestyle / mixed UGC
+3. Cinematic B-roll with voiceover
+4. Founder-led talking head
+5. Product-led visual ad
+6. UI / screen-led product demo ad
+
+For each format, provide:
+- Why it could work
+- What it would feel like
+- Main strength
+- Main weakness
+
+Then shortlist:
+- Best primary format
+- Best backup format
+
+Rules:
+- Be decisive and practical
+- Consider ad performance, clarity, and feasibility
+- Do not romanticize a format that does not fit the offer
+- Keep each explanation concise
+
+Output format:
+FORMAT 1 — UGC direct-to-camera
+- Why it could work:
+- Feel:
+- Strength:
+- Weakness:
+
+FORMAT 2 — UGC lifestyle / mixed UGC
+- Why it could work:
+- Feel:
+- Strength:
+- Weakness:
+
+FORMAT 3 — Cinematic B-roll with voiceover
+- Why it could work:
+- Feel:
+- Strength:
+- Weakness:
+
+FORMAT 4 — Founder-led talking head
+- Why it could work:
+- Feel:
+- Strength:
+- Weakness:
+
+FORMAT 5 — Product-led visual ad
+- Why it could work:
+- Feel:
+- Strength:
+- Weakness:
+
+FORMAT 6 — UI / screen-led product demo ad
+- Why it could work:
+- Feel:
+- Strength:
+- Weakness:
+
+SHORTLIST
+- Best primary format:
+- Why:
+- Best backup format:
+- Why:
+
+NEXT STEP READY
+- Selected path to continue:
+- Main reason this format wins:
+
+What to do next
+Use the selected primary format and move to the matching path below.
+Copy-paste connector
+I have selected the primary format below. Build the next output strictly for this format and do not blend it with other ad styles unless explicitly stated.
+
+Standard handoff format
+SELECTED PRIMARY FORMAT
+[PASTE BEST PRIMARY FORMAT HERE]
+
+SELECTED BACKUP FORMAT
+[PASTE BACKUP FORMAT HERE]
+
+SELECTED VIDEO ANGLE
+[PASTE BEST VIDEO ANGLE HERE]
+
+SELECTED IMAGE ANGLE
+[PASTE BEST IMAGE ANGLE HERE]
+
+
+PATH A — UGC WORKFLOW
+When to use
+Use this path if the selected format is UGC direct-to-camera or mixed UGC.
+
+A1 — UGC SCRIPT
+PROMPT A1 — UGC SCRIPT GENERATOR
+You are a high-converting UGC ad scriptwriter.
+
+Your job is to write 3 short-form UGC scripts using the selected strategic context below.
+
+[PASTE SELECTED CONTEXT HERE]
+
+Structure each script as:
+Hook → Problem → Shift → Proof → CTA
+
+Rules:
+- Write like a real person speaking naturally
+- Keep the language simple, punchy, and conversational
+- One script = one clear message
+- Avoid sounding scripted, overly polished, or corporate
+- Optimize for short-form performance ads
+- Keep hooks strong and fast
+
+Output format:
+SCRIPT 1
+- Hook:
+- Problem:
+- Shift:
+- Proof:
+- CTA:
+- Full script:
+
+SCRIPT 2
+- Hook:
+- Problem:
+- Shift:
+- Proof:
+- CTA:
+- Full script:
+
+SCRIPT 3
+- Hook:
+- Problem:
+- Shift:
+- Proof:
+- CTA:
+- Full script:
+
+FINAL SELECTION READY
+- Best script for production:
+- Why:
+
+Next
+Choose one script and paste it into Prompt A2.
+Copy-paste connector
+I have selected the UGC script below. Use it as the exact spoken and visual foundation for the character and creator design step.
+
+Standard handoff format to paste into Prompt A2
+SELECTED UGC SCRIPT
+[PASTE FULL SELECTED SCRIPT HERE]
+
+
+A2 — UGC CREATOR / FACE LOCK
+PROMPT A2 — UGC CHARACTER + FACE LOCK
+You are a character designer for realistic UGC ad generation.
+
+Using the selected UGC script and brand context below, create a master creator description for consistent visual generation.
+
+[PASTE SELECTED SCRIPT + CONTEXT HERE]
+
+Provide:
+1. Full face description
+2. Skin tone and undertone
+3. Hair details
+4. Outfit direction
+5. Makeup / grooming level
+6. Body language / vibe
+7. Home / room setting style
+8. Realism notes
+9. A reusable face-lock block
+
+Rules:
+- Make it highly realistic
+- Suitable for ad-generation tools
+- Keep the creator attractive but believable
+- Designed for scene-by-scene consistency
+
+Output format:
+- Character overview:
+- Face details:
+- Skin:
+- Hair:
+- Outfit:
+- Vibe:
+- Environment:
+- Realism rules:
+
+FACE-LOCK BLOCK:
+[final reusable block]
+
+Next
+Paste the selected script + face-lock block into Prompt A3.
+Copy-paste connector
+Use the selected UGC script and face-lock block below to break the ad into visually clear, short-form scenes.
+
+Standard handoff format to paste into Prompt A3
+SELECTED UGC SCRIPT
+[PASTE FULL SELECTED SCRIPT HERE]
+
+FACE-LOCK BLOCK
+[PASTE FINAL FACE-LOCK BLOCK HERE]
+
+
+SKIN ENHANCER PROMPT:
+Hyperrealistic photographic detail. Real human skin with visible natural texture, pores, micro shadows, faint peach fuzz, subtle fine lines, slight tonal variation, and authentic under-eye detail. Preserve natural skin irregularities such as tiny blemishes, soft pigmentation, realistic lip texture, and delicate facial contours. No plastic skin, no airbrushing, no over-smoothing, no waxy finish, no fake beauty-filter effect.True-to-life anatomy and facial structure with consistent features, realistic eyes with natural moisture and depth, detailed eyelashes, believable eyebrows, and naturally textured lips. Hair should show individual strands, baby hairs, flyaways, and realistic density without looking helmet-like or overly polished.
+Lighting should behave naturally on skin with soft falloff, realistic highlights, subtle subsurface scattering, gentle shadow transitions, and accurate reflection behavior. Maintain true camera realism with depth, optical softness where appropriate, natural contrast, and lifelike tonal roll-off. High-detail photographic rendering, premium editorial realism, grounded in real-world camera capture.
+Textures across the image must feel physically believable: skin, fabric, hair, jewelry, and background surfaces should all carry realistic material response, micro-detail, and natural imperfections. Avoid CGI look, avoid overly sharpened edges, avoid artificial symmetry, avoid sterile studio perfection. Prioritize authenticity, tactile realism, and cinematic photographic truth.
+
+
+
+A3 — UGC SCENE BREAKDOWN
+PROMPT A3 — UGC SCENE BREAKDOWN
+You are a short-form ad storyboard strategist.
+
+Your job is to break the selected UGC script into scene-wise visual beats that can be directly used for image and video generation.
+
+[PASTE SCRIPT + FACE-LOCK BLOCK HERE]
+
+For each scene, provide:
+- Scene number
+- Spoken line
+- Visual
+- Shot type
+- Action
+- Mood
+- Product visibility
+
+Rules:
+- Keep scenes short, practical, and visually clear
+- Each scene must be easy to generate as a still image
+- Prioritize short-form pacing and clarity
+- Do not create scenes that are too abstract to produce
+
+Output format:
+SCENE 1
+- Spoken line:
+- Visual:
+- Shot type:
+- Action:
+- Mood:
+- Product visibility:
+
+SCENE 2
+- Spoken line:
+- Visual:
+- Shot type:
+- Action:
+- Mood:
+- Product visibility:
+
+Continue for all scenes.
+
+NEXT STEP READY
+- Total number of scenes:
+- Scenes best suited for motion progression later:
+
+Next
+Paste the scene breakdown into Prompt A4.
+Copy-paste connector
+Use the scene breakdown and face-lock block below to create complete standalone image prompts for each scene. Maintain consistency across all scenes.
+
+Standard handoff format to paste into Prompt A4
+UGC SCENE BREAKDOWN
+[PASTE FINAL SCENE BREAKDOWN HERE]
+
+FACE-LOCK BLOCK
+[PASTE FINAL FACE-LOCK BLOCK HERE]
+
+
+A4 — UGC BASE IMAGE PROMPTS
+PROMPT A4 — UGC BASE IMAGE PROMPTS
+You are an AI image prompt engineer for realistic UGC ad production.
+
+Your job is to convert the scene breakdown into complete standalone image prompts.
+
+[PASTE SCENE BREAKDOWN + FACE-LOCK BLOCK HERE]
+
+For each scene, create:
+1. One full base image prompt
+2. One short negative prompt
+
+Each base image prompt must include:
+- full character description repeated for consistency
+- environment details
+- outfit details
+- exact action
+- framing / camera angle
+- lighting
+- mood
+- product placement if relevant
+- realism requirements
+- aspect ratio: vertical 9:16
+
+Rules:
+- Every scene prompt must be fully standalone
+- Keep identity, outfit, and environment continuity strong
+- Prioritize realism and commercial clarity
+- Avoid vague artistic filler
+
+Output format:
+SCENE 1 BASE IMAGE PROMPT:
+...
+NEGATIVE PROMPT:
+...
+
+SCENE 2 BASE IMAGE PROMPT:
+...
+NEGATIVE PROMPT:
+...
+
+Continue for all scenes.
+
+NEXT STEP READY
+- Scenes where start and end images may be useful:
+
+Next
+Generate the images, choose the approved ones, then paste the scene breakdown + approved scene list into Prompt A5.
+Copy-paste connector
+Using the approved UGC scenes below, create linked start and end image prompts only where motion progression is useful.
+
+Standard handoff format to paste into Prompt A5
+APPROVED UGC SCENES
+[PASTE ONLY THE APPROVED SCENES HERE]
+
+
+A5 — UGC START / END IMAGE PROMPTS
+PROMPT A5 — UGC START AND END IMAGE PROMPTS
+You are an AI image sequence prompt engineer.
+
+Using the approved UGC scene breakdown below, create linked start-image and end-image prompts for each scene where motion or visual progression is needed.
+
+[PASTE APPROVED SCENE BREAKDOWN HERE]
+
+For each applicable scene, provide:
+- Start image prompt
+- End image prompt
+- What must remain locked between them
+- What changes between start and end
+
+Rules:
+- The two images must feel like the same shot family
+- Keep identity, outfit, environment, and lighting consistent
+- Only change pose, hand movement, expression, or action state where needed
+- Optimize for later video generation
+
+Output format:
+SCENE X
+START IMAGE PROMPT:
+...
+END IMAGE PROMPT:
+...
+LOCKED ELEMENTS:
+...
+CHANGES:
+...
+
+
+A6 — UGC VIDEO PROMPTS
+PROMPT A6 — UGC VIDEO PROMPTS
+You are a Veo-style short-form video prompt engineer.
+
+Using the approved UGC scene breakdown, selected base images, and face-lock rules below, create scene-wise video prompts.
+
+[PASTE APPROVED SCENES HERE]
+
+For each scene, provide:
+- video prompt
+- suggested duration
+- camera behavior
+- subject movement
+- continuity reminders
+
+Rules:
+- Keep motion realistic and subtle
+- Preserve identity, outfit, and lighting
+- Keep it feeling like real handheld or realistic UGC capture
+- Avoid over-choreographed motion
+
+Output format:
+SCENE 1 VIDEO PROMPT:
+- Prompt:
+- Duration:
+- Camera behavior:
+- Subject movement:
+- Continuity notes:
+
+SCENE 2 VIDEO PROMPT:
+...
+
+
+A7 — UGC AUDIO/ VoiceOver
+
+Alternate VOICE Prompt for ElevenLabs:
+[PASTE YOUR SCRIPT]
+this is a voiceover script for instagram;
+i want to generate the voiceover using eleven labs;
+i will be using eleven labs Alphav3 model, so make sure to include emotions and and proper speech structure for the voiceover;
+give me a proper structured copy paste ready prompt to put in eleven labs to get the output
+
+
+
+PATH B — CINEMATIC WORKFLOW
+When to use
+Use this path if the selected format is cinematic B-roll, premium visual storytelling, or voiceover-led ad film.
+
+B0 — CONCEPT GENERATOR
+PROMPT B0 – CONCEPT GENERATOR
+You are the AI Ad Workflow Director.
+
+We are at Stage 6 — Concept Development.
+
+Your job is to turn the approved strategic foundation into distinct ad concepts that are commercially strong, visually executable, and aligned with the selected format path.
+
+Important rules:
+- Do not skip steps.
+- Do not move into hooks, script, or storyboard yet.
+- Do not merge options unless asked.
+- Keep all options clearly distinct.
+- Preserve all approved logic from earlier stages.
+- Recommend the strongest option with a short reason.
+- Output in plain language, not JSON.
+
+
+SELECTED FORMAT / PATH:
+[PASTE HERE]
+
+Task:
+Create 3 distinct concept routes for this ad.
+
+For each concept, provide:
+- Concept name
+- Core concept
+- Story engine
+- Why it works
+- Visual identity
+- Emotional arc
+- Commercial strength
+
+Then give:
+- A clear recommendation for the strongest concept
+- A short reason why it is the best fit
+- A short “selected-direction summary” for that recommended concept
+
+Response structure:
+- Stage
+- Objective
+- Options
+- Recommendation
+- Main Output
+- What I need from you
+- Next-Step Handoff
+
+Requirements:
+- Concepts must be meaningfully different, not slight variations
+- Concepts must fit the selected ad format exactly
+- Concepts must be easy to script and storyboard later
+- Keep product/service integration clear
+- Prioritize originality, clarity, strategic fit, visual executability, platform fit, and AI feasibility
+- Keep the concepts commercially relevant, not vague or overly artistic
+
+End by asking the user to choose:
+1. Concept 1
+2. Concept 2
+3. Concept 3
+4. Revise one of them
+
+
+B1 — CINEMATIC SCRIPT
+PROMPT B1 — CINEMATIC SCRIPT GENERATOR
+You are a cinematic advertising writer.
+
+Your job is to write 3 premium voiceover-led ad scripts using the selected strategic context below.
+
+[PASTE SELECTED CONTEXT HERE]
+
+Structure each script as:
+Hook → Tension → Shift → Proof → CTA
+
+Rules:
+- Write for voiceover, not talking head
+- Use fewer words and stronger imagery
+- Keep the tone premium, emotionally clear, and commercially useful
+- Leave room for visuals to breathe
+- Avoid over-written poetic lines that sound pretty but say nothing
+
+Output format:
+SCRIPT 1
+- Hook:
+- Tension:
+- Shift:
+- Proof:
+- CTA:
+- Full voiceover script:
+
+SCRIPT 2
+- Hook:
+- Tension:
+- Shift:
+- Proof:
+- CTA:
+- Full voiceover script:
+
+SCRIPT 3
+- Hook:
+- Tension:
+- Shift:
+- Proof:
+- CTA:
+- Full voiceover script:
+
+FINAL SELECTION READY
+- Best script for production:
+- Why:
+
+Next
+Choose one script and paste it into Prompt B2.
+Copy-paste connector
+I have selected the cinematic script below. Use it as the exact narrative and visual foundation for the storyboard step.
+
+Standard handoff format to paste into Prompt B2
+SELECTED CINEMATIC SCRIPT
+[PASTE FULL SELECTED SCRIPT HERE]
+
+
+B2 — SCENE BREAKDOWN + STORYBOARD
+PROMPT B2 — CINEMATIC STORYBOARD BUILDER
+You are a cinematic storyboard director.
+
+Your job is to convert the selected cinematic script into a scene-by-scene storyboard that can be used directly for image generation.
+
+[PASTE SELECTED SCRIPT HERE]
+
+For each scene, provide:
+- Scene number
+- Voiceover line
+- Visual objective
+- Detailed visual description
+- Shot type
+- Camera direction
+- Lighting direction
+- Mood
+- Product visibility
+
+Rules:
+- Keep the scenes premium, clear, and producible
+- Each scene should feel visually distinct but part of one world
+- Make the descriptions detailed enough for later prompt generation
+- Do not create vague cinematic fluff
+
+Output format:
+SCENE 1
+- Voiceover line:
+- Visual objective:
+- Visual description:
+- Shot type:
+- Camera direction:
+- Lighting:
+- Mood:
+- Product visibility:
+
+SCENE 2
+- Voiceover line:
+- Visual objective:
+- Visual description:
+- Shot type:
+- Camera direction:
+- Lighting:
+- Mood:
+- Product visibility:
+
+Continue for all scenes.
+
+NEXT STEP READY
+- Total number of scenes:
+- Scenes best suited for motion progression later:
+
+Next
+Paste the storyboard into Prompt B3.
+Copy-paste connector
+Use the storyboard below to design a character who can appear consistently across the cinematic scenes. Build the lock system for continuity.
+
+Standard handoff format to paste into Prompt B3
+CINEMATIC STORYBOARD
+[PASTE FINAL STORYBOARD HERE]
+
+
+B3 — CHARACTER BIBLE / FACE LOCK
+PROMPT B3 — CINEMATIC CHARACTER BIBLE
+You are a cinematic character design specialist.
+
+Using the selected cinematic storyboard below, create a master character bible for the person appearing in the ad.
+
+[PASTE STORYBOARD HERE]
+
+Provide:
+1. Character role in the ad
+2. Full face description
+3. Skin tone and undertone
+4. Hair details
+5. Outfit rules
+6. Styling rules
+7. Emotional presence
+8. Environment fit
+9. A reusable face-lock / character-lock block
+
+Rules:
+- This character may appear in multiple B-roll scenes
+- They do not need to look at camera unless clearly needed
+- Keep the look premium, attractive, and believable
+- Prioritize continuity across scenes
+
+Output format:
+- Role:
+- Face details:
+- Skin:
+- Hair:
+- Outfit rules:
+- Styling rules:
+- Emotional presence:
+- Environment fit:
+
+CHARACTER LOCK BLOCK:
+[final reusable block]
+
+Next
+Paste the storyboard + character lock into Prompt B4.
+Copy-paste connector
+Use the storyboard and character lock below to create premium standalone base image prompts for each scene, while preserving continuity.
+
+Standard handoff format to paste into Prompt B4
+CINEMATIC STORYBOARD
+[PASTE FINAL STORYBOARD HERE]
+
+CHARACTER LOCK BLOCK
+[PASTE FINAL CHARACTER LOCK BLOCK HERE]
+
+
+
+
+
+
+SKIN ENHANCER PROMPT:
+Hyperrealistic photographic detail. Real human skin with visible natural texture, pores, micro shadows, faint peach fuzz, subtle fine lines, slight tonal variation, and authentic under-eye detail. Preserve natural skin irregularities such as tiny blemishes, soft pigmentation, realistic lip texture, and delicate facial contours. No plastic skin, no airbrushing, no over-smoothing, no waxy finish, no fake beauty-filter effect.True-to-life anatomy and facial structure with consistent features, realistic eyes with natural moisture and depth, detailed eyelashes, believable eyebrows, and naturally textured lips. Hair should show individual strands, baby hairs, flyaways, and realistic density without looking helmet-like or overly polished.
+Lighting should behave naturally on skin with soft falloff, realistic highlights, subtle subsurface scattering, gentle shadow transitions, and accurate reflection behavior. Maintain true camera realism with depth, optical softness where appropriate, natural contrast, and lifelike tonal roll-off. High-detail photographic rendering, premium editorial realism, grounded in real-world camera capture.
+Textures across the image must feel physically believable: skin, fabric, hair, jewelry, and background surfaces should all carry realistic material response, micro-detail, and natural imperfections. Avoid CGI look, avoid overly sharpened edges, avoid artificial symmetry, avoid sterile studio perfection. Prioritize authenticity, tactile realism, and cinematic photographic truth.
+
+
+
+B4 — CINEMATIC BASE IMAGE PROMPTS
+PROMPT B4 — CINEMATIC BASE IMAGE PROMPTS
+You are an AI prompt engineer for luxury cinematic still generation.
+
+Your job is to convert the approved storyboard into premium standalone base image prompts.
+
+[PASTE STORYBOARD + CHARACTER LOCK BLOCK HERE]
+
+For each scene, create:
+1. One full base image prompt
+2. One short negative prompt
+
+Each base image prompt must include:
+- full character description repeated for consistency
+- exact scene action
+- camera angle and framing
+- lighting direction
+- environment details
+- mood
+- product visibility
+- realism standards
+- aspect ratio: vertical 9:16 unless otherwise stated
+
+Rules:
+- These are premium editorial cinematic stills
+- Maintain continuity across scenes
+- Be visually rich but believable
+- Avoid filler phrases that do not help generation
+
+Output format:
+SCENE 1 BASE IMAGE PROMPT:
+...
+NEGATIVE PROMPT:
+...
+
+SCENE 2 BASE IMAGE PROMPT:
+...
+NEGATIVE PROMPT:
+...
+
+Continue for all scenes.
+
+NEXT STEP READY
+- Scenes where start and end images may be useful:
+
+Next
+Generate and approve the best images, then move to Prompt B5.
+Copy-paste connector
+Using the approved storyboard below, create linked start and end image prompts for the scenes that need motion progression.
+
+Standard handoff format to paste into Prompt B5
+APPROVED CINEMATIC STORYBOARD
+[PASTE APPROVED STORYBOARD HERE]
+
+
+B5 — START / END IMAGE PROMPTS
+PROMPT B5 — CINEMATIC START AND END IMAGE PROMPTS
+You are an AI image sequence prompt engineer for cinematic ad generation.
+
+Using the approved cinematic storyboard and character-lock rules below, create linked start-image and end-image prompts for each scene where motion progression is needed.
+
+[PASTE APPROVED STORYBOARD HERE]
+
+For each applicable scene, provide:
+- Start image prompt
+- End image prompt
+- What must remain locked
+- What changes from start to end
+- Why this pair supports motion generation
+
+Rules:
+- Preserve identity, outfit, product, environment, and lighting family
+- Only shift pose, hand interaction, gaze, or visual state where necessary
+- The pair should feel like the beginning and end of one believable shot
+
+Output format:
+SCENE X
+START IMAGE PROMPT:
+...
+END IMAGE PROMPT:
+...
+LOCKED ELEMENTS:
+...
+CHANGES:
+...
+WHY THIS PAIR WORKS:
+...
+
+
+B6 — CINEMATIC VIDEO PROMPTS
+PROMPT B6 — CINEMATIC VIDEO PROMPTS
+You are a cinematic video prompt engineer.
+
+Using the approved storyboard, selected base images, and character-lock rules below, create scene-wise video prompts.
+
+[PASTE APPROVED MATERIAL HERE]
+
+For each scene, provide:
+- video prompt
+- suggested duration
+- camera movement
+- subject movement
+- environment movement
+- continuity reminders
+
+Rules:
+- Keep motion smooth, cinematic, and realistic
+- Preserve identity, styling, and lighting
+- Avoid exaggerated movement unless clearly intentional
+- Prioritize elegant premium motion
+
+Output format:
+SCENE 1 VIDEO PROMPT:
+- Prompt:
+- Duration:
+- Camera movement:
+- Subject movement:
+- Environment movement:
+- Continuity notes:
+
+SCENE 2 VIDEO PROMPT:
+...
+
+
+B7 — VOICEOVER PROMPT
+PROMPT B7 — VOICEOVER DIRECTION PROMPT
+
+
+[PASTE YOUR SCRIPT]
+this is a voiceover script for instagram;
+i want to generate the voiceover using eleven labs;
+i will be using eleven labs Alphav3 model, so make sure to include emotions and and proper speech structure for the voiceover;
+give me a proper structured copy paste ready prompt to put in eleven labs to get the output
+
+
+STAGE 6 — STATIC IMAGE ADS
+Purpose
+Generate high-performing static image ads after the main angle is selected.
+PROMPT 6 — IMAGE AD CONCEPTS
+You are a direct-response static ad strategist.
+
+Your job is to generate strong static image ad concepts based on the selected image angle and brand context below.
+
+[PASTE RELEVANT CONTEXT HERE]
+
+Generate 8 concepts across these buckets:
+- 2 lifestyle/context concepts
+- 2 product hero concepts
+- 2 emotion/story concepts
+- 2 bold/creative concepts
+
+For each concept, provide:
+- Concept name
+- Core idea
+- What is shown visually
+- Headline direction
+- Why it could work
+
+Then shortlist the best 4.
+
+Rules:
+- Keep concepts ad-friendly and visually clear
+- Balance conversion logic with visual interest
+- Avoid ideas that are beautiful but commercially weak
+- Do not repeat the same concept in 4 outfits
+
+Output format:
+LIFESTYLE / CONTEXT
+1.
+- Concept name:
+- Core idea:
+- Visual:
+- Headline direction:
+- Why it could work:
+2.
+- Concept name:
+- Core idea:
+- Visual:
+- Headline direction:
+- Why it could work:
+
+PRODUCT HERO
+1.
+- Concept name:
+- Core idea:
+- Visual:
+- Headline direction:
+- Why it could work:
+2.
+- Concept name:
+- Core idea:
+- Visual:
+- Headline direction:
+- Why it could work:
+
+EMOTION / STORY
+1.
+- Concept name:
+- Core idea:
+- Visual:
+- Headline direction:
+- Why it could work:
+2.
+- Concept name:
+- Core idea:
+- Visual:
+- Headline direction:
+- Why it could work:
+
+BOLD / CREATIVE
+1.
+- Concept name:
+- Core idea:
+- Visual:
+- Headline direction:
+- Why it could work:
+2.
+- Concept name:
+- Core idea:
+- Visual:
+- Headline direction:
+- Why it could work:
+
+SHORTLISTED 4
+- Concept 1:
+- Concept 2:
+- Concept 3:
+- Concept 4:
+
+Next
+Paste the shortlisted concepts into Prompt 7.
+
+PROMPT 7 — FULL STATIC AD PROMPTS
+You are a premium performance ad prompt engineer.
+
+Your job is to convert the shortlisted static ad concepts below into complete image-generation prompts.
+
+[PASTE SHORTLISTED CONCEPTS HERE]
+
+For each concept, create one complete standalone prompt.
+
+Each prompt must include:
+- concept objective
+- visual composition
+- environment
+- subject or product placement
+- styling if relevant
+- lighting
+- mood
+- headline placement guidance
+- subline placement guidance
+- CTA placement guidance
+- brand/logo placement guidance
+- realism and quality notes
+- aspect ratio
+
+Rules:
+- Make the prompts campaign-ready
+- Ensure clean visual space for text
+- Keep the image commercially usable, not just pretty
+- Avoid clutter, confusion, and fake design language
+
+Output format:
+CONCEPT 1 — FULL PROMPT:
+...
+
+CONCEPT 2 — FULL PROMPT:
+...
+
+CONCEPT 3 — FULL PROMPT:
+...
+
+CONCEPT 4 — FULL PROMPT:
+...
+
+
+PROMPT 8 — CAROUSEL PROMPTS
+You are a carousel ad strategist.
+
+Using the selected static ad concept below, convert it into a 5-slide carousel narrative.
+
+[PASTE SELECTED CONCEPT HERE]
+
+Structure it as:
+Slide 1: Hook
+Slide 2: Problem
+Slide 3: Shift
+Slide 4: Proof
+Slide 5: CTA
+
+For each slide, provide:
+- objective
+- headline
+- supporting line
+- visual direction
+- product visibility
+- layout guidance
+
+Output format:
+SLIDE 1
+- Objective:
+- Headline:
+- Supporting line:
+- Visual direction:
+- Product visibility:
+- Layout guidance:
+
+SLIDE 2
+...
+
+
+STAGE 7 — QC AND REFINEMENT
+Purpose
+Review outputs before finalizing.
+PROMPT 9 — QC CHECKLIST GENERATOR
+You are a creative QC specialist.
+
+Using the generated script, storyboard, prompts, and selected outputs below, create a quality-control checklist and fix list.
+
+[PASTE RELEVANT OUTPUTS HERE]
+
+Review for:
+- clarity
+- conversion strength
+- continuity
+- realism
+- premium feel
+- product accuracy
+- face consistency
+- lighting consistency
+- UI consistency if relevant
+- platform suitability
+
+Output format:
+QC CHECKLIST
+- Script:
+- Visual continuity:
+- Face lock:
+- Product lock:
+- Lighting:
+- Realism:
+- Premium feel:
+- Platform fit:
+
+FIX LIST
+1.
+2.
+3.
+...
+
+
+STAGE 8 — FINAL PACKAGING
+Purpose
+Organize everything into a reusable final delivery bundle.
+PROMPT 10 — FINAL DELIVERY PACKAGER
+You are a production coordinator.
+
+Using all final approved outputs below, create a final delivery structure for this project.
+
+[PASTE FINAL OUTPUTS HERE]
+
+Organize into:
+1. Final deliverables list
+2. Recommended folder structure
+3. File naming convention
+4. Reusable assets to archive
+5. Missing items if any
+
+Output format:
+FINAL DELIVERABLES
+- ...
+
+FOLDER STRUCTURE
+- ...
+
+FILE NAMING CONVENTION
+- ...
+
+REUSABLE ASSETS TO ARCHIVE
+- ...
+
+MISSING ITEMS
+- ...
+
+
+QUICK RUN VERSION
+Fast chain overview
+Brand Brief
+Prompt 1: Ad DNA
+Prompt 2: Customer Avatar
+Prompt 3: Campaign Role + Message Map
+Prompt 4: Marketing Angles
+Prompt 5: Format Selector
+Then choose Path A or Path B
+Static image prompts can run after angles are chosen
+Prompt 9: QC
+Prompt 10: Packaging
+
+NOTES FOR REFINEMENT LATER
+Strong candidate additions for v2
+example filled brand brief
+connecting lines between every step
+tool-specific prompt variants for ChatGPT / Claude / Gemini
+sample face-lock mini template
+sample product-lock mini template
+start vs end image examples
+naming convention examples by project type
+final asset tracker template
+common prompt failure fixes
+Current design principle
+This doc is meant to be:
+easy to teach
+easy to run
+copy-paste ready
+low-friction
+scalable for interns, teams, and workshop use
+usable for both strategy and execution
+
+EXAMPLE FULL RUN — END-TO-END SAMPLE
+Purpose of this section
+This section shows exactly how one full run should work so a new hire can see:
+what to paste
+what kind of output to expect
+what to select
+what to paste into the next step
+This is a simplified but realistic example.
+
+EXAMPLE BRAND BRIEF
+Brand Name: GlowMint
+What does the brand sell?: Teeth whitening strips for at-home use
+Product / Service Type: D2C beauty / personal care product
+Price Range: Mid-range
+Target Audience: Women and men aged 22 to 35 who care about appearance and confidence
+Main Customer Problem: Their teeth look dull in photos and during social situations
+Main Desired Outcome: A visibly brighter smile without expensive dental visits
+Top 3 Product / Service Benefits: Easy to use, visible improvement, affordable at-home solution
+What makes it different?: Enamel-safe formula and easy 20-minute routine
+Proof / Trust Signals: Positive customer reviews, before-after visuals, enamel-safe messaging
+Brand Tone / Personality: Clean, modern, confidence-boosting, simple
+Where will this ad be used?: Instagram Reels and Story ads
+Ad Goal: Conversions
+Preferred Ad Style (if any): UGC or clean product-led visual ad
+Any visual references / competitor references?: Clean bathroom visuals, creator-style skincare content
+Any mandatory things to include?: Easy routine, enamel-safe, visible results
+Any things to avoid?: Over-medical claims, unrealistic whitening promises
+
+EXAMPLE STEP 1 — AD DNA OUTPUT
+Example selected output
+OPTION 2
+- Audience: Appearance-conscious young professionals who want to look polished in social and work settings
+- Emotional state: Slightly self-conscious, frustrated, hopeful
+- Problem: Their smile looks dull in photos and face-to-face interactions
+- Desired outcome: A noticeably brighter smile that boosts confidence quickly
+- Promise: A simple at-home whitening routine that makes teeth look visibly brighter without the hassle of clinic visits
+- Proof: Enamel-safe formula, customer reviews, before-and-after results
+- Urgency: Upcoming events, dates, weddings, work meetings, social content
+- CTA direction: Try the strips now and see the difference yourself
+- One-line Ad DNA: For people who are tired of hiding a dull smile, GlowMint offers an easy enamel-safe whitening routine that helps them look brighter and feel more confident fast.
+
+What the user pastes next
+SELECTED AD DNA
+OPTION 2
+- Audience: Appearance-conscious young professionals who want to look polished in social and work settings
+- Emotional state: Slightly self-conscious, frustrated, hopeful
+- Problem: Their smile looks dull in photos and face-to-face interactions
+- Desired outcome: A noticeably brighter smile that boosts confidence quickly
+- Promise: A simple at-home whitening routine that makes teeth look visibly brighter without the hassle of clinic visits
+- Proof: Enamel-safe formula, customer reviews, before-and-after results
+- Urgency: Upcoming events, dates, weddings, work meetings, social content
+- CTA direction: Try the strips now and see the difference yourself
+- One-line Ad DNA: For people who are tired of hiding a dull smile, GlowMint offers an easy enamel-safe whitening routine that helps them look brighter and feel more confident fast.
+
+
+EXAMPLE STEP 2 — CUSTOMER AVATAR OUTPUT
+Example selected output
+AVATAR 1
+- Profile: 27-year-old marketing executive living in a metro city
+- Lifestyle: Social, image-aware, takes photos often, spends on beauty and wellness products that feel easy and effective
+- Current struggle: Feels her smile looks slightly yellow in pictures and notices it more every time she records stories or attends events
+- Secret desire: To smile openly in photos without overthinking it
+- Fear: That she will keep looking less polished than she feels
+- Biggest objection: Worry that whitening products may feel harsh or damage enamel
+- Emotional tone: Slightly insecure but motivated to fix it
+- Internal monologue: I don’t need a perfect Hollywood smile. I just want to stop noticing the dullness every time I see myself in photos.
+
+What the user pastes next
+SELECTED AVATAR
+AVATAR 1
+- Profile: 27-year-old marketing executive living in a metro city
+- Lifestyle: Social, image-aware, takes photos often, spends on beauty and wellness products that feel easy and effective
+- Current struggle: Feels her smile looks slightly yellow in pictures and notices it more every time she records stories or attends events
+- Secret desire: To smile openly in photos without overthinking it
+- Fear: That she will keep looking less polished than she feels
+- Biggest objection: Worry that whitening products may feel harsh or damage enamel
+- Emotional tone: Slightly insecure but motivated to fix it
+- Internal monologue: I don’t need a perfect Hollywood smile. I just want to stop noticing the dullness every time I see myself in photos.
+
+SELECTED AD DNA
+[PASTE THE SELECTED AD DNA BLOCK]
+
+
+EXAMPLE STEP 3 — CAMPAIGN ROLE + MESSAGE MAP OUTPUT
+Example selected output
+- Campaign stage: Conversion
+- Current belief: Whitening sounds useful, but many products feel gimmicky or too harsh
+- Main doubt: Will this actually work without damaging enamel?
+- New belief required: This is a simple, enamel-safe, low-effort whitening solution that can visibly improve my smile
+- One job of this ad: Make the product feel safe, easy, and worth trying now
+- What this ad should not try to do: Explain the entire science of whitening or build broad category awareness
+
+MESSAGE MAP
+- Pain: My smile looks dull in photos and I notice it constantly
+- Desire: I want a brighter smile that makes me feel polished and confident
+- Objection: I don’t want something harsh or complicated
+- Promise: GlowMint makes whitening simple, visible, and enamel-safe
+- Proof: Before-after style results, easy 20-minute routine, enamel-safe formula
+- CTA: Try GlowMint and see the difference yourself
+
+What the user pastes next
+CAMPAIGN ROLE
+- Campaign stage: Conversion
+- Current belief: Whitening sounds useful, but many products feel gimmicky or too harsh
+- Main doubt: Will this actually work without damaging enamel?
+- New belief required: This is a simple, enamel-safe, low-effort whitening solution that can visibly improve my smile
+- One job of this ad: Make the product feel safe, easy, and worth trying now
+- What this ad should not try to do: Explain the entire science of whitening or build broad category awareness
+
+MESSAGE MAP
+- Pain: My smile looks dull in photos and I notice it constantly
+- Desire: I want a brighter smile that makes me feel polished and confident
+- Objection: I don’t want something harsh or complicated
+- Promise: GlowMint makes whitening simple, visible, and enamel-safe
+- Proof: Before-after style results, easy 20-minute routine, enamel-safe formula
+- CTA: Try GlowMint and see the difference yourself
+
+
+EXAMPLE STEP 4 — MARKETING ANGLES OUTPUT
+Example selected output
+SHORTLIST
+- Best video angle: The “camera confidence” angle
+- Why: It turns a relatable emotional pain into a clear visual payoff and works well for UGC
+- Best image angle: The “low-effort glow-up” angle
+- Why: It makes the product feel simple, beauty-adjacent, and visually easy to understand
+
+What the user pastes next
+SELECTED VIDEO ANGLE
+- Best video angle: The “camera confidence” angle
+- Why: It turns a relatable emotional pain into a clear visual payoff and works well for UGC
+
+SELECTED IMAGE ANGLE
+- Best image angle: The “low-effort glow-up” angle
+- Why: It makes the product feel simple, beauty-adjacent, and visually easy to understand
+
+MESSAGE MAP
+[PASTE MESSAGE MAP HERE]
+
+
+EXAMPLE STEP 5 — FORMAT SELECTION OUTPUT
+Example selected output
+SHORTLIST
+- Best primary format: UGC direct-to-camera
+- Why: The problem is personal and confidence-based, which works best when a relatable person explains it naturally
+- Best backup format: Product-led visual ad
+- Why: The routine is simple and visually demonstrable
+
+What the user pastes next
+SELECTED PRIMARY FORMAT
+- Best primary format: UGC direct-to-camera
+- Why: The problem is personal and confidence-based, which works best when a relatable person explains it naturally
+
+SELECTED BACKUP FORMAT
+- Best backup format: Product-led visual ad
+- Why: The routine is simple and visually demonstrable
+
+SELECTED VIDEO ANGLE
+- Best video angle: The “camera confidence” angle
+- Why: It turns a relatable emotional pain into a clear visual payoff and works well for UGC
+
+
+EXAMPLE PATH A — UGC RUN
+EXAMPLE A1 — UGC SCRIPT OUTPUT
+Example selected output
+SCRIPT 1
+- Hook: I didn’t realize how dull my teeth looked until I started seeing them in every photo.
+- Problem: I tried editing my smile brighter, changing angles, even smiling less.
+- Shift: Then I found GlowMint whitening strips.
+- Proof: They’re enamel-safe, easy to use, and the routine takes just 20 minutes.
+- CTA: If you want a brighter smile without overcomplicating it, try GlowMint.
+- Full script: I didn’t realize how dull my teeth looked until I started seeing them in every photo. I’d literally change angles or avoid smiling too wide. Then I tried GlowMint whitening strips. They’re super easy, enamel-safe, and I only need 20 minutes. It’s such a small step, but it made my smile look way more fresh and polished. If you’ve been noticing the same thing, just try GlowMint.
+
+What the user pastes next
+SELECTED UGC SCRIPT
+SCRIPT 1
+- Hook: I didn’t realize how dull my teeth looked until I started seeing them in every photo.
+- Problem: I tried editing my smile brighter, changing angles, even smiling less.
+- Shift: Then I found GlowMint whitening strips.
+- Proof: They’re enamel-safe, easy to use, and the routine takes just 20 minutes.
+- CTA: If you want a brighter smile without overcomplicating it, try GlowMint.
+- Full script: I didn’t realize how dull my teeth looked until I started seeing them in every photo. I’d literally change angles or avoid smiling too wide. Then I tried GlowMint whitening strips. They’re super easy, enamel-safe, and I only need 20 minutes. It’s such a small step, but it made my smile look way more fresh and polished. If you’ve been noticing the same thing, just try GlowMint.
+
+
+EXAMPLE A2 — FACE LOCK OUTPUT
+Example selected output
+- Character overview: A 27-year-old stylish urban woman with a relatable beauty-creator vibe
+- Face details: Soft oval face, almond-shaped dark brown eyes, straight brows, medium-small nose, naturally full lips, balanced features
+- Skin: Light-medium skin with warm neutral undertone and natural skin texture
+- Hair: Dark brown smooth hair, center part, shoulder length, softly styled
+- Outfit: Clean fitted neutral tank top or soft beige lounge top
+- Vibe: Casual, polished, real, camera-friendly
+- Environment: Bright modern bathroom or vanity area with soft natural daylight
+- Realism rules: Natural pores, no plastic skin, believable lighting, realistic teeth and lips
+
+FACE-LOCK BLOCK:
+A 27-year-old stylish urban woman with a soft oval face, almond-shaped dark brown eyes, straight natural brows, a medium-small nose, naturally full lips, light-medium skin with a warm neutral undertone, visible natural skin texture, dark brown shoulder-length smooth hair parted at the center, casual polished appearance, clean neutral outfit, bright modern bathroom setting, soft natural daylight, realistic beauty-creator look, photorealistic skin and facial proportions.
+
+
+EXAMPLE A3 — SCENE BREAKDOWN OUTPUT
+Example selected output
+SCENE 1
+- Spoken line: I didn’t realize how dull my teeth looked until I started seeing them in every photo.
+- Visual: She looks at a selfie on her phone and subtly reacts to her smile
+- Shot type: Medium close-up
+- Action: Looking down at phone, then slight expression shift
+- Mood: Self-aware, relatable
+- Product visibility: None
+
+SCENE 2
+- Spoken line: I’d literally change angles or avoid smiling too wide.
+- Visual: She retakes a selfie and gives an awkward closed-lip smile
+- Shot type: Front-facing creator shot
+- Action: Subtle repositioning and uncomfortable smile
+- Mood: Slightly frustrated, relatable
+- Product visibility: None
+
+SCENE 3
+- Spoken line: Then I tried GlowMint whitening strips.
+- Visual: She holds the product pack toward camera in a clean vanity setting
+- Shot type: Medium shot
+- Action: Product reveal
+- Mood: Solution appears
+- Product visibility: High
+
+
+EXAMPLE A4 — BASE IMAGE PROMPT OUTPUT
+Example selected output
+SCENE 1 BASE IMAGE PROMPT:
+A photorealistic UGC-style vertical 9:16 image of a 27-year-old stylish urban woman with a soft oval face, almond-shaped dark brown eyes, straight natural brows, a medium-small nose, naturally full lips, light-medium skin with a warm neutral undertone, visible natural skin texture, dark brown shoulder-length smooth hair parted at the center, wearing a clean neutral beige fitted lounge top, standing in a bright modern bathroom vanity area with soft natural daylight. She is holding a smartphone slightly below eye level and looking at a selfie on the screen with a subtle self-conscious expression as she notices her smile. Medium close-up framing, realistic bathroom background softly out of focus, clean premium creator aesthetic, believable skin texture, realistic facial proportions, natural daylight reflections, no text, no UI.
+
+NEGATIVE PROMPT:
+plastic skin, extra fingers, distorted teeth, warped phone, fake smile, text overlay, cluttered background
+
+
+EXAMPLE A5 — START / END IMAGE OUTPUT
+Example selected output
+SCENE 1
+START IMAGE PROMPT:
+The same woman stands in the bright bathroom holding her phone and looking at the screen neutrally before noticing anything unusual about her smile. Medium close-up, soft daylight, relaxed face, same outfit, same setting.
+
+END IMAGE PROMPT:
+The same woman in the same bathroom and same outfit looks at her phone with a subtle self-conscious reaction as she notices her dull smile. Medium close-up, soft daylight, same framing family.
+
+LOCKED ELEMENTS:
+Same face, same hair, same outfit, same bathroom, same lighting family, same framing style
+
+CHANGES:
+Expression shifts from neutral to slightly self-conscious
+
+
+EXAMPLE A6 — VIDEO PROMPT OUTPUT
+Example selected output
+SCENE 1 VIDEO PROMPT:
+- Prompt: A realistic UGC-style handheld vertical video of the same young woman standing in a bright modern bathroom, holding her phone and looking at a selfie on the screen. She begins neutral, then subtly reacts as she notices her smile looks dull. Natural micro-expression shift, realistic eye movement, soft daylight, slight handheld camera realism, no dramatic motion.
+- Duration: 3 seconds
+- Camera behavior: Subtle handheld stability
+- Subject movement: Small eye movement, slight face shift, soft change in expression
+- Continuity notes: Keep face, hair, outfit, bathroom background, and daylight consistent with the approved base image
+
+
+EXAMPLE A7 — AUDIO TIMING OUTPUT
+Example selected output
+SCENE 1
+- Spoken line: I didn’t realize how dull my teeth looked until I started seeing them in every photo.
+- Estimated duration: 2.8 seconds
+- Energy note: conversational, lightly self-aware
+- Overlap note: line can begin slightly before the scene appears
+
+
+EXAMPLE STATIC IMAGE AD RUN
+EXAMPLE STEP 6 — IMAGE AD CONCEPT OUTPUT
+Example selected output
+SHORTLISTED 4
+- Concept 1: The “photo-ready smile” mirror visual
+- Concept 2: The “20-minute glow-up” routine visual
+- Concept 3: The “before your next event” confidence visual
+- Concept 4: The clean product-hero plus smile close-up visual
+
+EXAMPLE STEP 7 — FULL STATIC AD PROMPT OUTPUT
+Example selected output
+CONCEPT 2 — FULL PROMPT:
+Create a premium static ad image in vertical 4:5 format for a modern teeth whitening brand called GlowMint. Show a clean vanity or bathroom counter with the GlowMint whitening strips pack placed neatly beside simple beauty essentials. Include a stylish young woman in soft focus in the background adjusting her hair or smiling slightly into the mirror, suggesting a low-effort beauty upgrade. Bright natural daylight, clean modern aesthetic, soft neutral color palette, premium but accessible beauty-ad feel. Leave clean space in the upper third for headline text and bottom-right space for CTA. The visual should communicate a simple 20-minute routine that helps you look more polished and confident. Photorealistic, commercially usable, no clutter, no fake design elements.
+
+
+WHAT TO LEARN FROM THIS EXAMPLE
+The key lesson
+Do not improvise the workflow.
+The logic is:
+build strategy first
+choose one direction
+use that chosen block in the next prompt
+keep the selected output clean
+do not paste six conflicting options into the next step
+move forward with one approved version
+Operational rule
+At each step, select one output and pass only that forward unless the SOP explicitly asks for multiple items.
+Why this matters
+This keeps the entire system:
+faster
+cleaner
+easier to review
+easier to hand off
+easier to scale across projects
+
+COMMON MISTAKES TO AVOID
+1. Passing multiple options into the next step
+What goes wrong
+The model gets conflicting context and starts blending ideas that were supposed to stay separate.
+Wrong approach
+Pasting all 3 Ad DNA options into the Customer Avatar prompt.
+Correct approach
+Choose 1 final Ad DNA option and only pass that forward.
+
+2. Skipping the selection step
+What goes wrong
+The workflow becomes messy because nothing is actually approved before moving ahead.
+Wrong approach
+Generating scripts before selecting the final angle or format.
+Correct approach
+At every stage, pause, select the strongest option, then continue.
+
+3. Rewriting selected outputs too casually
+What goes wrong
+Important emotional tension, positioning, or constraints get lost between steps.
+Wrong approach
+Summarizing the selected avatar in your own words before pasting it into the next prompt.
+Correct approach
+Paste the selected output cleanly and as fully as possible using the standard handoff block.
+
+4. Mixing UGC and cinematic logic in the same path
+What goes wrong
+The resulting ad becomes confused and visually inconsistent.
+Wrong approach
+Using a cinematic script structure and then asking for handheld creator-style UGC visuals in the same chain without a clear reason.
+Correct approach
+Choose one primary format and stay inside that path unless the SOP specifically asks for an alternate version.
+
+5. Turning every step into a brainstorming session
+What goes wrong
+The workflow slows down and the outputs become broad, repetitive, and less usable.
+Wrong approach
+Asking for 10 extra variations at every stage before selecting one.
+Correct approach
+Use the SOP to narrow down, not expand forever.
+
+6. Generating visuals before locking the character or product
+What goes wrong
+Faces drift, styling changes, and product appearance becomes inconsistent across scenes.
+Wrong approach
+Generating scene prompts before finalizing face-lock, product-lock, or styling rules.
+Correct approach
+Lock the character, product, and styling first when continuity matters.
+
+7. Using vague prompts for later execution steps
+What goes wrong
+Images and videos come back generic, unstable, or visually inconsistent.
+Wrong approach
+Prompting with lines like “make it cinematic and premium” without defining the actual scene, subject, lighting, and framing.
+Correct approach
+Use the structured prompts exactly and include all locked variables.
+
+8. Not keeping the output format clean
+What goes wrong
+The next prompt becomes harder to run because the handoff is messy.
+Wrong approach
+Mixing your own notes into the selected output block before pasting it forward.
+Correct approach
+Use the copy-paste connector and standard handoff format.
+
+9. Choosing based only on what sounds pretty
+What goes wrong
+The team picks ideas that sound creative but are weak for actual ad performance.
+Wrong approach
+Selecting the most poetic concept even if it does not clearly sell the product.
+Correct approach
+Choose based on clarity, emotional relevance, and execution strength.
+
+10. Treating generated output as final without QC
+What goes wrong
+Weak scripts, inconsistent visuals, and sloppy prompts move downstream and create bigger problems later.
+Wrong approach
+Using first-draft prompts or visuals without checking them.
+Correct approach
+Always do a quick QC pass before locking anything as final.
+
+GOLDEN RULES FOR RUNNING THIS SYSTEM
+One selected output moves forward at a time
+Do not skip steps
+Do not rewrite the logic casually between steps
+Stay inside the selected format path
+Lock continuity before scaling scenes
+Use the standard handoff blocks
+Review before finalizing
+Keep the workflow narrow and controlled
+
+FINAL REMINDER
+This system works best when you treat it like a production pipeline, not a chat.
+The model is not supposed to “figure out the project eventually.”
+You are supposed to move it through the correct steps in the correct order.
+Clean inputs create clean outputs.
+Clean outputs make the next step fast.
+That is the whole game.
