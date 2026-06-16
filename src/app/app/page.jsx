@@ -18,7 +18,7 @@ import { Search } from "lucide-react";
 const REAL_ESTATE_TEMPLATES = [
   {
     title: "Model exiting a luxury vehicle",
-    href: "/app/veo-long-ad",
+    href: "/app/seedance-reel",
     video: "https://content.thumbpin.in/templates/modelLuxuryVehicle.mp4",
   },
 ];

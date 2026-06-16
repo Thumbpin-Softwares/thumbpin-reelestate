@@ -38,14 +38,15 @@ async function callLLM(prompt) {
 }
 
 async function generateElevenLabsTTS(text, voiceId) {
+  const vs = ELEVENLABS_VOICE_SETTINGS[voiceId] ?? ELEVENLABS_VOICE_SETTINGS["dVTC43Yewy5fAIcmsISI"];
   const result = await fal.subscribe("fal-ai/elevenlabs/tts/multilingual-v2", {
     input: {
       text,
-      voice: voiceId,
-      stability:        ELEVENLABS_VOICE_SETTINGS.stability,
-      similarity_boost: ELEVENLABS_VOICE_SETTINGS.similarity_boost,
-      style:            ELEVENLABS_VOICE_SETTINGS.style,
-      speed:            ELEVENLABS_VOICE_SETTINGS.speed,
+      voice:            voiceId,
+      stability:        vs.stability,
+      similarity_boost: vs.similarity_boost,
+      style:            vs.style,
+      speed:            vs.speed,
     },
     logs: false,
   });

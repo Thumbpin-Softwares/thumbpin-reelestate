@@ -17,20 +17,16 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { LANGUAGES } from "@/utils/constants";
+import { ELEVENLABS_VOICES } from "@/lib/elevenlabs-config";
 
 const MIN_SCRIPT_WORDS = 20;
 const MAX_SCRIPT_WORDS = 300;
 
-const ELEVENLABS_VOICES = [
-  { id: "dVTC43Yewy5fAIcmsISI", label: "Anvi (Female)" },
-  { id: "K2Byg54sHB1oHegvENtI", label: "Kanika (Female)" },
-  { id: "XB0fDUnXU5powFXDhCwa", label: "Charlotte (Female)" },
-  { id: "pMsXgVXv3BLzUgSXRplE", label: "Serena (Female)" },
-  { id: "DdD5pVl1QDeeI6MMtYbk", label: "Abhay (Male)" },
-  { id: "JBFqnCBsd6RMkjVDRZzb", label: "George (Male)" },
-  { id: "onwK4e9ZLuTAKqWW03F9", label: "Daniel (Male)" },
-  { id: "TX3LPaxmHKxFdv7VOQHJ", label: "Liam (Male)" },
-];
+const ChevronDown = () => (
+  <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+    <path d="M6 8l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
 
 /**
  * StepScript — Step 1 for the Seedance Reel pipeline.
@@ -137,12 +133,6 @@ export function StepScript({ onBack, onGenerate }) {
     if (!isScriptReady) return;
     onGenerate({ script: activeScript.trim(), voiceId: elevenLabsVoice, language });
   };
-
-  const ChevronDown = () => (
-    <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
-      <path d="M6 8l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
 
   return (
     <div className="space-y-6 animate-fade-in">
