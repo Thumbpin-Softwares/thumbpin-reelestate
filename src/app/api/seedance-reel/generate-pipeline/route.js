@@ -2,15 +2,15 @@ export const maxDuration = 300;
 
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "#/lib/auth-config";
-import Asset from "#/models/Asset";
-import dbConnect from "#/lib/mongodb";
-import { uploadToR2, buildUserKey } from "#/lib/r2-upload";
-import { R2_PUBLIC_URL } from "#/lib/r2";
-import { consumeCreditsForAction, refundCreditsForAction } from "#/lib/credit-system";
-import { fal } from "#fal-ai/client";
+import { authOptions } from "@/lib/auth-config";
+import Asset from "@/models/Asset";
+import dbConnect from "@/lib/mongodb";
+import { uploadToR2, buildUserKey } from "@/lib/r2-upload";
+import { R2_PUBLIC_URL } from "@/lib/r2";
+import { consumeCreditsForAction, refundCreditsForAction } from "@/lib/credit-system";
+import { fal } from "@fal-ai/client";
 import sharp from "sharp";
-import { ELEVENLABS_VOICE_SETTINGS } from "#/lib/elevenlabs-config";
+import { ELEVENLABS_VOICE_SETTINGS } from "@/lib/elevenlabs-config";
 
 if (process.env.FAL_KEY) {
   fal.config({ credentials: process.env.FAL_KEY });
@@ -87,7 +87,7 @@ export async function POST(request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { resolveUserFromSession } = await import("#/lib/user-resolver");
+    const { resolveUserFromSession } = await import("@/lib/user-resolver");
     const user = await resolveUserFromSession(request);
     if (!user) {
       return NextResponse.json({ error: "User not found." }, { status: 404 });
@@ -343,8 +343,8 @@ ${part3_cta}`;
           const locationPhrase    = locationImageRefs ? `into the outdoor entrance area shown in ${locationImageRefs}` : "toward the outdoor entrance";
 
           const introPrompt =
-            `Simple, sleek UGC smartphone vlog footage. The video begins as a luxury white car door opens. ` +
-            `#Image1 steps out naturally ${locationPhrase}. ` +
+            `Simple, sleek UGC smartphone vlog footage. The video opens mid-action: #Image1 is already mid-exit from a luxury white car door, one foot on the ground — skip the door opening, start from the step out. ` +
+            `She walks naturally ${locationPhrase}. ` +
             `Her face matches the exact identity, features, and smile of ${faceIdentityRef}. ` +
             `She stands in place, looks directly at the camera lens, and speaks the exact following dialogue words: "${part1_roman}". ` +
             `Her lip movements, mouth openings, and natural facial muscles shape perfectly to the precise spoken syllables, phonetics, and cadence of #Audio1. ` +

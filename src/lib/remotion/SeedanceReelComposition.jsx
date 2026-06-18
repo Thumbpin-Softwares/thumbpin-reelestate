@@ -5,21 +5,19 @@ import {
   useCurrentFrame,
   interpolate,
 } from "remotion";
-import { Video, Audio } from "@remotion/media";
+import { OffthreadVideo } from "remotion";
+import { Audio } from "@remotion/media";
 import { IntroAnimation } from "./IntroAnimation";
 import { OutroAnimation } from "./OutroAnimation";
 
 const INTRO_S = 3;
 const OUTRO_S = 3;
 
-function FadeContent({ children, totalFrames, fade }) {
+function FadeContent({ children, totalFrames, fade, fadeIn = true, fadeOut = true }) {
   const frame = useCurrentFrame();
-  const opacity = interpolate(
-    frame,
-    [0, fade, totalFrames - fade, totalFrames],
-    [0, 1, 1, 0],
-    { extrapolateRight: "clamp", extrapolateLeft: "clamp" }
-  );
+  const inOpacity  = fadeIn  ? interpolate(frame, [0, fade], [0, 1], { extrapolateRight: "clamp", extrapolateLeft: "clamp" }) : 1;
+  const outOpacity = fadeOut ? interpolate(frame, [totalFrames - fade, totalFrames], [1, 0], { extrapolateRight: "clamp", extrapolateLeft: "clamp" }) : 1;
+  const opacity = Math.min(inOpacity, outOpacity);
   return <AbsoluteFill style={{ opacity }}>{children}</AbsoluteFill>;
 }
 
@@ -98,9 +96,9 @@ export function SeedanceReelComposition({
       {/* 2 — Avatar intro (Seedance-baked audio preserved) */}
       {avatarVideoUrl && (
         <Sequence from={avatarAt} durationInFrames={avatarFrames}>
-          <FadeContent totalFrames={avatarFrames} fade={FADE}>
+          <FadeContent totalFrames={avatarFrames} fade={FADE} fadeIn fadeOut={false}>
             <AbsoluteFill>
-              <Video
+              <OffthreadVideo
                 src={avatarVideoUrl}
                 objectFit="cover"
                 style={{ width: "100%", height: "100%" }}
@@ -117,16 +115,15 @@ export function SeedanceReelComposition({
 
           {clips.map((clip, i) => (
             <Sequence
-              key={i}
+              key={clip.url || i}
               from={clipOffsets[i]}
               durationInFrames={clip.segFrames}
             >
-              <FadeContent totalFrames={clip.segFrames} fade={FADE}>
+              <FadeContent totalFrames={clip.segFrames} fade={FADE} fadeIn={false} fadeOut={false}>
                 <AbsoluteFill>
-                  <Video
+                  <OffthreadVideo
                     src={clip.url}
                     playbackRate={clip.rate}
-                    loop
                     muted
                     objectFit="cover"
                     style={{ width: "100%", height: "100%" }}
@@ -141,9 +138,9 @@ export function SeedanceReelComposition({
       {/* 4 — CTA avatar (Seedance-baked audio preserved) */}
       {ctaVideoUrl && (
         <Sequence from={ctaAt} durationInFrames={ctaFrames}>
-          <FadeContent totalFrames={ctaFrames} fade={FADE}>
+          <FadeContent totalFrames={ctaFrames} fade={FADE} fadeIn={false} fadeOut>
             <AbsoluteFill>
-              <Video
+              <OffthreadVideo
                 src={ctaVideoUrl}
                 objectFit="cover"
                 style={{ width: "100%", height: "100%" }}
