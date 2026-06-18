@@ -20,6 +20,38 @@ const REAL_ESTATE_TEMPLATES = [
     title: "Model exiting a luxury vehicle",
     href: "/app/seedance-reel",
     video: "https://content.thumbpin.in/templates/modelLuxuryVehicle.mp4",
+    tag: "Popular",
+  },
+  {
+    title: "Interior Shots",
+    href: "/app/interior-shots",
+    video: null,
+    tag: "New",
+    description: "5–6 photos → 15s cinematic walkthrough, no hard cuts",
+  },
+  {
+    title: "Exterior & Facade",
+    href: null,
+    video: null,
+    tag: "Soon",
+    description: "Stunning outside views and property facade shots",
+    comingSoon: true,
+  },
+  {
+    title: "Luxury Amenities",
+    href: null,
+    video: null,
+    tag: "Soon",
+    description: "Gym, pool, rooftop and clubhouse showcase",
+    comingSoon: true,
+  },
+  {
+    title: "New Launch Promo",
+    href: null,
+    video: null,
+    tag: "Soon",
+    description: "Countdown + reveal for new property launches",
+    comingSoon: true,
   },
 ];
 
@@ -168,7 +200,7 @@ export default function DashboardPage() {
 
               {/* COUNT */}
               <span className="hidden md:flex bg-[#c7f038] px-4 py-2 rounded-full text-xs font-bold uppercase">
-                {REAL_ESTATE_TEMPLATES.length} Templates
+                {REAL_ESTATE_TEMPLATES.filter(t => !t.comingSoon).length} Templates
               </span>
             </div>
 
@@ -193,9 +225,10 @@ export default function DashboardPage() {
               <div className="grid grid-cols-2 md:grid-cols-5 xl:grid-cols-5 gap-5">
                 {filteredTemplates.map((template) => (
                   <TemplateCard
-                    key={template.href}
+                    key={template.title}
                     template={template}
                     onClick={() => {
+                      if (!template.href) return;
                       setTemplateModalOpen(false);
                       router.push(template.href);
                     }}

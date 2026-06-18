@@ -2,15 +2,15 @@ export const maxDuration = 300;
 
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth-config";
-import Asset from "@/models/Asset";
-import dbConnect from "@/lib/mongodb";
-import { uploadToR2, buildUserKey } from "@/lib/r2-upload";
-import { R2_PUBLIC_URL } from "@/lib/r2";
-import { consumeCreditsForAction, refundCreditsForAction } from "@/lib/credit-system";
-import { fal } from "@fal-ai/client";
+import { authOptions } from "#/lib/auth-config";
+import Asset from "#/models/Asset";
+import dbConnect from "#/lib/mongodb";
+import { uploadToR2, buildUserKey } from "#/lib/r2-upload";
+import { R2_PUBLIC_URL } from "#/lib/r2";
+import { consumeCreditsForAction, refundCreditsForAction } from "#/lib/credit-system";
+import { fal } from "#fal-ai/client";
 import sharp from "sharp";
-import { ELEVENLABS_VOICE_SETTINGS } from "@/lib/elevenlabs-config";
+import { ELEVENLABS_VOICE_SETTINGS } from "#/lib/elevenlabs-config";
 
 if (process.env.FAL_KEY) {
   fal.config({ credentials: process.env.FAL_KEY });
@@ -87,7 +87,7 @@ export async function POST(request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { resolveUserFromSession } = await import("@/lib/user-resolver");
+    const { resolveUserFromSession } = await import("#/lib/user-resolver");
     const user = await resolveUserFromSession(request);
     if (!user) {
       return NextResponse.json({ error: "User not found." }, { status: 404 });
@@ -338,44 +338,44 @@ ${part3_cta}`;
           const numLocImgs        = validLocationUrls.length;
 
           // ── Prompt A: Intro avatar (car → walk → dialogue, same proven template) ──
-          const faceIdentityRef   = numAvatarImages >= 3 ? `@Image2 and @Image3` : numAvatarImages >= 2 ? `@Image1 and @Image2` : `@Image1`;
-          const locationImageRefs = validLocationUrls.map((_, i) => `@Image${numAvatarImages + 1 + i}`).join(", ");
+          const faceIdentityRef   = numAvatarImages >= 3 ? `#Image2 and #Image3` : numAvatarImages >= 2 ? `#Image1 and #Image2` : `#Image1`;
+          const locationImageRefs = validLocationUrls.map((_, i) => `#Image${numAvatarImages + 1 + i}`).join(", ");
           const locationPhrase    = locationImageRefs ? `into the outdoor entrance area shown in ${locationImageRefs}` : "toward the outdoor entrance";
 
           const introPrompt =
             `Simple, sleek UGC smartphone vlog footage. The video begins as a luxury white car door opens. ` +
-            `@Image1 steps out naturally and walks two steps forward ${locationPhrase}. ` +
+            `#Image1 steps out naturally ${locationPhrase}. ` +
             `Her face matches the exact identity, features, and smile of ${faceIdentityRef}. ` +
             `She stands in place, looks directly at the camera lens, and speaks the exact following dialogue words: "${part1_roman}". ` +
-            `Her lip movements, mouth openings, and natural facial muscles shape perfectly to the precise spoken syllables, phonetics, and cadence of @Audio1. ` +
-            `In the background, out-of-focus bystanders casually walk past the property entrance. ` +
+            `Her lip movements, mouth openings, and natural facial muscles shape perfectly to the precise spoken syllables, phonetics, and cadence of #Audio1. ` +
+            `In the background, bystanders casually walk past the property entrance. ` +
             `Neutral daylight, realistic handheld camera stabilization, natural skin texture with visible pores, and clean, unedited raw video aesthetic.`;
 
           // ── Prompt B: Architectural walkthrough (location images only, no avatar) ──
           let walkthroughPrompt =
             `A seamless, continuous 12-second architectural walkthrough video with zero hard cuts. `;
           if (numLocImgs >= 1)
-            walkthroughPrompt += `The camera begins at the exterior facade and environment shown in @Image1, slowly pushing forward toward the main entrance. `;
+            walkthroughPrompt += `The camera begins at the exterior facade and environment shown in #Image1, slowly pushing forward toward the main entrance. `;
           if (numLocImgs >= 2)
-            walkthroughPrompt += `The camera fluidly morphs through the threshold to reveal the interior space depicted in @Image2, panning gently to highlight the ambient features and decor. `;
+            walkthroughPrompt += `The camera fluidly morphs through the threshold to reveal the interior space depicted in #Image2, panning gently to highlight the ambient features and decor. `;
           if (numLocImgs >= 3)
-            walkthroughPrompt += `Maintaining smooth stabilized handheld momentum, the camera pushes through an archway into the next adjoining space shown in @Image3, tracking smoothly across the room. `;
+            walkthroughPrompt += `Maintaining smooth stabilized handheld momentum, the camera pushes through an archway into the next adjoining space shown in #Image3, tracking smoothly across the room. `;
           if (numLocImgs >= 4)
-            walkthroughPrompt += `The camera glides forward, transitioning effortlessly into the environment shown in @Image4, accentuating the unique spatial layout and design elements. `;
+            walkthroughPrompt += `The camera glides forward, transitioning effortlessly into the environment shown in #Image4, accentuating the unique spatial layout and design elements. `;
           walkthroughPrompt +=
             `The entire 12-second progression is one fluid, unbroken sequence — hyper-realistic textures, consistent interior lighting transitions, soft shadows, and clean 4K architectural rendering quality.`;
           if (part2AudioUrl)
-            walkthroughPrompt += ` Camera pacing and transitions are dynamically synchronized with the rhythm of @Audio1.`;
+            walkthroughPrompt += ` Camera pacing and transitions are dynamically synchronized with the rhythm of #Audio1.`;
 
           // ── Prompt C: CTA avatar (confident, charming, hooky closing) ──────
-          const ctaBgRef    = numLocImgs > 0 ? ` against the stunning property backdrop in @Image${numAvatarImages + 1}` : "";
+          const ctaBgRef    = numLocImgs > 0 ? ` against the stunning property backdrop in #Image${numAvatarImages + 1}` : "";
           const ctaPrompt   =
-            `Sleek, punchy UGC smartphone vlog footage. @Image1 turns back toward the camera with a charismatic, wide grin${ctaBgRef}. ` +
+            `Sleek, punchy UGC smartphone vlog footage. #Image1 turns back toward the camera with a charismatic, wide grin${ctaBgRef}. ` +
             `Her face matches the exact identity and confident energy of ${faceIdentityRef}. ` +
             `She leans slightly toward the camera lens with sparkling eyes and delivers the closing line with irresistible charm: "${part3_roman}". ` +
-            `Her lip movements and natural expressions match perfectly to the syllables and cadence of @Audio1. ` +
+            `Her lip movements and natural expressions match perfectly to the syllables and cadence of #Audio1. ` +
             `She finishes with a bright, unforgettable smile directly into the lens — leaving no doubt about what to do next. ` +
-            `Warm golden-hour glow, soft property bokeh background, handheld micro-movement, natural skin texture. Confident, witty, memorable.`;
+            `Warm, soft property bokeh background, handheld micro-movement, natural skin texture. Confident, witty, memorable.`;
 
           send({ type: "seedance_prompt_ready", introPrompt, walkthroughPrompt, ctaPrompt, message: "All 3 Seedance prompts ready." });
 

@@ -10,8 +10,6 @@ import {
   Download,
   RotateCcw,
   ExternalLink,
-  Play,
-  Pause,
   Mic,
   Video,
   User,
@@ -19,11 +17,48 @@ import {
   FileText,
   Zap,
   Building2,
+  Film,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { compressImage } from "@/utils/compress-image";
-import { combineVideos, uploadCombinedVideo, concatWithAudio } from "@/lib/video-combiner";
+import { Player } from "@remotion/player";
+import { SeedanceReelComposition } from "@/lib/remotion/SeedanceReelComposition";
+import { calcDurationInFrames } from "@/lib/remotion/duration";
+
+/** Probe audio duration via browser <audio> element (header only, no full download). */
+async function getAudioDuration(url) {
+  return new Promise((resolve) => {
+    if (!url) return resolve(0);
+    const audio = new Audio();
+    audio.addEventListener("loadedmetadata", () => {
+      const dur = isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0;
+      audio.src = "";
+      resolve(dur);
+    });
+    audio.addEventListener("error", () => resolve(0));
+    audio.crossOrigin = "anonymous";
+    audio.preload = "metadata";
+    audio.src = url;
+  });
+}
+
+/** Probe video duration via browser <video> element (header only, no full download). */
+async function getVideoDuration(url) {
+  return new Promise((resolve) => {
+    if (!url) return resolve(0);
+    const video = document.createElement("video");
+    video.addEventListener("loadedmetadata", () => {
+      const dur = isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
+      video.src = "";
+      resolve(dur);
+    });
+    video.addEventListener("error", () => resolve(0));
+    video.crossOrigin = "anonymous";
+    video.preload = "metadata";
+    video.src = url;
+  });
+}
 
 const STATUS = {
   IDLE:      "idle",
@@ -40,7 +75,7 @@ const STAGE_LABELS = {
   [STATUS.SPLITTING]: "Splitting script into 3 parts…",
   [STATUS.VOICES]:    "Generating voiceovers for all 3 parts…",
   [STATUS.SEEDANCE]:  "Generating 3 videos in parallel (Seedance 2.0)…",
-  [STATUS.COMBINING]: "Assembling final reel (FFmpeg)…",
+  [STATUS.COMBINING]: "Preparing Remotion composition…",
   [STATUS.DONE]:      "Done!",
   [STATUS.ERROR]:     "Error",
 };
@@ -78,7 +113,6 @@ export function GenerationProgress({ generationParams, onReset }) {
   } = generationParams || {};
 
   const [status, setStatus]               = useState(STATUS.IDLE);
-  const [message, setMessage]             = useState("Starting Seedance Reel pipeline…");
   const [error, setError]                 = useState(null);
 
   // Script split state
@@ -93,14 +127,14 @@ export function GenerationProgress({ generationParams, onReset }) {
   const [walkthroughVideoUrl, setWalkthroughVideoUrl] = useState(null);
   const [ctaVideoUrl, setCtaVideoUrl]             = useState(null);
 
-  // Seedance parallel progress: how many of 3 videos are ready
-  const [seedanceDone, setSeedanceDone] = useState(0);
-
   // Final output
-  const [videoUrl, setVideoUrl]           = useState(null);
+  const [videoUrl, setVideoUrl]             = useState(null);
   const [combineProgress, setCombineProgress] = useState("");
-  const [totalDuration, setTotalDuration] = useState(0);
-  const [isPlaying, setIsPlaying]         = useState(false);
+
+  // Remotion composition props (set after all videos + durations are probed)
+  const [compositionProps, setCompositionProps] = useState(null);
+  const [isRendering, setIsRendering]           = useState(false);
+  const [renderProgress, setRenderProgress]     = useState("");
 
   // Seedance waiting UX
   const [seedanceStart, setSeedanceStart]     = useState(null);
@@ -108,7 +142,6 @@ export function GenerationProgress({ generationParams, onReset }) {
   const [tipIndex, setTipIndex]               = useState(0);
   const [fakeBonus, setFakeBonus]             = useState(0);
 
-  const videoRef   = useRef(null);
   const hasStarted = useRef(false);
 
   // Elapsed timer for SEEDANCE stage
@@ -155,13 +188,12 @@ export function GenerationProgress({ generationParams, onReset }) {
 
   const startPipeline = async () => {
     setStatus(STATUS.IDLE);
-    setMessage("Starting pipeline…");
     setError(null);
     setPart1(""); setPart2(""); setPart3Cta("");
     setPart1AudioUrl(null); setPart2AudioUrl(null);
     setAvatarVideoUrl(null); setWalkthroughVideoUrl(null); setCtaVideoUrl(null);
-    setSeedanceDone(0);
     setVideoUrl(null);
+    setCompositionProps(null);
     setFakeBonus(0);
 
     try {
@@ -217,8 +249,6 @@ export function GenerationProgress({ generationParams, onReset }) {
   };
 
   const handleEvent = useCallback((event) => {
-    if (event.message) setMessage(event.message);
-
     switch (event.type) {
       case "script_splitting":
       case "script_adapting":
@@ -252,19 +282,16 @@ export function GenerationProgress({ generationParams, onReset }) {
 
       case "seedance_done":
         setAvatarVideoUrl(event.avatarVideoUrl);
-        setSeedanceDone(n => n + 1);
         toast.success("Intro avatar video ready!");
         break;
 
       case "walkthrough_done":
         setWalkthroughVideoUrl(event.walkthroughVideoUrl);
-        setSeedanceDone(n => n + 1);
         toast.success("Property walkthrough ready!");
         break;
 
       case "seedance_cta_done":
         setCtaVideoUrl(event.ctaVideoUrl);
-        setSeedanceDone(n => n + 1);
         toast.success("CTA avatar video ready!");
         break;
 
@@ -273,12 +300,10 @@ export function GenerationProgress({ generationParams, onReset }) {
         break;
 
       case "uploading":
-        setMessage(event.message || "Saving…");
         break;
 
       case "video_ready":
-        setTotalDuration(event.totalDuration || 0);
-        triggerCombine(
+        prepareComposition(
           event.avatarVideoUrl,
           event.walkthroughVideoUrl,
           event.ctaVideoUrl,
@@ -298,74 +323,90 @@ export function GenerationProgress({ generationParams, onReset }) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   /**
-   * Two-step final assembly:
-   *   Step 1 — combineVideos([walkthroughUrl], { fullAudioUrl: part2TTS })
-   *             → walkthrough video with ElevenLabs Part 2 voiceover baked in
-   *   Step 2 — concatWithAudio([avatarVideoUrl, walkthroughBlobUrl, ctaVideoUrl])
-   *             → preserves Seedance-baked audio for intro + CTA
+   * After all 3 Seedance videos are ready, probe their durations and
+   * build the Remotion composition props for immediate preview.
+   *
+   * brollClips shape: Array<{ url, videoDuration, segmentDuration }>
+   *   segmentDuration = how long to display the clip (= Part 2 audio duration for 1 clip)
+   *   playbackRate is computed inside the composition: min(1, videoDuration / segmentDuration)
+   *   so a 12s clip filling a 25s segment plays at 0.48× speed (luxury slow-motion)
    */
-  const triggerCombine = async (avUrl, wtUrl, ctaUrl, p2Audio) => {
-    const clips = [avUrl, wtUrl, ctaUrl].filter(Boolean);
-    if (clips.length === 0) {
+  const prepareComposition = async (avUrl, wtUrl, ctaUrl, p2Audio) => {
+    if (![avUrl, wtUrl, ctaUrl].some(Boolean)) {
       setStatus(STATUS.ERROR);
       setError("No videos were generated. Check server logs.");
       return;
     }
 
     setStatus(STATUS.COMBINING);
-    setCombineProgress("Preparing assembly…");
+    setCombineProgress("Probing video durations for Remotion composition…");
 
     try {
-      let walkthroughBlobUrl = wtUrl;
+      const [avatarDur, walkthroughVideoDur, ctaDur, part2AudioDur] = await Promise.all([
+        getVideoDuration(avUrl),
+        getVideoDuration(wtUrl),
+        getVideoDuration(ctaUrl),
+        getAudioDuration(p2Audio),
+      ]);
 
-      // Step 1: Overlay Part 2 TTS onto the walkthrough (which has no baked audio)
-      if (wtUrl && p2Audio) {
-        setCombineProgress("Step 1/2 — Mixing voiceover into walkthrough…");
-        const { blob: wtBlob } = await combineVideos([wtUrl], {
-          onProgress: (msg) => setCombineProgress(`Step 1/2 — ${msg}`),
-          fullAudioUrl: p2Audio,
-        });
-        walkthroughBlobUrl = URL.createObjectURL(wtBlob);
-      }
+      const avatarDuration = avatarDur > 0 ? avatarDur : 15;
+      const ctaDuration    = ctaDur > 0 ? ctaDur : 10;
 
-      // Build the ordered concat list (only include available clips)
-      const toConcat = [avUrl, walkthroughBlobUrl, ctaUrl].filter(Boolean);
+      // segmentDuration = full Part 2 audio length — the clip will be slowed to fill it
+      const videoDuration   = walkthroughVideoDur > 0 ? walkthroughVideoDur : 12;
+      const segmentDuration = part2AudioDur > 0 ? part2AudioDur : videoDuration;
 
-      if (toConcat.length === 1) {
-        // Only one segment — serve directly
-        setVideoUrl(toConcat[0]);
-        setStatus(STATUS.DONE);
-        toast.success("🎬 Video ready!");
-        return;
-      }
+      const brollClips = wtUrl
+        ? [{ url: wtUrl, videoDuration, segmentDuration }]
+        : [];
 
-      // Step 2: Concat all segments — concatWithAudio re-encodes to baseline for Apple devices
-      setCombineProgress("Step 2/2 — Joining intro + walkthrough + CTA…");
-      const { blobUrl, blob } = await concatWithAudio(toConcat, {
-        onProgress: (msg) => setCombineProgress(`Step 2/2 — ${msg}`),
+      const props = {
+        avatarVideoUrl: avUrl  || "",
+        brollClips,
+        ctaVideoUrl:    ctaUrl || "",
+        part2AudioUrl:  p2Audio || "",
+        avatarDuration,
+        ctaDuration,
+        ctaText: part3Cta || "",
+      };
+
+      setCompositionProps(props);
+      setStatus(STATUS.DONE);
+      toast.success("🎬 Preview ready — watch below, then render for download!");
+    } catch (err) {
+      console.error("[GenerationProgress] prepareComposition failed:", err);
+      setStatus(STATUS.ERROR);
+      setError(`Composition prep failed: ${err.message}`);
+    }
+  };
+
+  /** Call the server-side Remotion render route and get a final MP4 URL. */
+  const renderWithRemotion = async () => {
+    if (!compositionProps) return;
+    setIsRendering(true);
+    setRenderProgress("Starting Remotion render (server-side)…");
+
+    try {
+      const res = await fetch("/api/seedance-reel/render-remotion", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(compositionProps),
       });
 
-      setCombineProgress("Saving final reel…");
-      try {
-        const { url } = await uploadCombinedVideo(blob, `seedance-reel-${Date.now()}.mp4`);
-        setVideoUrl(url);
-      } catch {
-        setVideoUrl(blobUrl);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Render error ${res.status}`);
       }
 
-      setStatus(STATUS.DONE);
-      toast.success("🎬 Seedance Reel assembled! Ready to download.");
+      const { url } = await res.json();
+      setVideoUrl(url);
+      toast.success("🎬 Final video rendered and saved!");
     } catch (err) {
-      console.error("[GenerationProgress] Combine failed:", err);
-      const fallback = avUrl || ctaUrl || wtUrl;
-      if (fallback) {
-        setVideoUrl(fallback);
-        setStatus(STATUS.DONE);
-        toast.warning("Auto-combine failed — showing best available clip.");
-      } else {
-        setStatus(STATUS.ERROR);
-        setError(`Combine failed: ${err.message}`);
-      }
+      console.error("[GenerationProgress] Remotion render failed:", err);
+      toast.error("Render failed", { description: err.message });
+    } finally {
+      setIsRendering(false);
+      setRenderProgress("");
     }
   };
 
@@ -388,16 +429,16 @@ export function GenerationProgress({ generationParams, onReset }) {
       <div className="text-center space-y-1">
         <h2 className="text-2xl font-bold font-heading tracking-tight">
           {status === STATUS.DONE
-            ? "Your Seedance Reel is Ready!"
+            ? "Preview Ready — Render to Download!"
             : status === STATUS.COMBINING
-            ? "Assembling Reel…"
+            ? "Building Remotion Composition…"
             : "Generating Seedance Reel"}
         </h2>
         <p className="text-sm text-muted-foreground">
           {status === STATUS.DONE
-            ? "Saved to your Asset Library"
+            ? "Watch the preview below, then render your final MP4"
             : status === STATUS.COMBINING
-            ? combineProgress || "Combining clips with FFmpeg WASM…"
+            ? combineProgress || "Probing durations and preparing Remotion Player…"
             : STAGE_LABELS[status] || "Processing…"}
         </p>
       </div>
@@ -539,7 +580,7 @@ export function GenerationProgress({ generationParams, onReset }) {
               { label: "Intro Avatar", url: avatarVideoUrl,      icon: User      },
               { label: "Walkthrough",  url: walkthroughVideoUrl, icon: Building2 },
               { label: "CTA Avatar",   url: ctaVideoUrl,         icon: Sparkles  },
-            ].map(({ label, url, icon: Icon }) => (
+            ].map(({ label, url }) => (
               <div key={label} className={`rounded-xl border p-2.5 flex flex-col items-center gap-1.5 transition-all ${
                 url
                   ? "border-emerald-300/60 bg-emerald-50/60 dark:border-emerald-700/30 dark:bg-emerald-900/20"
@@ -625,66 +666,100 @@ export function GenerationProgress({ generationParams, onReset }) {
         </div>
       )}
 
-      {/* ── Final video ────────────────────────────────────────────────────── */}
-      {status === STATUS.DONE && videoUrl && (
+      {/* ── Remotion Player preview (shown as soon as all videos are ready) ── */}
+      {status === STATUS.DONE && compositionProps && (
         <div className="space-y-4">
-          <div className="relative rounded-3xl overflow-hidden border border-border/50 bg-black aspect-9/16 max-w-xs mx-auto shadow-2xl">
-            <video
-              ref={videoRef}
-              src={videoUrl}
-              className="w-full h-full object-contain"
+          {/* Player */}
+          <div className="rounded-3xl overflow-hidden border border-border/50 bg-black shadow-2xl max-w-xs mx-auto">
+            <Player
+              component={SeedanceReelComposition}
+              inputProps={compositionProps}
+              durationInFrames={calcDurationInFrames({
+                avatarDuration: compositionProps.avatarDuration,
+                brollClips:     compositionProps.brollClips,
+                ctaDuration:    compositionProps.ctaDuration,
+              })}
+              compositionWidth={1080}
+              compositionHeight={1920}
+              fps={30}
+              style={{ width: "100%", aspectRatio: "9/16" }}
+              controls
               loop
-              playsInline
-              onPlay={() => setIsPlaying(true)}
-              onPause={() => setIsPlaying(false)}
+              clickToPlay
             />
-            <button
-              onClick={() => { if (!videoRef.current) return; isPlaying ? videoRef.current.pause() : videoRef.current.play(); }}
-              className="absolute inset-0 flex items-center justify-center group"
-            >
-              <div className={`w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center transition-opacity ${isPlaying ? "opacity-0 group-hover:opacity-100" : "opacity-100"}`}>
-                {isPlaying ? <Pause className="w-6 h-6 text-white" /> : <Play className="w-6 h-6 text-white ml-1" />}
-              </div>
-            </button>
-            {totalDuration > 0 && (
-              <div className="absolute bottom-3 left-3 bg-black/60 rounded-lg px-2 py-1 text-[10px] text-white font-medium backdrop-blur-sm">
-                ~{totalDuration}s
-              </div>
-            )}
           </div>
 
-          <div className="flex gap-2 flex-wrap justify-center">
-            <Button onClick={handleDownload} className="gradient-bg text-white hover:opacity-90 shadow-lg gap-2 px-5">
-              <Download className="w-4 h-4" />
-              Download Video
-            </Button>
-            <Button variant="outline" onClick={() => window.open(videoUrl, "_blank")} className="gap-2 px-4">
-              <ExternalLink className="w-4 h-4" />
-              Open in Tab
-            </Button>
-          </div>
-
-          <div className="text-center">
-            <p className="text-[11px] text-muted-foreground flex items-center justify-center gap-1.5">
-              <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-              Saved to your Asset Library automatically
-            </p>
-          </div>
-
+          {/* Stats row */}
           <div className="rounded-2xl border border-border/50 bg-muted/10 p-4 grid grid-cols-3 divide-x divide-border/30 text-center">
             <div>
               <p className="text-[10px] text-muted-foreground">Structure</p>
-              <p className="text-sm font-bold text-primary">3 Parts</p>
+              <p className="text-sm font-bold text-primary">5 Parts</p>
             </div>
             <div>
               <p className="text-[10px] text-muted-foreground">Est. Duration</p>
-              <p className="text-xl font-bold text-primary">~37s</p>
+              <p className="text-xl font-bold text-primary">
+                ~{Math.round(
+                  3 + compositionProps.avatarDuration +
+                  (compositionProps.brollClips?.reduce((s, c) => s + c.segmentDuration, 0) || 0) +
+                  compositionProps.ctaDuration + 3
+                )}s
+              </p>
             </div>
             <div>
               <p className="text-[10px] text-muted-foreground">Engine</p>
-              <p className="text-sm font-bold text-primary">Seedance 2</p>
+              <p className="text-sm font-bold text-primary">Remotion</p>
             </div>
           </div>
+
+          {/* Render + Download row */}
+          {videoUrl ? (
+            <div className="space-y-3">
+              <div className="text-center">
+                <p className="text-[11px] text-muted-foreground flex items-center justify-center gap-1.5">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                  Final MP4 rendered and saved to your Asset Library
+                </p>
+              </div>
+              <div className="flex gap-2 flex-wrap justify-center">
+                <Button onClick={handleDownload} className="gradient-bg text-white hover:opacity-90 shadow-lg gap-2 px-5">
+                  <Download className="w-4 h-4" />
+                  Download Video
+                </Button>
+                <Button variant="outline" onClick={() => window.open(videoUrl, "_blank")} className="gap-2 px-4">
+                  <ExternalLink className="w-4 h-4" />
+                  Open in Tab
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-[11px] text-center text-muted-foreground">
+                Preview looks good? Render the final MP4 with intro &amp; outro animations.
+              </p>
+              <div className="flex justify-center">
+                <Button
+                  onClick={renderWithRemotion}
+                  disabled={isRendering}
+                  className="gradient-bg text-white hover:opacity-90 shadow-lg gap-2 px-6"
+                >
+                  {isRendering
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Rendering…</>
+                    : <><Film className="w-4 h-4" /> Render Final Video</>
+                  }
+                </Button>
+              </div>
+              {isRendering && renderProgress && (
+                <p className="text-[11px] text-center text-muted-foreground animate-pulse">
+                  {renderProgress}
+                </p>
+              )}
+              {isRendering && (
+                <p className="text-[10px] text-center text-muted-foreground/60">
+                  Server-side rendering… this takes 1–3 minutes. Keep this tab open.
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="flex justify-center pt-2">
             <Button variant="ghost" onClick={onReset} className="gap-2 text-muted-foreground text-sm">

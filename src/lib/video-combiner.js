@@ -90,7 +90,7 @@ function getWavDurationSeconds(data) {
  * @returns {Promise<{ blobUrl: string, blob: Blob }>}
  */
 export async function combineVideos(videoUrls, options = {}) {
-  const { onProgress, onLog, durations, audioUrls, fullAudioUrl } = options;
+  const { onProgress, onLog, durations, audioUrls, fullAudioUrl, videoSpeedFactor } = options;
   const logs = [];
 
   const internalLog = (msg) => {
@@ -162,9 +162,10 @@ export async function combineVideos(videoUrls, options = {}) {
           // target duration — Hailuo clips are typically 5–8s but Part 2 audio can be 30–40s.
           await ffmpeg.writeFile(`raw${i}.mp4`, data);
           const targetDur = durations?.[i];
+          const slowFactor = videoSpeedFactor && videoSpeedFactor > 1.05 ? videoSpeedFactor : 1;
+
           if (targetDur) {
             internalLog(`Looping clip ${i + 1} to fill ${targetDur}s...`);
-            // -stream_loop -1 loops indefinitely; -t stops at targetDur; re-encode for clean timestamps
             await ffmpeg.exec([
               "-stream_loop", "-1",
               "-i", `raw${i}.mp4`,
@@ -179,6 +180,23 @@ export async function combineVideos(videoUrls, options = {}) {
               `input${i}.mp4`,
             ]);
             internalLog(`Clip ${i + 1} looped to ${targetDur}s.`);
+          } else if (slowFactor > 1.05) {
+            // Slow the video down so it fills the Part 2 audio duration exactly.
+            // setpts=N*PTS where N>1 stretches time (N=2 → half speed).
+            internalLog(`Slowing clip ${i + 1} by ${slowFactor.toFixed(3)}× (setpts)...`);
+            await ffmpeg.exec([
+              "-i", `raw${i}.mp4`,
+              "-vf", `setpts=${slowFactor.toFixed(6)}*PTS`,
+              "-c:v", "libx264",
+              "-preset", "ultrafast",
+              "-profile:v", "baseline",
+              "-level", "3.1",
+              "-pix_fmt", "yuv420p",
+              "-movflags", "+faststart",
+              "-an",
+              `input${i}.mp4`,
+            ]);
+            internalLog(`Clip ${i + 1} slowed to ${slowFactor.toFixed(2)}×.`);
           } else {
             internalLog(`Stripping audio from clip ${i + 1}...`);
             await ffmpeg.exec([
