@@ -1,15 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   Loader2,
   CheckCircle2,
   AlertCircle,
   Clock,
   Clapperboard,
-  Download,
   RotateCcw,
-  ExternalLink,
   Mic,
   Video,
   User,
@@ -17,14 +16,10 @@ import {
   FileText,
   Zap,
   Building2,
-  Film,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { compressImage } from "@/utils/compress-image";
-import { Player } from "@remotion/player";
-import { SeedanceReelComposition } from "@/lib/remotion/SeedanceReelComposition";
-import { calcDurationInFrames } from "@/lib/remotion/duration";
 
 /** Probe audio duration via browser <audio> element (header only, no full download). */
 async function getAudioDuration(url) {
@@ -103,7 +98,8 @@ function formatElapsed(secs) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-export function GenerationProgress({ generationParams, onReset }) {
+export function GenerationProgress({ generationParams }) {
+  const router = useRouter();
   const {
     script       = "",
     voiceId      = "21m00Tcm4TlvDq8ikWAM",
@@ -127,14 +123,7 @@ export function GenerationProgress({ generationParams, onReset }) {
   const [walkthroughVideoUrl, setWalkthroughVideoUrl] = useState(null);
   const [ctaVideoUrl, setCtaVideoUrl]             = useState(null);
 
-  // Final output
-  const [videoUrl, setVideoUrl]             = useState(null);
   const [combineProgress, setCombineProgress] = useState("");
-
-  // Remotion composition props (set after all videos + durations are probed)
-  const [compositionProps, setCompositionProps] = useState(null);
-  const [isRendering, setIsRendering]           = useState(false);
-  const [renderProgress, setRenderProgress]     = useState("");
 
   // Seedance waiting UX
   const [seedanceStart, setSeedanceStart]     = useState(null);
@@ -192,8 +181,6 @@ export function GenerationProgress({ generationParams, onReset }) {
     setPart1(""); setPart2(""); setPart3Cta("");
     setPart1AudioUrl(null); setPart2AudioUrl(null);
     setAvatarVideoUrl(null); setWalkthroughVideoUrl(null); setCtaVideoUrl(null);
-    setVideoUrl(null);
-    setCompositionProps(null);
     setFakeBonus(0);
 
     try {
@@ -370,55 +357,15 @@ export function GenerationProgress({ generationParams, onReset }) {
         ctaText: part3Cta || "",
       };
 
-      setCompositionProps(props);
+      sessionStorage.setItem("seedance_composition", JSON.stringify(props));
       setStatus(STATUS.DONE);
-      toast.success("🎬 Preview ready — watch below, then render for download!");
+      toast.success("🎬 Reel ready! Opening editor…");
+      router.push("/app/seedance-reel/edit");
     } catch (err) {
       console.error("[GenerationProgress] prepareComposition failed:", err);
       setStatus(STATUS.ERROR);
       setError(`Composition prep failed: ${err.message}`);
     }
-  };
-
-  /** Call the server-side Remotion render route and get a final MP4 URL. */
-  const renderWithRemotion = async () => {
-    if (!compositionProps) return;
-    setIsRendering(true);
-    setRenderProgress("Starting Remotion render (server-side)…");
-
-    try {
-      const res = await fetch("/api/seedance-reel/render-remotion", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(compositionProps),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `Render error ${res.status}`);
-      }
-
-      const { url } = await res.json();
-      setVideoUrl(url);
-      toast.success("🎬 Final video rendered and saved!");
-    } catch (err) {
-      console.error("[GenerationProgress] Remotion render failed:", err);
-      toast.error("Render failed", { description: err.message });
-    } finally {
-      setIsRendering(false);
-      setRenderProgress("");
-    }
-  };
-
-  const handleDownload = () => {
-    if (!videoUrl) return;
-    const a = document.createElement("a");
-    a.href = videoUrl;
-    a.download = `seedance-reel-${Date.now()}.mp4`;
-    a.target = "_blank";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
   };
 
   const isGenerating = ![STATUS.DONE, STATUS.ERROR, STATUS.IDLE].includes(status);
@@ -429,14 +376,14 @@ export function GenerationProgress({ generationParams, onReset }) {
       <div className="text-center space-y-1">
         <h2 className="text-2xl font-bold font-heading tracking-tight">
           {status === STATUS.DONE
-            ? "Preview Ready — Render to Download!"
+            ? "Opening Editor…"
             : status === STATUS.COMBINING
             ? "Building Remotion Composition…"
             : "Generating Seedance Reel"}
         </h2>
         <p className="text-sm text-muted-foreground">
           {status === STATUS.DONE
-            ? "Watch the preview below, then render your final MP4"
+            ? "Taking you to the edit page"
             : status === STATUS.COMBINING
             ? combineProgress || "Probing durations and preparing Remotion Player…"
             : STAGE_LABELS[status] || "Processing…"}
@@ -666,107 +613,11 @@ export function GenerationProgress({ generationParams, onReset }) {
         </div>
       )}
 
-      {/* ── Remotion Player preview (shown as soon as all videos are ready) ── */}
-      {status === STATUS.DONE && compositionProps && (
-        <div className="space-y-4">
-          {/* Player */}
-          <div className="rounded-3xl overflow-hidden border border-border/50 bg-black shadow-2xl max-w-xs mx-auto">
-            <Player
-              component={SeedanceReelComposition}
-              inputProps={compositionProps}
-              durationInFrames={calcDurationInFrames({
-                avatarDuration: compositionProps.avatarDuration,
-                brollClips:     compositionProps.brollClips,
-                ctaDuration:    compositionProps.ctaDuration,
-              })}
-              compositionWidth={1080}
-              compositionHeight={1920}
-              fps={30}
-              style={{ width: "100%", aspectRatio: "9/16" }}
-              controls
-              loop
-              clickToPlay
-            />
-          </div>
-
-          {/* Stats row */}
-          <div className="rounded-2xl border border-border/50 bg-muted/10 p-4 grid grid-cols-3 divide-x divide-border/30 text-center">
-            <div>
-              <p className="text-[10px] text-muted-foreground">Structure</p>
-              <p className="text-sm font-bold text-primary">5 Parts</p>
-            </div>
-            <div>
-              <p className="text-[10px] text-muted-foreground">Est. Duration</p>
-              <p className="text-xl font-bold text-primary">
-                ~{Math.round(
-                  3 + compositionProps.avatarDuration +
-                  (compositionProps.brollClips?.reduce((s, c) => s + c.segmentDuration, 0) || 0) +
-                  compositionProps.ctaDuration + 3
-                )}s
-              </p>
-            </div>
-            <div>
-              <p className="text-[10px] text-muted-foreground">Engine</p>
-              <p className="text-sm font-bold text-primary">Remotion</p>
-            </div>
-          </div>
-
-          {/* Render + Download row */}
-          {videoUrl ? (
-            <div className="space-y-3">
-              <div className="text-center">
-                <p className="text-[11px] text-muted-foreground flex items-center justify-center gap-1.5">
-                  <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                  Final MP4 rendered and saved to your Asset Library
-                </p>
-              </div>
-              <div className="flex gap-2 flex-wrap justify-center">
-                <Button onClick={handleDownload} className="gradient-bg text-white hover:opacity-90 shadow-lg gap-2 px-5">
-                  <Download className="w-4 h-4" />
-                  Download Video
-                </Button>
-                <Button variant="outline" onClick={() => window.open(videoUrl, "_blank")} className="gap-2 px-4">
-                  <ExternalLink className="w-4 h-4" />
-                  Open in Tab
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <p className="text-[11px] text-center text-muted-foreground">
-                Preview looks good? Render the final MP4 with intro &amp; outro animations.
-              </p>
-              <div className="flex justify-center">
-                <Button
-                  onClick={renderWithRemotion}
-                  disabled={isRendering}
-                  className="gradient-bg text-white hover:opacity-90 shadow-lg gap-2 px-6"
-                >
-                  {isRendering
-                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Rendering…</>
-                    : <><Film className="w-4 h-4" /> Render Final Video</>
-                  }
-                </Button>
-              </div>
-              {isRendering && renderProgress && (
-                <p className="text-[11px] text-center text-muted-foreground animate-pulse">
-                  {renderProgress}
-                </p>
-              )}
-              {isRendering && (
-                <p className="text-[10px] text-center text-muted-foreground/60">
-                  Server-side rendering… this takes 1–3 minutes. Keep this tab open.
-                </p>
-              )}
-            </div>
-          )}
-
-          <div className="flex justify-center pt-2">
-            <Button variant="ghost" onClick={onReset} className="gap-2 text-muted-foreground text-sm">
-              <RotateCcw className="w-4 h-4" />
-              Create Another Reel
-            </Button>
-          </div>
+      {/* Done — navigating to editor automatically */}
+      {status === STATUS.DONE && (
+        <div className="flex flex-col items-center gap-3 py-6">
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Redirecting to editor…</p>
         </div>
       )}
     </div>
