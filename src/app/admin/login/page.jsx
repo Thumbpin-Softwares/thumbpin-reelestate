@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Shield,
+  RectangleGoggles,
   Eye,
   EyeOff,
   Lock,
@@ -48,15 +48,15 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-sm bg-white border border-neutral-200/80 rounded-2xl shadow-sm p-8">
+    <div className="min-h-screen bg-[#f5f6f0] flex items-center justify-center p-4">
+      <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl p-8">
         {/* Logo */}
-        <div className="flex items-center justify-center gap-2.5 mb-8">
-          <div className="w-9 h-9 rounded-lg bg-neutral-900 flex items-center justify-center">
-            <Shield className="w-4.5 h-4.5 text-white" />
+        <div className="flex items-center justify-center gap-2.5 mb-4">
+          <div className="w-10 h-10 rounded-full bg-neutral-900 flex items-center justify-center">
+            <RectangleGoggles className="w-5 h-5 text-[#c7f038]" />
           </div>
           <span className="text-neutral-900 font-semibold tracking-tight">
-            ThumbpinVids
+            ThumbGram
           </span>
         </div>
 
@@ -66,14 +66,14 @@ export default function AdminLoginPage() {
             Sign in to admin
           </h1>
           <p className="text-neutral-500 text-sm">
-            Enter your credentials to access the dashboard
+            Enter your credentials to access the panel
           </p>
         </div>
 
         {/* Error */}
         {error && (
           <div className="flex items-center gap-2.5 text-red-700 text-sm bg-red-50 border border-red-200/80 rounded-xl px-4 py-3 mb-5">
-            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            <AlertCircle className="w-4 h-4 shrink-0" />
             {error}
           </div>
         )}
@@ -95,7 +95,7 @@ export default function AdminLoginPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@adoraai.com"
+                placeholder="admin-user@admin.com"
                 required
                 className="w-full bg-white border border-neutral-200 rounded-xl pl-11 pr-4 py-2.5 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-neutral-400 focus:ring-2 focus:ring-neutral-100 transition-all"
               />
@@ -111,12 +111,6 @@ export default function AdminLoginPage() {
               >
                 Password
               </label>
-              <button
-                type="button"
-                className="text-xs font-medium text-neutral-500 hover:text-neutral-900 transition-colors"
-              >
-                Forgot password?
-              </button>
             </div>
             <div className="relative">
               <Lock className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
@@ -148,7 +142,7 @@ export default function AdminLoginPage() {
             id="admin-login-submit"
             type="submit"
             disabled={loading}
-            className="w-full bg-neutral-900 hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-xl text-sm transition-all duration-200 hover:shadow-lg hover:shadow-neutral-900/10 active:scale-[0.98] mt-1"
+            className="w-full bg-[#c7f038] hover:bg-[#c7f038] text-black disabled:opacity-40 disabled:cursor-not-allowed font-semibold py-3 rounded-lg text-sm transition-all duration-300 hover:scale-105 mt-2"
           >
             {loading ? (
               <span className="flex items-center justify-center gap-2">
@@ -178,17 +172,6 @@ export default function AdminLoginPage() {
             )}
           </button>
         </form>
-
-        {/* Footer */}
-        <p className="text-center text-neutral-400 text-xs mt-6">
-          Don&apos;t have access?{" "}
-          <button
-            type="button"
-            className="font-medium text-neutral-900 hover:underline underline-offset-2"
-          >
-            Contact support
-          </button>
-        </p>
       </div>
     </div>
   );

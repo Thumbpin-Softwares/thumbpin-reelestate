@@ -75,18 +75,15 @@ export default function AdminLayout({ children }) {
 
       {/* Sidebar */}
       <aside
-        className={`fixed md:sticky top-0 left-0 h-screen w-58 bg-white border-r border-gray-200 flex flex-col z-50 transition-transform duration-300 ${
+        className={`fixed md:sticky top-0 left-0 h-screen w-58 bg-[#f5efe8] border-r border-gray-200 flex flex-col z-50 transition-transform duration-300 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         }`}
       >
         {/* Brand */}
         <div className="p-5 border-b border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gray-900 border border-gray-900 flex items-center justify-center shadow-sm">
-              <Shield className="w-4.5 h-4.5 text-white" />
-            </div>
             <div>
-              <p className="text-gray-900 text-sm font-bold font-heading leading-none">
+              <p className="text-black font-semibold font-heading leading-none">
                 Admin Panel
               </p>
             </div>
