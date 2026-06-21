@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-config";
 import Asset from "@/models/Asset";
+import SeedanceJob from "@/models/SeedanceJob";
 import dbConnect from "@/lib/mongodb";
 import { uploadToR2, buildUserKey } from "@/lib/r2-upload";
 import { R2_PUBLIC_URL } from "@/lib/r2";
@@ -98,9 +99,21 @@ export async function POST(request) {
     const script = (formData.get("script") || "").toString().trim();
     const voiceId = (formData.get("voiceId") || "21m00Tcm4TlvDq8ikWAM").toString();
     const language = (formData.get("language") || "english").toString();
+    const jobId = (formData.get("jobId") || "").toString().trim();
 
     if (!script || script.length < 30) {
       return NextResponse.json({ error: "script is required (min 30 chars)" }, { status: 400 });
+    }
+    if (!jobId) {
+      return NextResponse.json({ error: "jobId is required" }, { status: 400 });
+    }
+
+    // Idempotency guard: refuse a duplicate POST for a jobId that's already
+    // running/finished — prevents a stray double-fire from double-billing credits.
+    await dbConnect();
+    const existingJob = await SeedanceJob.findOne({ jobId }).lean();
+    if (existingJob) {
+      return NextResponse.json({ error: "Job already exists", jobId }, { status: 409 });
     }
 
     // Collect avatar URLs — handle full https:// and relative /api/r2?key= proxy URLs
@@ -141,6 +154,10 @@ export async function POST(request) {
     }
     debit = creditResult.debit;
 
+    // Create the persistent job record now that credits are debited — this is
+    // the source of truth a refreshed tab can reattach to instead of re-POSTing.
+    await SeedanceJob.create({ jobId, userId, status: "running" });
+
     // Upload location images to R2 (9:16 crop for Seedance)
     const locationR2Urls = [];
     await Promise.all(
@@ -164,6 +181,15 @@ export async function POST(request) {
       async start(controller) {
         function send(data) {
           try { controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`)); } catch (_) {}
+        }
+
+        // Persists progress to Mongo so a refreshed/abandoned tab can resume
+        // by polling GET /api/seedance-reel/jobs/:jobId instead of re-POSTing
+        // (which would double-bill credits and double-fire fal generations).
+        async function persistJob(patch) {
+          try { await SeedanceJob.updateOne({ jobId }, { $set: patch }); } catch (e) {
+            console.error("[SeedanceReel] Job persist failed:", e.message);
+          }
         }
 
         const pingInterval = setInterval(() => send({ type: "ping" }), 3000);
@@ -312,6 +338,7 @@ ${part3_cta}`;
           }
 
           send({ type: "script_split", part1, part2, part3_cta, part1Words, part2Words, part3Words });
+          await persistJob({ status: "splitting", part1, part2, part3Cta: part3_cta });
 
           // ── Stage 2: Generate all 3 TTS in parallel ───────────────────────
           send({ type: "voice_generating", message: "Generating voiceovers for all 3 parts in parallel…" });
@@ -331,6 +358,7 @@ ${part3_cta}`;
           else console.error("[SeedanceReel] Part 3 TTS failed:", p3TtsResult.reason?.message);
 
           send({ type: "voice_all_ready", part1AudioUrl, part2AudioUrl, part3AudioUrl });
+          await persistJob({ status: "voices", part1AudioUrl, part2AudioUrl, part3AudioUrl });
 
           // ── Stage 3: Build 3 Seedance prompts ─────────────────────────────
           const numAvatarImages   = avatarUrls.length;
@@ -381,6 +409,7 @@ ${part3_cta}`;
 
           // ── Stage 4: All 3 Seedance calls in parallel ─────────────────────
           send({ type: "seedance_generating", message: "Generating 3 videos in parallel via Seedance 2.0 (takes ~3–7 min)…" });
+          await persistJob({ status: "seedance" });
 
           // Intro: avatar images + all location images; 720p; baked audio
           const introImageUrls = [...avatarUrls.slice(0, 3), ...validLocationUrls];
@@ -431,6 +460,7 @@ ${part3_cta}`;
                 avatarVideoUrl = url;
                 console.log("[SeedanceReel] Intro avatar uploaded:", url);
                 send({ type: "seedance_done", avatarVideoUrl: url, message: "Intro avatar video ready!" });
+                persistJob({ avatarVideoUrl: url });
               })
               .catch(err => {
                 console.error("[SeedanceReel] Intro Seedance failed:", err.message);
@@ -442,6 +472,7 @@ ${part3_cta}`;
                 walkthroughVideoUrl = url;
                 console.log("[SeedanceReel] Walkthrough uploaded:", url);
                 send({ type: "walkthrough_done", walkthroughVideoUrl: url, message: "Architectural walkthrough ready!" });
+                persistJob({ walkthroughVideoUrl: url });
               })
               .catch(err => {
                 console.error("[SeedanceReel] Walkthrough Seedance failed:", err.message);
@@ -453,6 +484,7 @@ ${part3_cta}`;
                 ctaVideoUrl = url;
                 console.log("[SeedanceReel] CTA avatar uploaded:", url);
                 send({ type: "seedance_cta_done", ctaVideoUrl: url, message: "CTA avatar video ready!" });
+                persistJob({ ctaVideoUrl: url });
               })
               .catch(err => {
                 console.error("[SeedanceReel] CTA Seedance failed:", err.message);
@@ -499,6 +531,7 @@ ${part3_cta}`;
             totalDuration,
             message: "All assets ready! Assembling final reel…",
           });
+          await persistJob({ status: "done", avatarVideoUrl, walkthroughVideoUrl, ctaVideoUrl, part2AudioUrl });
 
           send({ type: "done" });
           clearInterval(pingInterval);
@@ -506,6 +539,7 @@ ${part3_cta}`;
         } catch (err) {
           clearInterval(pingInterval);
           console.error("[SeedanceReel] Pipeline error:", err);
+          await persistJob({ status: "error", error: err.message || "Pipeline failed" });
 
           if (userId && debit) {
             await refundCreditsForAction({
