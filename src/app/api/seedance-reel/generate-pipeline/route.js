@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-config";
 import Asset from "@/models/Asset";
+import SeedanceJob from "@/models/SeedanceJob";
 import dbConnect from "@/lib/mongodb";
 import { uploadToR2, buildUserKey } from "@/lib/r2-upload";
 import { R2_PUBLIC_URL } from "@/lib/r2";
@@ -98,9 +99,21 @@ export async function POST(request) {
     const script = (formData.get("script") || "").toString().trim();
     const voiceId = (formData.get("voiceId") || "21m00Tcm4TlvDq8ikWAM").toString();
     const language = (formData.get("language") || "english").toString();
+    const jobId = (formData.get("jobId") || "").toString().trim();
 
     if (!script || script.length < 30) {
       return NextResponse.json({ error: "script is required (min 30 chars)" }, { status: 400 });
+    }
+    if (!jobId) {
+      return NextResponse.json({ error: "jobId is required" }, { status: 400 });
+    }
+
+    // Idempotency guard: refuse a duplicate POST for a jobId that's already
+    // running/finished — prevents a stray double-fire from double-billing credits.
+    await dbConnect();
+    const existingJob = await SeedanceJob.findOne({ jobId }).lean();
+    if (existingJob) {
+      return NextResponse.json({ error: "Job already exists", jobId }, { status: 409 });
     }
 
     // Collect avatar URLs — handle full https:// and relative /api/r2?key= proxy URLs
@@ -141,6 +154,10 @@ export async function POST(request) {
     }
     debit = creditResult.debit;
 
+    // Create the persistent job record now that credits are debited — this is
+    // the source of truth a refreshed tab can reattach to instead of re-POSTing.
+    await SeedanceJob.create({ jobId, userId, status: "running" });
+
     // Upload location images to R2 (9:16 crop for Seedance)
     const locationR2Urls = [];
     await Promise.all(
@@ -166,6 +183,15 @@ export async function POST(request) {
           try { controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`)); } catch (_) {}
         }
 
+        // Persists progress to Mongo so a refreshed/abandoned tab can resume
+        // by polling GET /api/seedance-reel/jobs/:jobId instead of re-POSTing
+        // (which would double-bill credits and double-fire fal generations).
+        async function persistJob(patch) {
+          try { await SeedanceJob.updateOne({ jobId }, { $set: patch }); } catch (e) {
+            console.error("[SeedanceReel] Job persist failed:", e.message);
+          }
+        }
+
         const pingInterval = setInterval(() => send({ type: "ping" }), 3000);
 
         try {
@@ -178,7 +204,8 @@ RULES:
 - Part 1 (AVATAR INTRO ≤35 words): Opening hook. The presenter speaks directly to camera with energy and personality. Must end at a natural sentence boundary.
 - Part 2 (WALKTHROUGH NARRATION ≤80 words): Property highlights. This plays as voiceover behind a smooth architectural walkthrough. Describes rooms, features, lifestyle.
 - Part 3 CTA (≤20 words): Punchy, humorous, memorable call-to-action delivered directly to camera. Make it witty and irresistible.
-- Do NOT change any words — split at natural sentence boundaries only.
+- Do NOT change, add, or remove any words — split at natural sentence boundaries only.
+- You MAY adjust punctuation and emphasis to make the delivery sound more emotional and energetic when spoken aloud: add exclamation marks where there's excitement, ellipses (…) for dramatic pauses, and emphasis on key words. This is punctuation-only — the underlying words and meaning must stay identical.
 - Return ONLY valid JSON, no markdown: {"part1": "...", "part2": "...", "part3_cta": "..."}
 
 SCRIPT:
@@ -238,19 +265,24 @@ ${script}`;
           const NATIVE_SCRIPT_RE = /[ऀ-ൿ؀-ۿ]/;
           const part1HasNativeScript = NATIVE_SCRIPT_RE.test(part1);
 
+          // IMPORTANT: every rule below must keep ALL English words/phrases in Roman —
+          // not just proper nouns/numbers. These scripts are written Hinglish-style
+          // (heavy code-switching), and an incomplete rule lets the LLM phonetically
+          // Devanagari-ize plain English words, which the TTS model then mispronounces
+          // as garbled Hindi — producing choppy, unnatural-sounding narration.
           const nativeScriptRule = {
-            hindi:     "Convert every Hindi/Urdu word to Devanagari script. Keep English brand names, property names, and numbers in Roman.",
+            hindi:     "Convert every Hindi/Urdu word to Devanagari script. Any English word or phrase — not just brand names, property names, and numbers — stays in Roman exactly as written.",
             hinglish:  "Convert every Hindi/Urdu word to Devanagari script. English words stay in Roman exactly as written.",
-            marathi:   "Convert to full Marathi Devanagari script. English proper nouns stay Roman.",
-            bengali:   "Convert to Bengali script (বাংলা). English proper nouns stay Roman.",
-            gujarati:  "Convert to Gujarati script (ગુજરાતી). English proper nouns stay Roman.",
-            punjabi:   "Convert to Gurmukhi script (ਪੰਜਾਬੀ). English proper nouns stay Roman.",
-            urdu:      "Convert to Nastaliq Urdu script. English proper nouns stay Roman.",
-            odia:      "Convert to Odia script (ଓଡ଼ିଆ). English proper nouns stay Roman.",
-            tamil:     "Convert to Tamil script (தமிழ்). English proper nouns stay Roman.",
-            telugu:    "Convert to Telugu script (తెలుగు). English proper nouns stay Roman.",
-            kannada:   "Convert to Kannada script (ಕನ್ನಡ). English proper nouns stay Roman.",
-            malayalam: "Convert to Malayalam script (മലയാളം). English proper nouns stay Roman.",
+            marathi:   "Convert every Marathi word to Devanagari script. Any English word or phrase stays in Roman exactly as written.",
+            bengali:   "Convert every Bengali word to Bengali script (বাংলা). Any English word or phrase stays in Roman exactly as written.",
+            gujarati:  "Convert every Gujarati word to Gujarati script (ગુજરાતી). Any English word or phrase stays in Roman exactly as written.",
+            punjabi:   "Convert every Punjabi word to Gurmukhi script (ਪੰਜਾਬੀ). Any English word or phrase stays in Roman exactly as written.",
+            urdu:      "Convert every Urdu word to Nastaliq Urdu script. Any English word or phrase stays in Roman exactly as written.",
+            odia:      "Convert every Odia word to Odia script (ଓଡ଼ିଆ). Any English word or phrase stays in Roman exactly as written.",
+            tamil:     "Convert every Tamil word to Tamil script (தமிழ்). Any English word or phrase stays in Roman exactly as written.",
+            telugu:    "Convert every Telugu word to Telugu script (తెలుగు). Any English word or phrase stays in Roman exactly as written.",
+            kannada:   "Convert every Kannada word to Kannada script (ಕನ್ನಡ). Any English word or phrase stays in Roman exactly as written.",
+            malayalam: "Convert every Malayalam word to Malayalam script (മലയാളം). Any English word or phrase stays in Roman exactly as written.",
           };
 
           if (language !== "english") {
@@ -278,9 +310,21 @@ ${part3_cta}`;
                 const match = adaptRaw.replace(/^```[a-z]*\n?/i, "").replace(/\n?```$/i, "").trim().match(/\{[\s\S]*\}/);
                 if (match) {
                   const parsed = JSON.parse(match[0]);
-                  if (parsed.part1?.trim().length > 5)     part1_tts = parsed.part1.trim();
-                  if (parsed.part2?.trim().length > 5)     part2_tts = parsed.part2.trim();
-                  if (parsed.part3_cta?.trim().length > 5) part3_tts = parsed.part3_cta.trim();
+                  // All-or-nothing: if any one part fails to convert, applying the
+                  // others alone would leave that one part in raw Roman text while
+                  // its siblings switch to native script — TTS then reads them as
+                  // different languages, producing inconsistent per-part delivery.
+                  const allValid =
+                    parsed.part1?.trim().length > 5 &&
+                    parsed.part2?.trim().length > 5 &&
+                    parsed.part3_cta?.trim().length > 5;
+                  if (allValid) {
+                    part1_tts = parsed.part1.trim();
+                    part2_tts = parsed.part2.trim();
+                    part3_tts = parsed.part3_cta.trim();
+                  } else {
+                    console.warn("[SeedanceReel] Roman→native conversion incomplete — keeping all parts in Roman for consistency:", parsed);
+                  }
                 }
               } catch (adaptErr) {
                 console.warn("[SeedanceReel] Roman→native conversion failed:", adaptErr.message);
@@ -312,6 +356,7 @@ ${part3_cta}`;
           }
 
           send({ type: "script_split", part1, part2, part3_cta, part1Words, part2Words, part3Words });
+          await persistJob({ status: "splitting", part1, part2, part3Cta: part3_cta });
 
           // ── Stage 2: Generate all 3 TTS in parallel ───────────────────────
           send({ type: "voice_generating", message: "Generating voiceovers for all 3 parts in parallel…" });
@@ -331,6 +376,7 @@ ${part3_cta}`;
           else console.error("[SeedanceReel] Part 3 TTS failed:", p3TtsResult.reason?.message);
 
           send({ type: "voice_all_ready", part1AudioUrl, part2AudioUrl, part3AudioUrl });
+          await persistJob({ status: "voices", part1AudioUrl, part2AudioUrl, part3AudioUrl });
 
           // ── Stage 3: Build 3 Seedance prompts ─────────────────────────────
           const numAvatarImages   = avatarUrls.length;
@@ -343,11 +389,11 @@ ${part3_cta}`;
           const locationPhrase    = locationImageRefs ? `into the outdoor entrance area shown in ${locationImageRefs}` : "toward the outdoor entrance";
 
           const introPrompt =
-            `Simple, sleek UGC smartphone vlog footage. The video opens mid-action: #Image1 is already mid-exit from a luxury white car door, one foot on the ground — skip the door opening, start from the step out. ` +
-            `She walks naturally ${locationPhrase}. ` +
+            `Simple, sleek UGC smartphone vlog footage. The very first frame already shows #Image1 halfway exited through a luxury white car door — one leg already out, body partway emerged from the vehicle, frozen at that exact midpoint as the clip begins; skip the door opening and the full exit entirely. ` +
+            `From that first frame she continues exiting and walks naturally ${locationPhrase}, speaking directly to the camera lens the whole time — talking and walking simultaneously, with dialogue starting immediately and never pausing to stand still. ` +
             `Her face matches the exact identity, features, and smile of ${faceIdentityRef}. ` +
-            `She stands in place, looks directly at the camera lens, and speaks the exact following dialogue words: "${part1_roman}". ` +
-            `Her lip movements, mouth openings, and natural facial muscles shape perfectly to the precise spoken syllables, phonetics, and cadence of #Audio1. ` +
+            `While continuously walking toward the camera, she speaks the exact following dialogue words: "${part1_roman}". ` +
+            `Her lip movements, mouth openings, and natural facial muscles shape perfectly to the precise spoken syllables, phonetics, and cadence of #Audio1, synced throughout her walking motion. ` +
             `In the background, bystanders casually walk past the property entrance. ` +
             `Neutral daylight, realistic handheld camera stabilization, natural skin texture with visible pores, and clean, unedited raw video aesthetic.`;
 
@@ -381,6 +427,7 @@ ${part3_cta}`;
 
           // ── Stage 4: All 3 Seedance calls in parallel ─────────────────────
           send({ type: "seedance_generating", message: "Generating 3 videos in parallel via Seedance 2.0 (takes ~3–7 min)…" });
+          await persistJob({ status: "seedance" });
 
           // Intro: avatar images + all location images; 720p; baked audio
           const introImageUrls = [...avatarUrls.slice(0, 3), ...validLocationUrls];
@@ -431,6 +478,7 @@ ${part3_cta}`;
                 avatarVideoUrl = url;
                 console.log("[SeedanceReel] Intro avatar uploaded:", url);
                 send({ type: "seedance_done", avatarVideoUrl: url, message: "Intro avatar video ready!" });
+                persistJob({ avatarVideoUrl: url });
               })
               .catch(err => {
                 console.error("[SeedanceReel] Intro Seedance failed:", err.message);
@@ -442,6 +490,7 @@ ${part3_cta}`;
                 walkthroughVideoUrl = url;
                 console.log("[SeedanceReel] Walkthrough uploaded:", url);
                 send({ type: "walkthrough_done", walkthroughVideoUrl: url, message: "Architectural walkthrough ready!" });
+                persistJob({ walkthroughVideoUrl: url });
               })
               .catch(err => {
                 console.error("[SeedanceReel] Walkthrough Seedance failed:", err.message);
@@ -453,6 +502,7 @@ ${part3_cta}`;
                 ctaVideoUrl = url;
                 console.log("[SeedanceReel] CTA avatar uploaded:", url);
                 send({ type: "seedance_cta_done", ctaVideoUrl: url, message: "CTA avatar video ready!" });
+                persistJob({ ctaVideoUrl: url });
               })
               .catch(err => {
                 console.error("[SeedanceReel] CTA Seedance failed:", err.message);
@@ -499,6 +549,7 @@ ${part3_cta}`;
             totalDuration,
             message: "All assets ready! Assembling final reel…",
           });
+          await persistJob({ status: "done", avatarVideoUrl, walkthroughVideoUrl, ctaVideoUrl, part2AudioUrl });
 
           send({ type: "done" });
           clearInterval(pingInterval);
@@ -506,6 +557,7 @@ ${part3_cta}`;
         } catch (err) {
           clearInterval(pingInterval);
           console.error("[SeedanceReel] Pipeline error:", err);
+          await persistJob({ status: "error", error: err.message || "Pipeline failed" });
 
           if (userId && debit) {
             await refundCreditsForAction({

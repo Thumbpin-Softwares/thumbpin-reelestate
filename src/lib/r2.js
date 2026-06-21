@@ -26,11 +26,15 @@ export const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL || null;
  * - Public assets (Avatars/) → direct CDN URL (zero latency, no Vercel hop)
  * - User assets → presigned URL valid for `expiresIn` seconds (default 1 hour)
  */
-export async function getAssetUrl(key, expiresIn = 3600) {
+export async function getAssetUrl(key, expiresIn = 3600, { contentDisposition } = {}) {
   const PUBLIC_PREFIXES = ["Avatars/", "web-assets/"];
   if (R2_PUBLIC_URL && PUBLIC_PREFIXES.some((p) => key.startsWith(p))) {
     return `${R2_PUBLIC_URL}/${key}`;
   }
-  const command = new GetObjectCommand({ Bucket: BUCKET, Key: key });
+  const command = new GetObjectCommand({
+    Bucket: BUCKET,
+    Key: key,
+    ...(contentDisposition && { ResponseContentDisposition: contentDisposition }),
+  });
   return awsGetSignedUrl(s3, command, { expiresIn });
 }

@@ -42,13 +42,21 @@ export function SeedanceReelComposition({
   avatarDuration = 15,
   ctaDuration    = 10,
   ctaText        = "",
+  // Intro/outro title cards are NOT baked into the generated reel by default —
+  // they're optional, user-editable additions made on the edit page.
+  showIntro      = false,
+  showOutro      = false,
+  introTitle     = "Luxury",
+  introSubtitle  = "Living",
+  introTagline   = "Where Every Detail Matters",
+  outroBrandText = "thumbpin.ai",
 }) {
   const { fps } = useVideoConfig();
 
-  const introFrames  = Math.round(INTRO_S * fps);
+  const introFrames  = showIntro ? Math.round(INTRO_S * fps) : 0;
   const avatarFrames = Math.round(avatarDuration * fps);
   const ctaFrames    = Math.round(ctaDuration * fps);
-  const outroFrames  = Math.round(OUTRO_S * fps);
+  const outroFrames  = showOutro ? Math.round(OUTRO_S * fps) : 0;
 
   // Pre-compute per-clip frame counts and playback rates.
   // rawRate = videoDuration / segmentDuration:
@@ -88,10 +96,12 @@ export function SeedanceReelComposition({
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#000000" }}>
-      {/* 1 — Intro animation (luxury white screen) */}
-      <Sequence from={introAt} durationInFrames={introFrames}>
-        <IntroAnimation />
-      </Sequence>
+      {/* 1 — Intro animation (luxury white screen) — optional, off by default */}
+      {showIntro && (
+        <Sequence from={introAt} durationInFrames={introFrames}>
+          <IntroAnimation title={introTitle} subtitle={introSubtitle} tagline={introTagline} />
+        </Sequence>
+      )}
 
       {/* 2 — Avatar intro (Seedance-baked audio preserved) */}
       {avatarVideoUrl && (
@@ -150,10 +160,12 @@ export function SeedanceReelComposition({
         </Sequence>
       )}
 
-      {/* 5 — Outro animation (luxury white screen + CTA text) */}
-      <Sequence from={outroAt} durationInFrames={outroFrames}>
-        <OutroAnimation ctaText={ctaText} />
-      </Sequence>
+      {/* 5 — Outro animation (luxury white screen + CTA text) — optional, off by default */}
+      {showOutro && (
+        <Sequence from={outroAt} durationInFrames={outroFrames}>
+          <OutroAnimation ctaText={ctaText} brandText={outroBrandText} />
+        </Sequence>
+      )}
     </AbsoluteFill>
   );
 }

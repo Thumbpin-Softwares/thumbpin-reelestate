@@ -6,7 +6,7 @@ import {
   Easing,
 } from "remotion";
 
-export function IntroAnimation() {
+export function IntroAnimation({ title = "Luxury", subtitle = "Living", tagline = "Where Every Detail Matters" }) {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
 
@@ -84,7 +84,7 @@ export function IntroAnimation() {
           textAlign: "center",
         }}
       >
-        Luxury
+        {title}
       </div>
       <div
         style={{
@@ -100,7 +100,7 @@ export function IntroAnimation() {
           marginTop: 4,
         }}
       >
-        Living
+        {subtitle}
       </div>
 
       {/* Thin separator */}
@@ -127,7 +127,7 @@ export function IntroAnimation() {
           textAlign: "center",
         }}
       >
-        Where Every Detail Matters
+        {tagline}
       </div>
     </AbsoluteFill>
   );

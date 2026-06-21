@@ -20,6 +20,7 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { compressImage } from "@/utils/compress-image";
+import { clampBrollClips } from "@/lib/remotion/duration";
 
 /** Probe audio duration via browser <audio> element (header only, no full download). */
 async function getAudioDuration(url) {
@@ -91,6 +92,16 @@ const ORDERED_STAGES = [
   STATUS.SEEDANCE,
   STATUS.COMBINING,
 ];
+
+const JOB_ID_KEY = "seedance_job_id";
+
+const JOB_STATUS_TO_LOCAL = {
+  running:    STATUS.SPLITTING,
+  splitting:  STATUS.SPLITTING,
+  voices:     STATUS.VOICES,
+  seedance:   STATUS.SEEDANCE,
+  combining:  STATUS.COMBINING,
+};
 
 function formatElapsed(secs) {
   const m = Math.floor(secs / 60);
@@ -171,9 +182,66 @@ export function GenerationProgress({ generationParams }) {
   useEffect(() => {
     if (hasStarted.current) return;
     hasStarted.current = true;
-    startPipeline();
+
+    let existingJobId = null;
+    try { existingJobId = sessionStorage.getItem(JOB_ID_KEY); } catch (_) {}
+
+    if (existingJobId) {
+      resumeJob(existingJobId);
+    } else {
+      startPipeline();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /** Re-attach to an already-running (or finished) job instead of re-POSTing,
+   * which would double-bill credits and double-fire the fal/Seedance calls. */
+  const resumeJob = async (jobId) => {
+    setStatus(STATUS.SPLITTING);
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/seedance-reel/jobs/${jobId}`);
+        if (res.status === 404) {
+          // Job record gone (cleared/expired) — nothing to resume from.
+          try { sessionStorage.removeItem(JOB_ID_KEY); } catch (_) {}
+          startPipeline();
+          return;
+        }
+        if (!res.ok) throw new Error(`Resume failed: ${res.status}`);
+
+        const { job } = await res.json();
+        if (job.part1) setPart1(job.part1);
+        if (job.part2) setPart2(job.part2);
+        if (job.part3Cta) setPart3Cta(job.part3Cta);
+        if (job.part1AudioUrl) setPart1AudioUrl(job.part1AudioUrl);
+        if (job.part2AudioUrl) setPart2AudioUrl(job.part2AudioUrl);
+        if (job.avatarVideoUrl) setAvatarVideoUrl(job.avatarVideoUrl);
+        if (job.walkthroughVideoUrl) setWalkthroughVideoUrl(job.walkthroughVideoUrl);
+        if (job.ctaVideoUrl) setCtaVideoUrl(job.ctaVideoUrl);
+
+        if (job.status === "done") {
+          try { sessionStorage.removeItem(JOB_ID_KEY); } catch (_) {}
+          await prepareComposition(job.avatarVideoUrl, job.walkthroughVideoUrl, job.ctaVideoUrl, job.part2AudioUrl);
+          return;
+        }
+        if (job.status === "error") {
+          try { sessionStorage.removeItem(JOB_ID_KEY); } catch (_) {}
+          setStatus(STATUS.ERROR);
+          setError(job.error || "Generation failed");
+          return;
+        }
+
+        if (JOB_STATUS_TO_LOCAL[job.status]) setStatus(JOB_STATUS_TO_LOCAL[job.status]);
+        setTimeout(poll, 3000);
+      } catch (err) {
+        console.error("[GenerationProgress] Resume poll failed:", err);
+        setTimeout(poll, 5000);
+      }
+    };
+
+    poll();
+  };
 
   const startPipeline = async () => {
     setStatus(STATUS.IDLE);
@@ -183,8 +251,12 @@ export function GenerationProgress({ generationParams }) {
     setAvatarVideoUrl(null); setWalkthroughVideoUrl(null); setCtaVideoUrl(null);
     setFakeBonus(0);
 
+    const jobId = crypto.randomUUID();
+    try { sessionStorage.setItem(JOB_ID_KEY, jobId); } catch (_) {}
+
     try {
       const formData = new FormData();
+      formData.append("jobId", jobId);
       formData.append("script", script);
       formData.append("voiceId", voiceId);
       formData.append("language", language);
@@ -229,6 +301,7 @@ export function GenerationProgress({ generationParams }) {
       }
     } catch (err) {
       console.error("[GenerationProgress] Error:", err);
+      try { sessionStorage.removeItem(JOB_ID_KEY); } catch (_) {}
       setStatus(STATUS.ERROR);
       setError(err.message || "Pipeline failed");
       toast.error("Generation failed", { description: err.message });
@@ -299,6 +372,7 @@ export function GenerationProgress({ generationParams }) {
         break;
 
       case "error":
+        try { sessionStorage.removeItem(JOB_ID_KEY); } catch (_) {}
         setStatus(STATUS.ERROR);
         setError(event.message || "Pipeline failed");
         toast.error("Pipeline error", { description: event.message });
@@ -343,9 +417,13 @@ export function GenerationProgress({ generationParams }) {
       const videoDuration   = walkthroughVideoDur > 0 ? walkthroughVideoDur : 12;
       const segmentDuration = part2AudioDur > 0 ? part2AudioDur : videoDuration;
 
-      const brollClips = wtUrl
+      const rawBrollClips = wtUrl
         ? [{ url: wtUrl, videoDuration, segmentDuration }]
         : [];
+
+      // Keep the merged reel at 60s max — the Part 2 voiceover length is the
+      // only elastic part, so it's the one that gets compressed if needed.
+      const brollClips = clampBrollClips({ avatarDuration, brollClips: rawBrollClips, ctaDuration });
 
       const props = {
         avatarVideoUrl: avUrl  || "",
@@ -358,6 +436,8 @@ export function GenerationProgress({ generationParams }) {
       };
 
       sessionStorage.setItem("seedance_composition", JSON.stringify(props));
+      try { sessionStorage.removeItem(JOB_ID_KEY); } catch (_) {}
+      try { sessionStorage.removeItem("seedance_resume"); } catch (_) {}
       setStatus(STATUS.DONE);
       toast.success("🎬 Reel ready! Opening editor…");
       router.push("/app/seedance-reel/edit");

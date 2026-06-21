@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { Loader2 } from "lucide-react";
 import { useAvatars } from "@/modules/ai-walkthrough/hooks/useAvatars";
 import { StepUpload } from "@/modules/seedance-reel/components/StepUpload";
@@ -8,6 +8,7 @@ import { StepScript } from "@/modules/seedance-reel/components/StepScript";
 import { GenerationProgress } from "@/modules/seedance-reel/components/GenerationProgress";
 
 const STEPS = ["Upload & Presenter", "Script", "Generate"];
+const RESUME_KEY = "seedance_resume";
 
 function StepIndicator({ currentStep = 0 }) {
   return (
@@ -49,8 +50,26 @@ function SeedanceReelContent() {
   const [step, setStep] = useState(0);
   const [locationImages, setLocationImages] = useState([]);
   const [generationParams, setGenerationParams] = useState(null);
+  const [hydrated, setHydrated] = useState(false);
 
   const avatarHook = useAvatars();
+
+  // Restore step 2 (Generate) on refresh — location image Files can't survive
+  // a reload, but GenerationProgress doesn't need them once a job has already
+  // started; it resumes the existing job instead of re-submitting.
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(RESUME_KEY);
+      if (raw) {
+        const saved = JSON.parse(raw);
+        if (saved?.generationParams) {
+          setGenerationParams(saved.generationParams);
+          setStep(2);
+        }
+      }
+    } catch (_) {}
+    setHydrated(true);
+  }, []);
 
   const step0Valid = locationImages.length >= 1 && avatarHook.selectedAvatars.length >= 1;
 
@@ -68,6 +87,13 @@ function SeedanceReelContent() {
       avatarUrls,
     });
     setStep(2);
+
+    try {
+      sessionStorage.setItem(
+        RESUME_KEY,
+        JSON.stringify({ generationParams: { script, voiceId, language, avatarUrls } })
+      );
+    } catch (_) {}
   };
 
   const handleReset = () => {
@@ -75,7 +101,16 @@ function SeedanceReelContent() {
     setLocationImages([]);
     avatarHook.setSelectedAvatars([]);
     setGenerationParams(null);
+    try { sessionStorage.removeItem(RESUME_KEY); } catch (_) {}
   };
+
+  if (!hydrated) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto py-8 px-4 space-y-2 animate-fade-in">

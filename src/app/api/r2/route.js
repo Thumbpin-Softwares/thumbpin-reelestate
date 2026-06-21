@@ -19,6 +19,8 @@ export async function GET(request) {
 
     const { searchParams } = new URL(request.url);
     const encodedKey = searchParams.get("key");
+    const wantsDownload = searchParams.get("download") === "1";
+    const filename = searchParams.get("filename");
 
     if (!encodedKey) {
       return NextResponse.json({ error: "key is required" }, { status: 400 });
@@ -33,7 +35,11 @@ export async function GET(request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const url = await getAssetUrl(key);
+    const contentDisposition = wantsDownload
+      ? `attachment; filename="${(filename || "download").replace(/[^a-zA-Z0-9._-]/g, "_")}"`
+      : undefined;
+
+    const url = await getAssetUrl(key, 3600, { contentDisposition });
     return NextResponse.redirect(url, { status: 307 });
   } catch (error) {
     console.error("[R2] Error:", error);
