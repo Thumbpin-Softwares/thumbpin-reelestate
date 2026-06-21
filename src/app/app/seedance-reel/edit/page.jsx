@@ -6,8 +6,12 @@ import { Player } from "@remotion/player";
 import { Plus, ArrowLeft, Loader2, Download, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { SeedanceReelComposition } from "@/lib/remotion/SeedanceReelComposition";
-import { calcDurationInFrames } from "@/lib/remotion/duration";
+import { calcDurationInFrames, clampBrollClips } from "@/lib/remotion/duration";
 
 export default function SeedanceReelEditPage() {
   const router = useRouter();
@@ -15,10 +19,24 @@ export default function SeedanceReelEditPage() {
   const [rendering, setRendering] = useState(false);
   const [renderError, setRenderError] = useState(null);
 
+  // Intro/outro title cards are NOT baked in by default — user opts in and
+  // customizes them here on the edit page.
+  const [showIntro, setShowIntro] = useState(false);
+  const [showOutro, setShowOutro] = useState(false);
+  const [introTitle, setIntroTitle] = useState("Luxury");
+  const [introSubtitle, setIntroSubtitle] = useState("Living");
+  const [introTagline, setIntroTagline] = useState("Where Every Detail Matters");
+  const [outroCtaText, setOutroCtaText] = useState("");
+  const [outroBrandText, setOutroBrandText] = useState("thumbpin.ai");
+
   useEffect(() => {
     try {
       const raw = sessionStorage.getItem("seedance_composition");
-      if (raw) setCompositionProps(JSON.parse(raw));
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        setCompositionProps(parsed);
+        setOutroCtaText(parsed.ctaText || "");
+      }
     } catch (_) {}
   }, []);
 
@@ -26,10 +44,27 @@ export default function SeedanceReelEditPage() {
     setRendering(true);
     setRenderError(null);
     try {
+      const renderProps = {
+        ...compositionProps,
+        brollClips: clampBrollClips({
+          avatarDuration: compositionProps.avatarDuration,
+          brollClips:     compositionProps.brollClips,
+          ctaDuration:    compositionProps.ctaDuration,
+          showIntro,
+          showOutro,
+        }),
+        showIntro,
+        showOutro,
+        introTitle,
+        introSubtitle,
+        introTagline,
+        outroBrandText,
+        ctaText: outroCtaText,
+      };
       const res = await fetch("/api/seedance-reel/render-remotion", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(compositionProps),
+        body: JSON.stringify(renderProps),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.url) throw new Error(data.error || `Render failed: ${res.status}`);
@@ -67,10 +102,32 @@ export default function SeedanceReelEditPage() {
     );
   }
 
-  const durationInFrames = calcDurationInFrames({
+  const clampedBrollClips = clampBrollClips({
     avatarDuration: compositionProps.avatarDuration,
     brollClips:     compositionProps.brollClips,
     ctaDuration:    compositionProps.ctaDuration,
+    showIntro,
+    showOutro,
+  });
+
+  const previewProps = {
+    ...compositionProps,
+    brollClips: clampedBrollClips,
+    showIntro,
+    showOutro,
+    introTitle,
+    introSubtitle,
+    introTagline,
+    outroBrandText,
+    ctaText: outroCtaText,
+  };
+
+  const durationInFrames = calcDurationInFrames({
+    avatarDuration: compositionProps.avatarDuration,
+    brollClips:     clampedBrollClips,
+    ctaDuration:    compositionProps.ctaDuration,
+    showIntro,
+    showOutro,
   });
 
   return (
@@ -97,7 +154,7 @@ export default function SeedanceReelEditPage() {
           <div className="w-full rounded-3xl overflow-hidden border border-border/50 bg-black shadow-2xl">
             <Player
               component={SeedanceReelComposition}
-              inputProps={compositionProps}
+              inputProps={previewProps}
               durationInFrames={durationInFrames}
               compositionWidth={1080}
               compositionHeight={1920}
@@ -115,6 +172,61 @@ export default function SeedanceReelEditPage() {
 
         {/* Controls column */}
         <div className="flex-1 w-full lg:max-w-sm space-y-4">
+          {/* Intro title card */}
+          <div className="rounded-2xl border border-border/50 bg-muted/20 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold">Intro title card</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Optional white title card before the reel starts.
+                </p>
+              </div>
+              <Switch checked={showIntro} onCheckedChange={setShowIntro} />
+            </div>
+            {showIntro && (
+              <div className="space-y-2.5 pt-1">
+                <div className="space-y-1">
+                  <Label htmlFor="intro-title" className="text-xs">Title</Label>
+                  <Input id="intro-title" value={introTitle} onChange={(e) => setIntroTitle(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="intro-subtitle" className="text-xs">Subtitle</Label>
+                  <Input id="intro-subtitle" value={introSubtitle} onChange={(e) => setIntroSubtitle(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="intro-tagline" className="text-xs">Tagline</Label>
+                  <Input id="intro-tagline" value={introTagline} onChange={(e) => setIntroTagline(e.target.value)} />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Outro title card */}
+          <div className="rounded-2xl border border-border/50 bg-muted/20 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold">Outro title card</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Optional white CTA card after the reel ends.
+                </p>
+              </div>
+              <Switch checked={showOutro} onCheckedChange={setShowOutro} />
+            </div>
+            {showOutro && (
+              <div className="space-y-2.5 pt-1">
+                <div className="space-y-1">
+                  <Label htmlFor="outro-cta" className="text-xs">CTA text</Label>
+                  <Textarea id="outro-cta" value={outroCtaText} onChange={(e) => setOutroCtaText(e.target.value)} rows={3} />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="outro-brand" className="text-xs">Brand text</Label>
+                  <Input id="outro-brand" value={outroBrandText} onChange={(e) => setOutroBrandText(e.target.value)} />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Download */}
           <div className="rounded-2xl border border-border/50 bg-muted/20 p-4 space-y-3">
             <div>
               <h3 className="text-sm font-semibold">Download reel</h3>

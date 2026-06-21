@@ -6,7 +6,7 @@ import {
   Easing,
 } from "remotion";
 
-export function OutroAnimation({ ctaText = "" }) {
+export function OutroAnimation({ ctaText = "", brandText = "thumbpin.ai" }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -90,7 +90,7 @@ export function OutroAnimation({ ctaText = "" }) {
           textAlign: "center",
         }}
       >
-        thumbpin.ai
+        {brandText}
       </div>
     </AbsoluteFill>
   );

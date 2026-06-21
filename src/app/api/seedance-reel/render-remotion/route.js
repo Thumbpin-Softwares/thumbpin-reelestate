@@ -8,7 +8,6 @@ import { renderMedia, selectComposition } from "@remotion/renderer";
 import { join } from "path";
 import { tmpdir } from "os";
 import { readFileSync, unlinkSync } from "fs";
-import { calcDurationInFrames } from "@/lib/remotion/duration";
 
 // Bundle is expensive to create — cache it across requests in the same process.
 let cachedBundleUrl = null;
@@ -39,28 +38,17 @@ export async function POST(request) {
   const userId = session?.user?.id || session?.user?._id || "anon";
 
   const inputProps = await request.json();
-  const {
-    avatarDuration = 15,
-    brollClips     = [],
-    ctaDuration    = 10,
-  } = inputProps;
-
-  const durationInFrames = calcDurationInFrames({
-    avatarDuration,
-    brollClips,
-    ctaDuration,
-    fps: 30,
-  });
 
   try {
     const serveUrl = await getBundle();
 
+    // durationInFrames comes from the Composition's calculateMetadata hook
+    // (Root.jsx), which derives it from inputProps — keeps the render length
+    // matched to actual video lengths instead of a fixed duration.
     const composition = await selectComposition({
       serveUrl,
       id: "SeedanceReel",
       inputProps,
-      // Override duration to match actual video lengths
-      durationInFrames,
     });
 
     const outputPath = join(tmpdir(), `seedance-reel-${Date.now()}.mp4`);

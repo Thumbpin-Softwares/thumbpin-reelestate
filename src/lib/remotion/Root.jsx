@@ -20,6 +20,15 @@ export const RemotionRoot = () => {
         ctaDuration: 10,
         ctaText: "",
       }}
+      calculateMetadata={async ({ props }) => ({
+        durationInFrames: calcDurationInFrames({
+          avatarDuration: props.avatarDuration,
+          brollClips:     props.brollClips,
+          ctaDuration:    props.ctaDuration,
+          showIntro:      props.showIntro,
+          showOutro:      props.showOutro,
+        }),
+      })}
     />
   );
 };

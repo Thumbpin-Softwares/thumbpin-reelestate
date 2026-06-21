@@ -204,7 +204,8 @@ RULES:
 - Part 1 (AVATAR INTRO ≤35 words): Opening hook. The presenter speaks directly to camera with energy and personality. Must end at a natural sentence boundary.
 - Part 2 (WALKTHROUGH NARRATION ≤80 words): Property highlights. This plays as voiceover behind a smooth architectural walkthrough. Describes rooms, features, lifestyle.
 - Part 3 CTA (≤20 words): Punchy, humorous, memorable call-to-action delivered directly to camera. Make it witty and irresistible.
-- Do NOT change any words — split at natural sentence boundaries only.
+- Do NOT change, add, or remove any words — split at natural sentence boundaries only.
+- You MAY adjust punctuation and emphasis to make the delivery sound more emotional and energetic when spoken aloud: add exclamation marks where there's excitement, ellipses (…) for dramatic pauses, and emphasis on key words. This is punctuation-only — the underlying words and meaning must stay identical.
 - Return ONLY valid JSON, no markdown: {"part1": "...", "part2": "...", "part3_cta": "..."}
 
 SCRIPT:
@@ -264,19 +265,24 @@ ${script}`;
           const NATIVE_SCRIPT_RE = /[ऀ-ൿ؀-ۿ]/;
           const part1HasNativeScript = NATIVE_SCRIPT_RE.test(part1);
 
+          // IMPORTANT: every rule below must keep ALL English words/phrases in Roman —
+          // not just proper nouns/numbers. These scripts are written Hinglish-style
+          // (heavy code-switching), and an incomplete rule lets the LLM phonetically
+          // Devanagari-ize plain English words, which the TTS model then mispronounces
+          // as garbled Hindi — producing choppy, unnatural-sounding narration.
           const nativeScriptRule = {
-            hindi:     "Convert every Hindi/Urdu word to Devanagari script. Keep English brand names, property names, and numbers in Roman.",
+            hindi:     "Convert every Hindi/Urdu word to Devanagari script. Any English word or phrase — not just brand names, property names, and numbers — stays in Roman exactly as written.",
             hinglish:  "Convert every Hindi/Urdu word to Devanagari script. English words stay in Roman exactly as written.",
-            marathi:   "Convert to full Marathi Devanagari script. English proper nouns stay Roman.",
-            bengali:   "Convert to Bengali script (বাংলা). English proper nouns stay Roman.",
-            gujarati:  "Convert to Gujarati script (ગુજરાતી). English proper nouns stay Roman.",
-            punjabi:   "Convert to Gurmukhi script (ਪੰਜਾਬੀ). English proper nouns stay Roman.",
-            urdu:      "Convert to Nastaliq Urdu script. English proper nouns stay Roman.",
-            odia:      "Convert to Odia script (ଓଡ଼ିଆ). English proper nouns stay Roman.",
-            tamil:     "Convert to Tamil script (தமிழ்). English proper nouns stay Roman.",
-            telugu:    "Convert to Telugu script (తెలుగు). English proper nouns stay Roman.",
-            kannada:   "Convert to Kannada script (ಕನ್ನಡ). English proper nouns stay Roman.",
-            malayalam: "Convert to Malayalam script (മലയാളം). English proper nouns stay Roman.",
+            marathi:   "Convert every Marathi word to Devanagari script. Any English word or phrase stays in Roman exactly as written.",
+            bengali:   "Convert every Bengali word to Bengali script (বাংলা). Any English word or phrase stays in Roman exactly as written.",
+            gujarati:  "Convert every Gujarati word to Gujarati script (ગુજરાતી). Any English word or phrase stays in Roman exactly as written.",
+            punjabi:   "Convert every Punjabi word to Gurmukhi script (ਪੰਜਾਬੀ). Any English word or phrase stays in Roman exactly as written.",
+            urdu:      "Convert every Urdu word to Nastaliq Urdu script. Any English word or phrase stays in Roman exactly as written.",
+            odia:      "Convert every Odia word to Odia script (ଓଡ଼ିଆ). Any English word or phrase stays in Roman exactly as written.",
+            tamil:     "Convert every Tamil word to Tamil script (தமிழ்). Any English word or phrase stays in Roman exactly as written.",
+            telugu:    "Convert every Telugu word to Telugu script (తెలుగు). Any English word or phrase stays in Roman exactly as written.",
+            kannada:   "Convert every Kannada word to Kannada script (ಕನ್ನಡ). Any English word or phrase stays in Roman exactly as written.",
+            malayalam: "Convert every Malayalam word to Malayalam script (മലയാളം). Any English word or phrase stays in Roman exactly as written.",
           };
 
           if (language !== "english") {
@@ -304,9 +310,21 @@ ${part3_cta}`;
                 const match = adaptRaw.replace(/^```[a-z]*\n?/i, "").replace(/\n?```$/i, "").trim().match(/\{[\s\S]*\}/);
                 if (match) {
                   const parsed = JSON.parse(match[0]);
-                  if (parsed.part1?.trim().length > 5)     part1_tts = parsed.part1.trim();
-                  if (parsed.part2?.trim().length > 5)     part2_tts = parsed.part2.trim();
-                  if (parsed.part3_cta?.trim().length > 5) part3_tts = parsed.part3_cta.trim();
+                  // All-or-nothing: if any one part fails to convert, applying the
+                  // others alone would leave that one part in raw Roman text while
+                  // its siblings switch to native script — TTS then reads them as
+                  // different languages, producing inconsistent per-part delivery.
+                  const allValid =
+                    parsed.part1?.trim().length > 5 &&
+                    parsed.part2?.trim().length > 5 &&
+                    parsed.part3_cta?.trim().length > 5;
+                  if (allValid) {
+                    part1_tts = parsed.part1.trim();
+                    part2_tts = parsed.part2.trim();
+                    part3_tts = parsed.part3_cta.trim();
+                  } else {
+                    console.warn("[SeedanceReel] Roman→native conversion incomplete — keeping all parts in Roman for consistency:", parsed);
+                  }
                 }
               } catch (adaptErr) {
                 console.warn("[SeedanceReel] Roman→native conversion failed:", adaptErr.message);
@@ -371,11 +389,11 @@ ${part3_cta}`;
           const locationPhrase    = locationImageRefs ? `into the outdoor entrance area shown in ${locationImageRefs}` : "toward the outdoor entrance";
 
           const introPrompt =
-            `Simple, sleek UGC smartphone vlog footage. The video opens mid-action: #Image1 is already mid-exit from a luxury white car door, one foot on the ground — skip the door opening, start from the step out. ` +
-            `She walks naturally ${locationPhrase}. ` +
+            `Simple, sleek UGC smartphone vlog footage. The very first frame already shows #Image1 halfway exited through a luxury white car door — one leg already out, body partway emerged from the vehicle, frozen at that exact midpoint as the clip begins; skip the door opening and the full exit entirely. ` +
+            `From that first frame she continues exiting and walks naturally ${locationPhrase}, speaking directly to the camera lens the whole time — talking and walking simultaneously, with dialogue starting immediately and never pausing to stand still. ` +
             `Her face matches the exact identity, features, and smile of ${faceIdentityRef}. ` +
-            `She stands in place, looks directly at the camera lens, and speaks the exact following dialogue words: "${part1_roman}". ` +
-            `Her lip movements, mouth openings, and natural facial muscles shape perfectly to the precise spoken syllables, phonetics, and cadence of #Audio1. ` +
+            `While continuously walking toward the camera, she speaks the exact following dialogue words: "${part1_roman}". ` +
+            `Her lip movements, mouth openings, and natural facial muscles shape perfectly to the precise spoken syllables, phonetics, and cadence of #Audio1, synced throughout her walking motion. ` +
             `In the background, bystanders casually walk past the property entrance. ` +
             `Neutral daylight, realistic handheld camera stabilization, natural skin texture with visible pores, and clean, unedited raw video aesthetic.`;
 

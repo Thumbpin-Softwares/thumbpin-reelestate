@@ -20,6 +20,7 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { compressImage } from "@/utils/compress-image";
+import { clampBrollClips } from "@/lib/remotion/duration";
 
 /** Probe audio duration via browser <audio> element (header only, no full download). */
 async function getAudioDuration(url) {
@@ -416,9 +417,13 @@ export function GenerationProgress({ generationParams }) {
       const videoDuration   = walkthroughVideoDur > 0 ? walkthroughVideoDur : 12;
       const segmentDuration = part2AudioDur > 0 ? part2AudioDur : videoDuration;
 
-      const brollClips = wtUrl
+      const rawBrollClips = wtUrl
         ? [{ url: wtUrl, videoDuration, segmentDuration }]
         : [];
+
+      // Keep the merged reel at 60s max — the Part 2 voiceover length is the
+      // only elastic part, so it's the one that gets compressed if needed.
+      const brollClips = clampBrollClips({ avatarDuration, brollClips: rawBrollClips, ctaDuration });
 
       const props = {
         avatarVideoUrl: avUrl  || "",
