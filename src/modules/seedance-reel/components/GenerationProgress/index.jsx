@@ -93,8 +93,6 @@ const ORDERED_STAGES = [
   STATUS.COMBINING,
 ];
 
-const JOB_ID_KEY = "seedance_job_id";
-
 const JOB_STATUS_TO_LOCAL = {
   running:    STATUS.SPLITTING,
   splitting:  STATUS.SPLITTING,
@@ -109,7 +107,20 @@ function formatElapsed(secs) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-export function GenerationProgress({ generationParams }) {
+/**
+ * GenerationProgress drives the same Seedance 3-part pipeline for any route
+ * that wants its own independent API/job-tracking — pass apiBasePath/editPath
+ * (and the sessionStorage keys) to point it at that route's own endpoints
+ * instead of the seedance-reel defaults.
+ */
+export function GenerationProgress({
+  generationParams,
+  apiBasePath = "/api/seedance-reel",
+  editPath = "/app/seedance-reel/edit",
+  jobIdKey = "seedance_job_id",
+  compositionKey = "seedance_composition",
+  resumeKey = "seedance_resume",
+}) {
   const router = useRouter();
   const {
     script       = "",
@@ -184,7 +195,7 @@ export function GenerationProgress({ generationParams }) {
     hasStarted.current = true;
 
     let existingJobId = null;
-    try { existingJobId = sessionStorage.getItem(JOB_ID_KEY); } catch (_) {}
+    try { existingJobId = sessionStorage.getItem(jobIdKey); } catch (_) {}
 
     if (existingJobId) {
       resumeJob(existingJobId);
@@ -201,10 +212,10 @@ export function GenerationProgress({ generationParams }) {
 
     const poll = async () => {
       try {
-        const res = await fetch(`/api/seedance-reel/jobs/${jobId}`);
+        const res = await fetch(`${apiBasePath}/jobs/${jobId}`);
         if (res.status === 404) {
           // Job record gone (cleared/expired) — nothing to resume from.
-          try { sessionStorage.removeItem(JOB_ID_KEY); } catch (_) {}
+          try { sessionStorage.removeItem(jobIdKey); } catch (_) {}
           startPipeline();
           return;
         }
@@ -221,12 +232,12 @@ export function GenerationProgress({ generationParams }) {
         if (job.ctaVideoUrl) setCtaVideoUrl(job.ctaVideoUrl);
 
         if (job.status === "done") {
-          try { sessionStorage.removeItem(JOB_ID_KEY); } catch (_) {}
+          try { sessionStorage.removeItem(jobIdKey); } catch (_) {}
           await prepareComposition(job.avatarVideoUrl, job.walkthroughVideoUrl, job.ctaVideoUrl, job.part2AudioUrl);
           return;
         }
         if (job.status === "error") {
-          try { sessionStorage.removeItem(JOB_ID_KEY); } catch (_) {}
+          try { sessionStorage.removeItem(jobIdKey); } catch (_) {}
           setStatus(STATUS.ERROR);
           setError(job.error || "Generation failed");
           return;
@@ -252,7 +263,7 @@ export function GenerationProgress({ generationParams }) {
     setFakeBonus(0);
 
     const jobId = crypto.randomUUID();
-    try { sessionStorage.setItem(JOB_ID_KEY, jobId); } catch (_) {}
+    try { sessionStorage.setItem(jobIdKey, jobId); } catch (_) {}
 
     try {
       const formData = new FormData();
@@ -275,7 +286,7 @@ export function GenerationProgress({ generationParams }) {
         })
       );
 
-      const res = await fetch("/api/seedance-reel/generate-pipeline", { method: "POST", body: formData });
+      const res = await fetch(`${apiBasePath}/generate-pipeline`, { method: "POST", body: formData });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || `Server error: ${res.status}`);
@@ -301,7 +312,7 @@ export function GenerationProgress({ generationParams }) {
       }
     } catch (err) {
       console.error("[GenerationProgress] Error:", err);
-      try { sessionStorage.removeItem(JOB_ID_KEY); } catch (_) {}
+      try { sessionStorage.removeItem(jobIdKey); } catch (_) {}
       setStatus(STATUS.ERROR);
       setError(err.message || "Pipeline failed");
       toast.error("Generation failed", { description: err.message });
@@ -372,7 +383,7 @@ export function GenerationProgress({ generationParams }) {
         break;
 
       case "error":
-        try { sessionStorage.removeItem(JOB_ID_KEY); } catch (_) {}
+        try { sessionStorage.removeItem(jobIdKey); } catch (_) {}
         setStatus(STATUS.ERROR);
         setError(event.message || "Pipeline failed");
         toast.error("Pipeline error", { description: event.message });
@@ -435,12 +446,12 @@ export function GenerationProgress({ generationParams }) {
         ctaText: part3Cta || "",
       };
 
-      sessionStorage.setItem("seedance_composition", JSON.stringify(props));
-      try { sessionStorage.removeItem(JOB_ID_KEY); } catch (_) {}
-      try { sessionStorage.removeItem("seedance_resume"); } catch (_) {}
+      sessionStorage.setItem(compositionKey, JSON.stringify(props));
+      try { sessionStorage.removeItem(jobIdKey); } catch (_) {}
+      try { sessionStorage.removeItem(resumeKey); } catch (_) {}
       setStatus(STATUS.DONE);
       toast.success("🎬 Reel ready! Opening editor…");
-      router.push("/app/seedance-reel/edit");
+      router.push(editPath);
     } catch (err) {
       console.error("[GenerationProgress] prepareComposition failed:", err);
       setStatus(STATUS.ERROR);

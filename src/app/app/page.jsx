@@ -23,6 +23,13 @@ const REAL_ESTATE_TEMPLATES = [
     tag: "Popular",
   },
   {
+    title: "Home Tour",
+    href: "/app/home-tour",
+    video: null,
+    tag: "New",
+    description: "Avatar intro + walkthrough + CTA reel from your own script",
+  },
+  {
     title: "Interior Shots",
     href: "/app/interior-shots",
     video: null,

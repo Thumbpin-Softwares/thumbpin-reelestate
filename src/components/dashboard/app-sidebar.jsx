@@ -17,6 +17,7 @@ import {
   LogOut,
   MapPin,
   Clapperboard,
+  Building2,
 } from "lucide-react";
 import {
   Sidebar,
@@ -41,6 +42,7 @@ const mainNav = [
   { title: "Product Video", href: "/app/product-to-video", icon: ShoppingBag },
   { title: "Site View", href: "/app/site-view", icon: MapPin },
   { title: "Seedance Reel", href: "/app/seedance-reel", icon: Clapperboard },
+  { title: "Home Tour", href: "/app/home-tour", icon: Building2 },
 ];
 
 const libraryNav = [
