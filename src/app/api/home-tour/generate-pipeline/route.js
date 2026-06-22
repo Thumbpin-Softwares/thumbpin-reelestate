@@ -111,6 +111,7 @@ export async function POST(request) {
     const script = (formData.get("script") || "").toString().trim();
     const voiceId = (formData.get("voiceId") || "21m00Tcm4TlvDq8ikWAM").toString();
     const language = (formData.get("language") || "english").toString();
+    const tone = (formData.get("tone") || "luxury").toString();
     const jobId = (formData.get("jobId") || "").toString().trim();
 
     if (!script || script.length < 30) {
@@ -210,6 +211,20 @@ export async function POST(request) {
           // ── Stage 1: 3-Part Script Split via LLM ──────────────────────────
           send({ type: "script_splitting", message: "Splitting script into 3 parts…" });
 
+          // Tone only ever guides punctuation/emphasis here (never wording) —
+          // applies to BOTH pasted and AI-written scripts, since delivery style
+          // is independent of who wrote the underlying words.
+          const toneDeliveryMap = {
+            luxury:        "measured, confident, and aspirational — calm authority, not hype; sparing exclamation marks, more ellipses for poised dramatic pauses",
+            professional:  "steady, credible, matter-of-fact — minimal exclamation marks, clean sentence breaks, emphasis on facts and figures rather than excitement",
+            energetic:     "fast-paced and hyped — frequent exclamation marks, short punchy emphasis on key words, quick rhythm with few long pauses",
+            casual:        "relaxed and conversational — light punctuation, occasional ellipses like natural speech, friendly rather than salesy",
+            storytelling:  "warm and narrative — generous use of ellipses for emotional pacing, fewer exclamation marks, let moments breathe",
+            urgent:        "high-pressure and FOMO-driven — exclamation marks on urgency/scarcity words, short clipped phrasing, fast rhythm",
+            aspirational:  "dreamy and uplifting — ellipses for wistful pauses, emphasis on lifestyle/feeling words, exclamation marks reserved for the peak moment",
+          };
+          const toneDeliveryInstruction = toneDeliveryMap[tone] || toneDeliveryMap.luxury;
+
           const splitPrompt = `You are a video script editor. Split this real estate ad script into exactly THREE parts for a vertical reel video.
 
 RULES:
@@ -217,7 +232,7 @@ RULES:
 - Part 2 (WALKTHROUGH NARRATION ≤80 words): Property highlights. This plays as voiceover behind a smooth architectural walkthrough. Describes rooms, features, lifestyle.
 - Part 3 CTA (≤20 words): Punchy, humorous, memorable call-to-action delivered directly to camera. Make it witty and irresistible.
 - Do NOT change, add, or remove any words — split at natural sentence boundaries only.
-- You MAY adjust punctuation and emphasis to make the delivery sound more emotional and energetic when spoken aloud: add exclamation marks where there's excitement, ellipses (…) for dramatic pauses, and emphasis on key words. This is punctuation-only — the underlying words and meaning must stay identical.
+- You MAY adjust punctuation and emphasis to make the delivery match this TONE when spoken aloud: ${toneDeliveryInstruction}. This is punctuation-only — the underlying words and meaning must stay identical.
 - Return ONLY valid JSON, no markdown: {"part1": "...", "part2": "...", "part3_cta": "..."}
 
 SCRIPT:
@@ -260,7 +275,12 @@ ${script}`;
           // Dynamic durations
           const seedanceDuration    = String(Math.min(20, Math.max(10, Math.ceil(part1Words / 2.5) + 3)));
           const walkthroughDuration = "12";
-          const ctaDuration         = "10";
+          // Was a fixed 10s regardless of dialogue length — a short CTA line (e.g.
+          // "Book a site visit today!") only takes ~2-3s to speak, so Seedance was
+          // padding the rest of the fixed 10s by having her repeat the line. Scale
+          // it to the actual dialogue length plus a small buffer for the door-close/
+          // fade action at the end.
+          const ctaDuration         = String(Math.min(14, Math.max(6, Math.ceil(part3Words / 2.5) + 3)));
           console.log(`[SeedanceReel] Durations — intro:${seedanceDuration}s wt:${walkthroughDuration}s cta:${ctaDuration}s`);
 
           // ── Language adaptation: bidirectional script conversion ───────────
@@ -403,10 +423,13 @@ ${part3_cta}`;
           const introPrompt =
             `Simple, sleek UGC smartphone vlog footage. The very first frame already shows #Image1 with one hand on the front door, the door already pushed open halfway — frozen at that exact midpoint as the clip begins; skip any earlier approach, arrival, or the start of the door opening entirely. ` +
             `From that first frame she continues pushing the door fully open and steps through the threshold, the camera moving with her into ${interiorPhrase}, walking naturally deeper into the home while speaking directly to the camera lens the whole time — talking and walking simultaneously, with dialogue starting immediately and never pausing to stand still. ` +
+            `She and the camera stay together as one continuous, unbroken shot for the entire clip — she is in frame at every moment, with no cutaways to empty rooms and no separate property-only b-roll inserts. ` +
+            `If the space changes mid-clip, it only ever happens because she physically walks through a doorway or archway into the next room — the camera passing through that threshold with her — never as a sudden jump or unrelated cut to a different space. ` +
+            `Whatever room is in frame at any given moment must remain one single, stable, consistent space — no flickering, no double-exposed or overlapping backgrounds, no background elements appearing and disappearing. Stay grounded only in the reference images actually provided; do not blend or hallucinate any space not shown in them. ` +
             `Her face matches the exact identity, features, and smile of ${faceIdentityRef}. ` +
             `While continuously walking through the home as if guiding a tour, she speaks the exact following dialogue words: "${part1_roman}". ` +
             `Her lip movements, mouth openings, and natural facial muscles shape perfectly to the precise spoken syllables, phonetics, and cadence of #Audio1, synced throughout her walking motion. ` +
-            `The interior decor, lighting, and architecture are clearly visible around her as she moves through the space, giving the unmistakable feel of a home tour walkthrough. ` +
+            `The interior decor, lighting, and architecture are clearly visible around her as she moves through the space, giving the unmistakable feel of a home tour walkthrough — but she remains the visual anchor throughout, never leaving frame. ` +
             `Neutral daylight, realistic handheld camera stabilization, natural skin texture with visible pores, and clean, unedited raw video aesthetic.`;
 
           // ── Prompt B: Interior showcase cinematography (location images only, no avatar) ──
@@ -421,19 +444,29 @@ ${part3_cta}`;
           if (numLocImgs >= 4)
             walkthroughPrompt += `The camera then arcs in a slow, subtle curve around a key design feature in #Image4, settling into a final gentle push-in for a hero close-up on the space's standout detail. `;
           walkthroughPrompt +=
+            `The camera must keep moving for the entire duration of the clip — once it has moved through all ${numLocImgs} space${numLocImgs > 1 ? "s" : ""} above, it should cycle back through those exact same reference images again with fresh framing and a different angle or move than before (e.g. a reverse pan, a different push-in point, a new vantage of the same room), continuously revisiting and re-exploring ONLY the spaces shown in #Image1${numLocImgs > 1 ? `–#Image${numLocImgs}` : ""} rather than holding still, freezing, or settling on a static final frame. Do NOT invent, hallucinate, or generate any room, space, or detail that is not visible in the provided reference images — every frame must be grounded in #Image1${numLocImgs > 1 ? `–#Image${numLocImgs}` : ""}. The camera never stops moving until the very last frame. `;
+          walkthroughPrompt +=
             `Cinematic shallow depth of field with soft rack-focus transitions between rooms, warm natural daylight, soft realistic shadows, hyper-realistic textures, consistent interior lighting throughout, and polished 4K architectural visualization quality.`;
           if (part2AudioUrl)
             walkthroughPrompt += `Camera pacing and transitions are dynamically synchronized with the rhythm of #Audio1.`;
 
           // ── Prompt C: CTA avatar (walk-out closing, continues from intro's interior) ──
-          const ctaInteriorRef = locationImageRefs ? `the same interior space shown in ${locationImageRefs}` : "the home's interior";
+          // Must reference ONLY the location images actually passed to this call
+          // (ctaImageUrls below slices to the first 2) — referencing images beyond
+          // that gives Seedance a #ImageN with nothing behind it, which produced
+          // glitchy/overlapping backgrounds since the model has no real image to
+          // ground that reference in.
+          const ctaAvatarCount  = Math.min(numAvatarImages, 3);
+          const ctaLocationRefs = validLocationUrls.slice(0, 2).map((_, i) => `#Image${ctaAvatarCount + 1 + i}`).join(", ");
+          const ctaInteriorRef  = ctaLocationRefs ? `the same interior space shown in ${ctaLocationRefs}` : "the home's interior";
           const ctaPrompt   =
             `Simple, sleek UGC smartphone vlog footage, continuing directly from the same walkthrough inside ${ctaInteriorRef}. #Image1 turns fully around to face the camera head-on, a charismatic, wide grin already in place. ` +
+            `The background must remain one single, stable, consistent space throughout the shot — no flickering, no double-exposed or overlapping backgrounds, no background elements appearing and disappearing. Stay grounded only in the reference images actually provided; do not blend or hallucinate any space not shown in them. ` +
             `Her face matches the exact identity and confident energy of ${faceIdentityRef}. ` +
             `The instant she starts speaking, the camera begins walking backward at a steady, even pace, leading her through the home toward the main entrance, while she walks forward toward the lens in perfect step, never breaking eye contact with the camera. ` +
-            `While continuously walking backward together through the home, she delivers the closing line with irresistible charm: "${part3_roman}". ` +
+            `While continuously walking backward together through the home, she delivers the closing line with irresistible charm: "${part3_roman}". She says this line exactly ONCE, start to finish, in one continuous take — she does NOT repeat it, loop it, or say any part of it twice, and she adds no extra words beyond it. ` +
             `Her lip movements and natural expressions match perfectly to the syllables and cadence of #Audio1, synced throughout her walking motion. ` +
-            `As her dialogue reaches its final words, she arrives at the main door, the camera holding steady just outside the threshold facing her. Exactly as the last word is spoken, she grips the door and pulls it closed toward herself with a bright, unforgettable smile, the scene gently fading to black the instant the door clicks shut. ` +
+            `The instant the very last word of the line is spoken, she immediately arrives at the main door, the camera holding steady just outside the threshold facing her, and she immediately grips the door and pulls it closed toward herself with a bright, unforgettable smile — the scene fades to black right there. The clip ends at that fade; do not continue, repeat the dialogue, or add any further footage after the door closes. ` +
             `Warm natural interior lighting, handheld stabilization, natural skin texture. Confident, witty, memorable.`;
 
           send({ type: "seedance_prompt_ready", introPrompt, walkthroughPrompt, ctaPrompt, message: "All 3 Seedance prompts ready." });

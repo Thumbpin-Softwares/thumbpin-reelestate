@@ -142,7 +142,7 @@ export function StepScript({ onBack, onGenerate }) {
 
   const handleGenerate = () => {
     if (!isScriptReady) return;
-    onGenerate({ script: activeScript.trim(), voiceId: elevenLabsVoice, language });
+    onGenerate({ script: activeScript.trim(), voiceId: elevenLabsVoice, language, tone });
   };
 
   return (
@@ -212,6 +212,28 @@ export function StepScript({ onBack, onGenerate }) {
                   : <Play className="w-3.5 h-3.5 ml-0.5" />
                 }
               </button>
+            </div>
+          </div>
+
+          {/* Tone — applies to both AI-written and pasted scripts (affects delivery/punctuation, not the words) */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-neutral-500 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5" />
+              Tone
+            </label>
+            <div className="relative">
+              <select
+                value={tone}
+                onChange={(e) => setTone(e.target.value)}
+                className="w-44 appearance-none text-sm rounded-xl border border-neutral-200 bg-white px-3 py-2 pr-10 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#c7f038]/40 focus:border-[#c7f038]"
+              >
+                {TONE_OPTIONS.map((t) => (
+                  <option key={t.id} value={t.id}>{t.label}</option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400">
+                <ChevronDown />
+              </div>
             </div>
           </div>
         </div>
@@ -303,23 +325,6 @@ export function StepScript({ onBack, onGenerate }) {
                   />
                 </div>
               ))}
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium">Script Personality</label>
-              <div className="relative">
-                <select
-                  value={tone}
-                  onChange={(e) => setTone(e.target.value)}
-                  className="w-full appearance-none text-sm rounded-xl border border-neutral-200 bg-white px-3 py-2 pr-10 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                >
-                  {TONE_OPTIONS.map((t) => (
-                    <option key={t.id} value={t.id}>{t.label} — {t.description}</option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400">
-                  <ChevronDown />
-                </div>
-              </div>
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-medium">

@@ -11,7 +11,7 @@ export const ELEVENLABS_VOICE_SETTINGS = {
   // NOTE: only `style` (emotional expressiveness) was bumped up here to fix flat
   // delivery — stability/similarity_boost/speed are intentionally untouched, they
   // were already tuned and validated for natural pacing/pronunciation.
-  "dVTC43Yewy5fAIcmsISI": { stability: 0.22, similarity_boost: 0.10, style: 0.30, speed: 1.12 }, // Anvi (Female)
+  "dVTC43Yewy5fAIcmsISI": { stability: 0.52, similarity_boost: 0.80, style: 0.63, speed: 0.94 }, // Anvi (Female)
   "K2Byg54sHB1oHegvENtI": { stability: 0.28, similarity_boost: 0.20, style: 0.30, speed: 1.20 }, // Kanika (Female)
   "7b9mYhmnp0y2qSH1FnBL": { stability: 0.24, similarity_boost: 0.08, style: 0.30, speed: 1.22 }, // Bunty (Male)
   "JS6C6yu2x9Byh4i1a8lX": { stability: 0.44, similarity_boost: 0.40, style: 0.30, speed: 1.50 }, // Meher (Female)

@@ -231,7 +231,7 @@ RULES:
 1. Write out ALL numbers as words, fully and consistently in the script's own language: ${numberWordExample}. English brand/technical terms like "BHK" or "sqft" may stay in English even inside an otherwise non-English number phrase, but the number word itself (one/two/four/thousand/hazaar/etc.) must be entirely in one language — never split a single number across two languages.
 2. Expand ALL abbreviations: "sqft" → "square feet", "BR" → "bedroom", "yr" → "year", "yrs" → "years", "approx" → "approximately"
 3. Remove currency symbols — write them as words: "₹" → nothing (just say the number and crore/lakh), "$" → "dollars"
-4. Replace "…" with a period and line break. Replace " — " with a comma or period.
+4. KEEP every "…" exactly as-is — it is a soft dramatic pause within continuous flowing speech, not a sentence break. Do NOT convert it into a period or a new sentence; ElevenLabs pronounces "…" natively as a brief pause without a full stop. Only replace " — " with a comma (never a period, to avoid adding unintended hard stops).
 5. Keep proper nouns, project names, and location names exactly as-is (do not change spelling of names).
 6. Keep the same language and tone — do NOT translate or rephrase content. Only fix pronunciation-unsafe characters and abbreviations.
 7. Return ONLY the cleaned script text. No labels, no headers, no explanation.

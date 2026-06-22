@@ -126,6 +126,7 @@ export function GenerationProgress({
     script       = "",
     voiceId      = "21m00Tcm4TlvDq8ikWAM",
     language     = "english",
+    tone         = "luxury",
     locationImages = [],
     avatarUrls   = [],
   } = generationParams || {};
@@ -271,6 +272,7 @@ export function GenerationProgress({
       formData.append("script", script);
       formData.append("voiceId", voiceId);
       formData.append("language", language);
+      formData.append("tone", tone);
 
       avatarUrls.slice(0, 3).forEach((url, i) => formData.append(`avatarUrl_${i}`, url));
 
