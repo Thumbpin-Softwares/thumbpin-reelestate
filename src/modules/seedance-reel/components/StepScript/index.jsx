@@ -22,6 +22,16 @@ import { ELEVENLABS_VOICES } from "@/lib/elevenlabs-config";
 const MIN_SCRIPT_WORDS = 20;
 const MAX_SCRIPT_WORDS = 300;
 
+const TONE_OPTIONS = [
+  { id: "luxury", label: "Luxury", description: "Ultra-premium, aspirational, exclusive" },
+  { id: "professional", label: "Professional", description: "Confident, credible, trust-building" },
+  { id: "energetic", label: "Energetic", description: "Fast-paced, exciting, hype energy" },
+  { id: "casual", label: "Casual", description: "Friendly, conversational, relatable" },
+  { id: "storytelling", label: "Storytelling", description: "Narrative-driven, emotional, lifestyle-focused" },
+  { id: "urgent", label: "Urgent", description: "FOMO-heavy, limited inventory, act-now" },
+  { id: "aspirational", label: "Aspirational", description: "Dream-home feeling, lifestyle upgrade" },
+];
+
 const ChevronDown = () => (
   <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
     <path d="M6 8l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -54,6 +64,7 @@ export function StepScript({ onBack, onGenerate }) {
     usps: "",
     cta: "Book a site visit today!",
   });
+  const [tone, setTone] = useState("luxury");
   const [generatingScript, setGeneratingScript] = useState(false);
   const [aiGeneratedScript, setAiGeneratedScript] = useState("");
   const [scriptWordCount, setScriptWordCount] = useState(0);
@@ -113,7 +124,7 @@ export function StepScript({ onBack, onGenerate }) {
           usps: qaAnswers.usps.split("\n").map((s) => s.trim()).filter(Boolean),
           cta: qaAnswers.cta,
           language,
-          tone: "luxury",
+          tone,
         }),
       });
       const data = await res.json();
@@ -292,6 +303,23 @@ export function StepScript({ onBack, onGenerate }) {
                   />
                 </div>
               ))}
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium">Script Personality</label>
+              <div className="relative">
+                <select
+                  value={tone}
+                  onChange={(e) => setTone(e.target.value)}
+                  className="w-full appearance-none text-sm rounded-xl border border-neutral-200 bg-white px-3 py-2 pr-10 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                >
+                  {TONE_OPTIONS.map((t) => (
+                    <option key={t.id} value={t.id}>{t.label} — {t.description}</option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400">
+                  <ChevronDown />
+                </div>
+              </div>
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-medium">
