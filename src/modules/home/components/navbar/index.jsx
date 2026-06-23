@@ -34,12 +34,6 @@ export function Navbar() {
         </h1>
       </div>
 
-      {/* gradient line */}
-      <div className="flex">
-        <div className="h-1 bg-linear-to-r from-purple-500 via-yellow-500 to-green-500 w-full" />
-        <div className="h-1 bg-linear-to-l from-purple-500 via-yellow-500 to-green-500 w-full" />
-      </div>
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         <div className="flex items-center justify-between h-16">

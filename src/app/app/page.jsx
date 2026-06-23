@@ -23,43 +23,11 @@ const REAL_ESTATE_TEMPLATES = [
     tag: "Popular",
   },
   {
-    title: "Home Tour",
+    title: "Model doing Home Tour of the property",
     href: "/app/home-tour",
-    video: null,
-    tag: "New",
-    description: "Avatar intro + walkthrough + CTA reel from your own script",
-  },
-  {
-    title: "Interior Shots",
-    href: "/app/interior-shots",
-    video: null,
-    tag: "New",
-    description: "5–6 photos → 15s cinematic walkthrough, no hard cuts",
-  },
-  {
-    title: "Exterior & Facade",
-    href: null,
-    video: null,
-    tag: "Soon",
-    description: "Stunning outside views and property facade shots",
-    comingSoon: true,
-  },
-  {
-    title: "Luxury Amenities",
-    href: null,
-    video: null,
-    tag: "Soon",
-    description: "Gym, pool, rooftop and clubhouse showcase",
-    comingSoon: true,
-  },
-  {
-    title: "New Launch Promo",
-    href: null,
-    video: null,
-    tag: "Soon",
-    description: "Countdown + reveal for new property launches",
-    comingSoon: true,
-  },
+    video: "https://content.thumbpin.in/web-assets/hometour-final-1782134969657-1782134969657-3ac17d57.mp4",
+    tag: "Popular"
+  }
 ];
 
 export default function DashboardPage() {
