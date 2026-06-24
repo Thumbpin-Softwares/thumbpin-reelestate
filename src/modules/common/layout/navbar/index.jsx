@@ -5,18 +5,15 @@ import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import {
-  Sparkles,
   LayoutDashboard,
   FolderOpen,
   Clock,
-  Clapperboard,
   User as UserIcon,
   LogOut,
   Menu,
   X,
   CreditCard,
 } from "lucide-react";
-import { RectangleGoggles } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,42 +46,9 @@ export default function UserNav() {
   ];
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-[#f7f5e8] border-b border-b-neutral-200">
+    <nav className="fixed top-0 left-0 right-0 z-10 bg-transparent">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 group">
-            <div className="bg-black flex items-center justify-center p-2 inset-shadow-sidebar-primary-foreground rounded-full">
-              <RectangleGoggles className="w-4 h-4" fill="#c7f038" />
-            </div>
-            <span className="text-xl font-semibold">ThumbGram</span>
-          </Link>
-
-          {/* Desktop Nav Links */}
-          <div className="hidden md:flex items-center gap-6">
-            {navItems.map((item) => {
-              const isActive = pathname === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center gap-8 text-sm transition-colors ${
-                    isActive
-                      ? "underline underline-offset-4"
-                      : "text-black hover:text-foreground"
-                  }`}
-                >
-                  {item.label}
-                  {item.beta && (
-                    <span className="px-4 py-2 rounded-full text-[9px] font-bold bg-[#c6f036] text-black">
-                      BETA
-                    </span>
-                  )}
-                </Link>
-              );
-            })}
-          </div>
-
+        <div className="flex items-center justify-end h-16">
           {/* Right: User Profile + Mobile Trigger */}
           <div className="flex items-center gap-3">
             <div className="hidden sm:block">

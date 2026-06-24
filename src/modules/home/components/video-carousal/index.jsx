@@ -26,7 +26,7 @@ export default function Video({ initialVideos = [] }) {
     initialVideos.map((src, index) => (
       <div
         key={`${src}-${index}`}
-        className="shrink-0 w-55 h-90 rounded-3xl overflow-hidden border border-neutral-800"
+        className="shrink-0 w-60 h-100 rounded-3xl overflow-hidden"
       >
         <video
           src={src}
@@ -40,7 +40,7 @@ export default function Video({ initialVideos = [] }) {
     ));
 
   return (
-    <section className="py-12">
+    <section className="pb-12">
       <div ref={containerRef} className="overflow-hidden max-w-7xl mx-auto">
         <div
           ref={trackRef}

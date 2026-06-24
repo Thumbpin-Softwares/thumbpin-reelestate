@@ -64,19 +64,11 @@ export default function SignupPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 bg-[#fafbfc]">
-      <div className="relative inline-block">
-        <Image
-          className="object-cover rounded-lg"
-          width={1250}
-          height={1250}
-          alt="bg"
-          src="/bg/bg.avif"
-        />
-
+      <div className="">
         <div className="absolute inset-0 flex justify-center items-center">
-          <Card className="w-full rounded-2xl max-w-sm border border-neutral-300 shadow-xl bg-white">
+          <Card className="w-full rounded-2xl max-w-sm border border-[#fafbfc] shadow-none bg-transparent">
             <CardHeader className="text-center pt-4">
-              <CardTitle className="text-2xl font-semibold">
+              <CardTitle className="text-2xl bg-[#c7f038] italic font-bold rounded-sm py-2">
                 Create your account
               </CardTitle>
               <p className="text-sm mt-1">
