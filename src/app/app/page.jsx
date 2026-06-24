@@ -170,19 +170,6 @@ export default function DashboardPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 bg-[#fafbfc]">
-      {/* Zen Header */}
-      <section className="text-center space-y-4 pt-12">
-        <h1 className="text-4xl font-bold font-heading tracking-tight sm:text-5xl">
-          Create something{" "}
-          <span className="italic text-black bg-[#c7f038] px-4 py-1 rounded-lg">
-            remarkable.
-          </span>
-        </h1>
-        <p className="text-base text-muted-foreground max-w-md mx-auto">
-          Welcome back, {userName}, What are you upto today
-        </p>
-      </section>
-
       {/* Minimalism Actions */}
       <section className="grid sm:grid-cols-3 gap-4">
         {actions.map((action) => {
@@ -310,12 +297,6 @@ export default function DashboardPage() {
           <h2 className="text-lg font-semibold font-heading tracking-tight">
             Recent Creations
           </h2>
-          <Link
-            href="/app/assets"
-            className="text-sm font-semibold shadow-xl text-[#c7f038] bg-neutral-900 px-4 py-2 rounded-full flex items-center gap-2"
-          >
-            View All <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
