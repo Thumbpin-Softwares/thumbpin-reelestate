@@ -13,6 +13,11 @@ import {
   Menu,
   X,
   CreditCard,
+  HelpCircle,
+  BookOpen,
+  MessageCircle,
+  MessageSquarePlus,
+  UserPlus,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -22,8 +27,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { CreditsBadge } from "@/components/dashboard/credits-badge";
 
 export default function UserNav() {
   const pathname = usePathname();
@@ -46,11 +58,23 @@ export default function UserNav() {
   ];
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-10 bg-transparent">
+    <nav className="fixed top-0 left-0 right-0 z-10 bg-[#fafbfd]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-end h-16">
           {/* Right: User Profile + Mobile Trigger */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <div className="hidden sm:block">
+              <CreditsBadge />
+            </div>
+
+            <div className="hidden sm:block">
+              <InviteButton />
+            </div>
+
+            <div className="hidden sm:block">
+              <HelpMenu />
+            </div>
+
             <div className="hidden sm:block">
               <UserMenu user={user} initials={initials} />
             </div>
@@ -116,6 +140,67 @@ export default function UserNav() {
         </div>
       )}
     </nav>
+  );
+}
+
+function InviteButton() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="rounded-lg py-2 px-4 hover:bg-neutral-200 flex gap-2 items-center cursor-pointer ring-0"
+        title="Invite"
+      >
+        <UserPlus size={14} />
+        <span className="text-black text-sm">Invite</span>
+      </button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-sm text-center">
+          <DialogHeader>
+            <DialogTitle className="text-center">Invite teammates</DialogTitle>
+          </DialogHeader>
+          <p className="py-6 text-sm text-muted-foreground">Coming soon</p>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function HelpMenu() {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          className="rounded-full p-2 hover:bg-neutral-100 flex items-center cursor-pointer ring-0"
+        >
+          <HelpCircle size={18}/>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56 mt-2">
+        <DropdownMenuItem asChild className="cursor-pointer">
+          <Link href="/app/help">
+            <BookOpen className="mr-2 h-4 w-4" />
+            <span>Help Center</span>
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild className="cursor-pointer">
+          <Link href="mailto:support@thumbpin.ai">
+            <MessageCircle className="mr-2 h-4 w-4" />
+            <span>Chat with us</span>
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild className="cursor-pointer">
+          <Link href="mailto:feedback@thumbpin.ai">
+            <MessageSquarePlus className="mr-2 h-4 w-4" />
+            <span>Feedback</span>
+          </Link>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
