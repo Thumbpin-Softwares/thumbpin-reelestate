@@ -124,6 +124,62 @@ export default function DashboardPage() {
     }
   };
 
+  const renderVideoCard = (video) => (
+    <Link key={video.id} href="/app/history" className="block group">
+      <div className="aspect-9/16 bg-muted rounded-2xl overflow-hidden relative border border-transparent group-hover:border-[#c7f038]/60 group-hover:shadow-xl transition-all duration-300">
+        {video.url ? (
+          <video
+            src={video.url}
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            className="w-full h-full object-cover"
+            onMouseEnter={(e) => e.currentTarget.play()}
+            onMouseLeave={(e) => {
+              e.currentTarget.pause();
+              e.currentTarget.currentTime = 0;
+            }}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-indigo-50">
+            <Video className="w-8 h-8 text-indigo-200" />
+          </div>
+        )}
+        <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/80 via-black/40 to-transparent p-3 pt-8">
+          <p className="font-semibold text-sm text-white truncate">
+            {video.name}
+          </p>
+          <p className="text-[11px] text-white/70">
+            {new Date(video.createdAt).toLocaleDateString("en-IN", {
+              day: "numeric",
+              month: "short",
+            })}{" "}
+            · {video.type}
+          </p>
+        </div>
+        <div className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:text-[#c7f038] transition-all duration-300">
+          <ArrowRight className="w-4 h-4" />
+        </div>
+        {EDITABLE_SOURCES[video.metadata?.source] && (
+          <button
+            type="button"
+            onClick={(e) => handleEditVideo(e, video)}
+            disabled={editingVideoId === video.id}
+            className="absolute top-3 left-3 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-[#c7f038] transition-all duration-300 disabled:opacity-100"
+            title="Edit"
+          >
+            {editingVideoId === video.id ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Pencil className="w-3.5 h-3.5" />
+            )}
+          </button>
+        )}
+      </div>
+    </Link>
+  );
+
   useEffect(() => {
     async function fetchRecentVideos() {
       try {
@@ -140,8 +196,6 @@ export default function DashboardPage() {
     }
     fetchRecentVideos();
   }, []);
-
-  const userName = profile?.name || profile?.email?.split("@")[0] || "there";
 
   const actions = [
     {
@@ -179,23 +233,24 @@ export default function DashboardPage() {
 
           const content = (
             <div
-              className={`relative h-48 flex flex-col bg-white items-center p-6 space-y-4 rounded-3xl border border-neutral-200 transition-all duration-300 ${
+              className={`relative flex flex-row sm:flex-col bg-white items-center justify-between sm:justify-center p-4 sm:p-6 sm:h-48 gap-4 sm:space-y-4 rounded-3xl border border-neutral-200 transition-all duration-300 ${
                 isComingSoon
                   ? "cursor-not-allowed"
                   : "hover:border-border/40 hover:bg-white hover:shadow-xl"
               }`}
             >
-              <div className={`w-12 h-12 rounded-3xl flex items-center justify-center ${action.color} ${!isComingSoon && "group-hover:scale-110 transition-transform"}`}>
-                <Icon className="w-6 h-6" />
-              </div>
-              <div className="text-center flex flex-col gap-2">
+              <div className="order-1 sm:order-2 text-left sm:text-center flex flex-col gap-1 sm:gap-2">
                 <h3 className="font-semibold">{action.title}</h3>
                 <p className="text-sm text-neutral-500">{action.description}</p>
               </div>
 
+              <div className={`order-2 sm:order-1 shrink-0 w-12 h-12 rounded-3xl flex items-center justify-center ${action.color} ${!isComingSoon && "group-hover:scale-110 transition-transform"}`}>
+                <Icon className="w-6 h-6" />
+              </div>
+
               {isComingSoon && (
-                <div className="absolute inset-0 pt-4 flex items-center justify-center">
-                  <span className="bg-[#c7f038] text-black text-xs font-bold uppercase tracking-widest px-2 py-1 rounded-full shadow-lg">
+                <div className="absolute top-3 right-3 sm:inset-0 sm:top-auto sm:right-auto sm:pt-4 sm:flex sm:items-center sm:justify-center">
+                  <span className="bg-[#c7f038] text-black text-[10px] sm:text-xs font-bold uppercase tracking-widest px-2 py-1 rounded-full shadow-lg">
                     Coming Soon
                   </span>
                 </div>
@@ -299,67 +354,31 @@ export default function DashboardPage() {
           </h2>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+        {/* Mobile: last 2, stacked one after another */}
+        <div className="flex sm:hidden flex-col gap-4">
+          {loadingVideos ? (
+            [1, 2].map((i) => (
+              <Skeleton key={i} className="aspect-9/16 w-full rounded-2xl" />
+            ))
+          ) : videos.length > 0 ? (
+            videos.slice(0, 2).map((video) => renderVideoCard(video))
+          ) : (
+            <div className="text-center py-10 bg-white/40 rounded-3xl border border-dashed border-border/40">
+              <p className="text-sm text-muted-foreground">
+                No projects yet. Let&apos;s start one!
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Desktop/tablet: full grid */}
+        <div className="hidden sm:grid grid-cols-3 md:grid-cols-4 gap-4">
           {loadingVideos ? (
             [1, 2, 3, 4].map((i) => (
               <Skeleton key={i} className="aspect-9/16 w-full rounded-2xl" />
             ))
           ) : videos.length > 0 ? (
-            videos.map((video) => (
-              <Link key={video.id} href="/app/history" className="block group">
-                <div className="aspect-9/16 bg-muted rounded-2xl overflow-hidden relative border border-transparent group-hover:border-[#c7f038]/60 group-hover:shadow-xl transition-all duration-300">
-                  {video.url ? (
-                    <video
-                      src={video.url}
-                      muted
-                      loop
-                      playsInline
-                      preload="metadata"
-                      className="w-full h-full object-cover"
-                      onMouseEnter={(e) => e.currentTarget.play()}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.pause();
-                        e.currentTarget.currentTime = 0;
-                      }}
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-indigo-50">
-                      <Video className="w-8 h-8 text-indigo-200" />
-                    </div>
-                  )}
-                  <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/80 via-black/40 to-transparent p-3 pt-8">
-                    <p className="font-semibold text-sm text-white truncate">
-                      {video.name}
-                    </p>
-                    <p className="text-[11px] text-white/70">
-                      {new Date(video.createdAt).toLocaleDateString("en-IN", {
-                        day: "numeric",
-                        month: "short",
-                      })}{" "}
-                      · {video.type}
-                    </p>
-                  </div>
-                  <div className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:text-[#c7f038] transition-all duration-300">
-                    <ArrowRight className="w-4 h-4" />
-                  </div>
-                  {EDITABLE_SOURCES[video.metadata?.source] && (
-                    <button
-                      type="button"
-                      onClick={(e) => handleEditVideo(e, video)}
-                      disabled={editingVideoId === video.id}
-                      className="absolute top-3 left-3 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-[#c7f038] transition-all duration-300 disabled:opacity-100"
-                      title="Edit"
-                    >
-                      {editingVideoId === video.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Pencil className="w-3.5 h-3.5" />
-                      )}
-                    </button>
-                  )}
-                </div>
-              </Link>
-            ))
+            videos.map((video) => renderVideoCard(video))
           ) : (
             <div className="col-span-full text-center py-10 bg-white/40 rounded-3xl border border-dashed border-border/40">
               <p className="text-sm text-muted-foreground">

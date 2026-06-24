@@ -1,5 +1,6 @@
 import UserNav from "@/modules/common/layout/navbar";
 import Aside from "@/modules/common/layout/aside";
+import MobileBottomNav from "@/modules/common/layout/mobile-bottom-nav";
 import { AdminModal } from "@/components/dashboard/admin-modal";
 
 export default function DashboardLayout({ children }) {
@@ -10,12 +11,14 @@ export default function DashboardLayout({ children }) {
       <div className="flex py-4">
         <Aside />
 
-        <main className="flex-1 max-w-5xl mx-auto px-4 py-8 sm:py-12">
+        <main className="flex-1 max-w-5xl mx-auto px-4 py-8 sm:py-12 pb-20 md:pb-12">
           <div className="animate-fade-in">
             {children}
           </div>
         </main>
       </div>
+
+      <MobileBottomNav />
     </div>
   );
 }
