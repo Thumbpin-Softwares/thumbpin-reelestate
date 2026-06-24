@@ -74,13 +74,13 @@ export function Navbar() {
             ) : (
               <>
                 <Link href="/auth/login">
-                  <span className="px-4 py-2.5 border border-black rounded-full text-sm">
-                    Log In
+                  <span className="px-4 py-2 rounded-full">
+                    Login
                   </span>
                 </Link>
                 <Link href="/auth/signup">
-                  <span className="bg-[#dbfd40] text-black px-4 py-2.5 rounded-full shadow text-sm">
-                    Start Free
+                  <span className="bg-linear-to-b from-black to-neutral-600 text-white px-4 py-2 rounded-full shadow-lg">
+                    Sign Up
                   </span>
                 </Link>
               </>
@@ -96,18 +96,11 @@ export function Navbar() {
                 </span>
               </Link>
             ) : (
-              <>
-                <Link href="/auth/login">
-                  <span className="px-3 py-2 border border-black rounded-full text-xs">
-                    Log In
-                  </span>
-                </Link>
-                <Link href="/auth/signup">
-                  <span className="bg-[#dbfd40] text-black px-3 py-2 rounded-full shadow text-xs">
-                    Start Free
-                  </span>
-                </Link>
-              </>
+              <Link href="/auth/signup">
+                <span className="bg-linear-to-b from-black to-neutral-600 text-white px-4 py-2 rounded-full shadow text-xs">
+                  Start Free
+                </span>
+              </Link>
             )}
             <Button
               variant="ghost"
