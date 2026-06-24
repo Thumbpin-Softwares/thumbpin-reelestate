@@ -26,7 +26,6 @@ import {
   ImagePlus,
   Sparkles,
   Package,
-  Video,
   PenLine,
   X,
 } from "lucide-react";
@@ -402,30 +401,74 @@ export default function AssetLibraryPage() {
     const isSelected = selectedAsset?.id === asset.id;
     const isVideo = asset.type === "video" || asset.type === "clip";
 
+    // Video clips use the same 9:16, full-color, hover-to-play grid card
+    // style as the dashboard's "Recent Creations" section.
+    if (isVideo) {
+      return (
+        <div
+          className={`group cursor-pointer aspect-9/16 bg-muted rounded-2xl overflow-hidden relative border transition-all duration-300 ${
+            isSelected ? "border-primary ring-2 ring-primary" : "border-transparent hover:border-[#c7f038]/60 hover:shadow-xl"
+          }`}
+          onClick={() => { setSelectedAsset(asset); setPreviewAsset(asset); }}
+        >
+          <video
+            src={asset.url}
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            className="w-full h-full object-cover"
+            onMouseEnter={(e) => e.currentTarget.play()}
+            onMouseLeave={(e) => {
+              e.currentTarget.pause();
+              e.currentTarget.currentTime = 0;
+            }}
+          />
+          <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/80 via-black/40 to-transparent p-3 pt-8">
+            <p className="font-semibold text-sm text-white truncate">{asset.name}</p>
+            <p className="text-[11px] text-white/70">
+              {asset.is_custom ? "Added by you" : "Library Asset"}
+            </p>
+          </div>
+          <div className="absolute top-3 right-3 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-300">
+            <button
+              className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center text-muted-foreground hover:text-[#c7f038] transition-colors"
+              onClick={(e) => { e.stopPropagation(); setPreviewAsset(asset); }}
+            >
+              <Eye className="w-4 h-4" />
+            </button>
+            {showDelete && (
+              <button
+                className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors"
+                onClick={(e) => { e.stopPropagation(); handleDelete(asset.id); }}
+                disabled={deleting === asset.id}
+              >
+                {deleting === asset.id ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4" />
+                )}
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     return (
       <Card
         className={`group cursor-pointer border-border/50 hover:shadow-lg transition-all hover:-translate-y-1 overflow-hidden ${
           isSelected ? "ring-2 ring-primary border-primary" : ""
-        } ${isVideo ? "aspect-[9/16]" : ""}`}
-        onClick={() => { setSelectedAsset(asset); if (isVideo) setPreviewAsset(asset); }}
+        }`}
+        onClick={() => setSelectedAsset(asset)}
       >
         <CardContent className="p-0">
-          <div className="aspect-square bg-gradient-to-br from-primary/10 to-accent/10 relative flex items-center justify-center overflow-hidden">
-            {isVideo ? (
-              <video
-                src={asset.url}
-                className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                muted
-                onMouseEnter={(e) => e.target.play()}
-                onMouseLeave={(e) => { e.target.pause(); e.target.currentTime = 0; }}
-              />
-            ) : (
-              <img
-                src={asset.url || asset.image_url}
-                alt={asset.name}
-                className="w-full h-full object-cover transition-transform group-hover:scale-105"
-              />
-            )}
+          <div className="aspect-square bg-linear-to-br from-primary/10 to-accent/10 relative flex items-center justify-center overflow-hidden">
+            <img
+              src={asset.url || asset.image_url}
+              alt={asset.name}
+              className="w-full h-full object-cover transition-transform group-hover:scale-105"
+            />
             {/* Hover overlay */}
             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
               <button
@@ -454,13 +497,12 @@ export default function AssetLibraryPage() {
                 </button>
               )}
             </div>
-            
+
             <div className="absolute top-2 left-2">
               <Badge className="bg-primary/80 text-white text-[10px] px-1.5 py-0.5 border-0 flex items-center gap-1">
                 {asset.type === "avatar" && <Sparkles className="w-2.5 h-2.5" />}
                 {asset.type === "product" && <Package className="w-2.5 h-2.5" />}
-                {isVideo && <Video className="w-2.5 h-2.5" />}
-                {asset.type === "avatar" ? "Avatar" : asset.type === "product" ? "Product" : "Video"}
+                {asset.type === "avatar" ? "Avatar" : "Product"}
               </Badge>
             </div>
 

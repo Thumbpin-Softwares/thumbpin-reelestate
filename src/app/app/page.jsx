@@ -44,7 +44,7 @@ export default function DashboardPage() {
   useEffect(() => {
     async function fetchRecentVideos() {
       try {
-        const res = await fetch("/api/user/videos?limit=3");
+        const res = await fetch("/api/user/videos?limit=4");
         if (res.ok) {
           const data = await res.json();
           setVideos(data.videos || []);
@@ -235,57 +235,57 @@ export default function DashboardPage() {
           </Link>
         </div>
 
-        <div className="space-y-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
           {loadingVideos ? (
-            [1, 2].map((i) => (
-              <Skeleton key={i} className="h-20 w-full rounded-xl" />
+            [1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="aspect-9/16 w-full rounded-2xl" />
             ))
           ) : videos.length > 0 ? (
             videos.map((video) => (
               <Link key={video.id} href="/app/history" className="block group">
-                <div className="flex items-center justify-between p-4 rounded-xl hover:bg-white hover:shadow-md transition-all duration-300 border border-transparent hover:border-border/30">
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-muted rounded-lg overflow-hidden relative shrink-0">
-                      {video.url ? (
-                        <video
-                          src={video.url}
-                          className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-indigo-50">
-                          <Video className="w-6 h-6 text-indigo-200" />
-                        </div>
-                      )}
+                <div className="aspect-9/16 bg-muted rounded-2xl overflow-hidden relative border border-transparent group-hover:border-[#c7f038]/60 group-hover:shadow-xl transition-all duration-300">
+                  {video.url ? (
+                    <video
+                      src={video.url}
+                      muted
+                      loop
+                      playsInline
+                      preload="metadata"
+                      className="w-full h-full object-cover"
+                      onMouseEnter={(e) => e.currentTarget.play()}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.pause();
+                        e.currentTarget.currentTime = 0;
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-indigo-50">
+                      <Video className="w-8 h-8 text-indigo-200" />
                     </div>
-                    <div className="min-w-0">
-                      <p className="font-semibold text-sm truncate">
-                        {video.name}
-                      </p>
-                      <p className="text-[12px] text-muted-foreground">
-                        {new Date(video.createdAt).toLocaleDateString("en-IN", {
-                          day: "numeric",
-                          month: "short",
-                        })}{" "}
-                        · {video.type}
-                      </p>
-                    </div>
+                  )}
+                  <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/80 via-black/40 to-transparent p-3 pt-8">
+                    <p className="font-semibold text-sm text-white truncate">
+                      {video.name}
+                    </p>
+                    <p className="text-[11px] text-white/70">
+                      {new Date(video.createdAt).toLocaleDateString("en-IN", {
+                        day: "numeric",
+                        month: "short",
+                      })}{" "}
+                      · {video.type}
+                    </p>
                   </div>
-                  <div className="w-8 h-8 rounded-full border border-border flex items-center justify-center text-muted-foreground group-hover:text-[#c7f038] group-hover:bg-neutral-900 duration-300 transition-colors">
+                  <div className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:text-[#c7f038] transition-all duration-300">
                     <ArrowRight className="w-4 h-4" />
                   </div>
                 </div>
               </Link>
             ))
           ) : (
-            <div className="text-center py-10 bg-white/40 rounded-3xl border border-dashed border-border/40">
+            <div className="col-span-full text-center py-10 bg-white/40 rounded-3xl border border-dashed border-border/40">
               <p className="text-sm text-muted-foreground">
                 No projects yet. Let&apos;s start one!
               </p>
-              <Link href="/app/veo-long-ad">
-                <Button variant="link" className="mt-2 text-primary font-bold">
-                  <Plus className="w-4 h-4 mr-1" /> Create Now
-                </Button>
-              </Link>
             </div>
           )}
         </div>
