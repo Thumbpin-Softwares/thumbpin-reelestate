@@ -37,7 +37,7 @@ export default async function LandingPage() {
   const heroVideos = await getWebVideos();
 
   return (
-    <main className="min-h-screen bg-[#f7f5e8]">
+    <main className="min-h-screen bg-neutral-100">
       <Navbar />
       <Hero videos={heroVideos} />
       <div className="bg-[#f5f6f0] py-12">

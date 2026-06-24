@@ -22,7 +22,7 @@ export function Navbar() {
   const isAuthenticated = status === "authenticated";
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-[#f7f5e8] border-b border-b-neutral-200">
+    <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-none border-b border-b-neutral-200">
       
       {/* Top banner */}
       <div className="flex items-center justify-center bg-black py-2 px-4 text-center">
@@ -87,8 +87,28 @@ export function Navbar() {
             )}
           </div>
 
-          {/* Mobile Button */}
-          <div className="md:hidden">
+          {/* Mobile CTA + Button */}
+          <div className="md:hidden flex items-center gap-2">
+            {isAuthenticated ? (
+              <Link href="/app" className="">
+                <span className="bg-linear-to-b from-black to-neutral-600 text-white text-sm py-2 px-4 flex items-center justify-center rounded-full shadow">
+                  Dashboard
+                </span>
+              </Link>
+            ) : (
+              <>
+                <Link href="/auth/login">
+                  <span className="px-3 py-2 border border-black rounded-full text-xs">
+                    Log In
+                  </span>
+                </Link>
+                <Link href="/auth/signup">
+                  <span className="bg-[#dbfd40] text-black px-3 py-2 rounded-full shadow text-xs">
+                    Start Free
+                  </span>
+                </Link>
+              </>
+            )}
             <Button
               variant="ghost"
               size="icon"
@@ -102,7 +122,7 @@ export function Navbar() {
         {/* Mobile Menu */}
         {mobileOpen && (
           <div className="md:hidden pb-6 pt-2 space-y-3">
-            
+
             {/* nav links */}
             <div className="flex flex-col gap-2">
               {navItems.map((item) => (
@@ -115,32 +135,6 @@ export function Navbar() {
                   {item.title}
                 </Link>
               ))}
-            </div>
-
-            {/* CTA */}
-            <div className="flex flex-col gap-2 pt-2">
-              {isAuthenticated ? (
-                <Link href="/app" onClick={() => setMobileOpen(false)}>
-                  <span className="w-full flex items-center justify-center gap-2 bg-black text-white py-3 rounded-xl">
-                    <LayoutDashboard className="w-4 h-4" />
-                    Dashboard
-                  </span>
-                </Link>
-              ) : (
-                <>
-                  <Link href="/auth/login" onClick={() => setMobileOpen(false)}>
-                    <Button variant="outline" className="w-full">
-                      Log In
-                    </Button>
-                  </Link>
-
-                  <Link href="/auth/signup" onClick={() => setMobileOpen(false)}>
-                    <Button className="w-full bg-[#dbfd40] text-black">
-                      Start Free
-                    </Button>
-                  </Link>
-                </>
-              )}
             </div>
           </div>
         )}
