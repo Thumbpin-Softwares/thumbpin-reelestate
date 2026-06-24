@@ -19,7 +19,7 @@ export default function Hero({ videos = [] }) {
   }, []);
 
   return (
-    <main className="relative bg-[#f5efe8] pt-24 md:pt-32 overflow-hidden">
+    <main className="relative bg-neutral-100 pt-24 md:pt-32 overflow-hidden">
       {/* Grid */}
       <div
         className="absolute inset-0 opacity-30"

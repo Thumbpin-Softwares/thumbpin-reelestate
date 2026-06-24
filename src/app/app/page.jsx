@@ -12,8 +12,44 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useUser } from "@/hooks/use-user";
-import { Video, Building, ShoppingBag, ArrowRight, Plus } from "lucide-react";
+import { Video, Building, ShoppingBag, ArrowRight, Plus, Pencil, Loader2 } from "lucide-react";
 import { Search } from "lucide-react";
+import { clampBrollClips } from "@/lib/remotion/duration";
+
+const EDITABLE_SOURCES = {
+  "seedance-reel": { compositionKey: "seedance_composition", editPath: "/app/seedance-reel/edit" },
+  "home-tour": { compositionKey: "home_tour_composition", editPath: "/app/home-tour/edit" },
+};
+
+/** Probe video duration via browser <video> element (header only, no full download). */
+async function getVideoDuration(url) {
+  return new Promise((resolve) => {
+    if (!url) return resolve(0);
+    const video = document.createElement("video");
+    video.addEventListener("loadedmetadata", () => {
+      resolve(isFinite(video.duration) && video.duration > 0 ? video.duration : 0);
+    });
+    video.addEventListener("error", () => resolve(0));
+    video.crossOrigin = "anonymous";
+    video.preload = "metadata";
+    video.src = url;
+  });
+}
+
+/** Probe audio duration via browser <audio> element (header only, no full download). */
+async function getAudioDuration(url) {
+  return new Promise((resolve) => {
+    if (!url) return resolve(0);
+    const audio = new Audio();
+    audio.addEventListener("loadedmetadata", () => {
+      resolve(isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0);
+    });
+    audio.addEventListener("error", () => resolve(0));
+    audio.crossOrigin = "anonymous";
+    audio.preload = "metadata";
+    audio.src = url;
+  });
+}
 
 const REAL_ESTATE_TEMPLATES = [
   {
@@ -37,9 +73,56 @@ export default function DashboardPage() {
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const router = useRouter();
   const [query, setQuery] = useState("");
+  const [editingVideoId, setEditingVideoId] = useState(null);
   const filteredTemplates = REAL_ESTATE_TEMPLATES.filter((t) =>
     t.title.toLowerCase().includes(query.toLowerCase()),
   );
+
+  const handleEditVideo = async (e, video) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const source = video.metadata?.source;
+    const editConfig = EDITABLE_SOURCES[source];
+    if (!editConfig || editingVideoId) return;
+
+    setEditingVideoId(video.id);
+    try {
+      const { avatarVideoUrl, walkthroughVideoUrl, ctaVideoUrl, part2AudioUrl } = video.metadata;
+
+      const [avatarDur, walkthroughDur, ctaDur, part2AudioDur] = await Promise.all([
+        getVideoDuration(avatarVideoUrl),
+        getVideoDuration(walkthroughVideoUrl),
+        getVideoDuration(ctaVideoUrl),
+        getAudioDuration(part2AudioUrl),
+      ]);
+
+      const avatarDuration = avatarDur > 0 ? avatarDur : 15;
+      const ctaDuration = ctaDur > 0 ? ctaDur : 10;
+      const videoDuration = walkthroughDur > 0 ? walkthroughDur : 12;
+      const segmentDuration = part2AudioDur > 0 ? part2AudioDur : videoDuration;
+
+      const rawBrollClips = walkthroughVideoUrl
+        ? [{ url: walkthroughVideoUrl, videoDuration, segmentDuration }]
+        : [];
+      const brollClips = clampBrollClips({ avatarDuration, brollClips: rawBrollClips, ctaDuration });
+
+      const compositionProps = {
+        avatarVideoUrl: avatarVideoUrl || "",
+        brollClips,
+        ctaVideoUrl: ctaVideoUrl || "",
+        part2AudioUrl: part2AudioUrl || "",
+        avatarDuration,
+        ctaDuration,
+        ctaText: "",
+      };
+
+      sessionStorage.setItem(editConfig.compositionKey, JSON.stringify(compositionProps));
+      router.push(editConfig.editPath);
+    } finally {
+      setEditingVideoId(null);
+    }
+  };
 
   useEffect(() => {
     async function fetchRecentVideos() {
@@ -278,6 +361,21 @@ export default function DashboardPage() {
                   <div className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:text-[#c7f038] transition-all duration-300">
                     <ArrowRight className="w-4 h-4" />
                   </div>
+                  {EDITABLE_SOURCES[video.metadata?.source] && (
+                    <button
+                      type="button"
+                      onClick={(e) => handleEditVideo(e, video)}
+                      disabled={editingVideoId === video.id}
+                      className="absolute top-3 left-3 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-[#c7f038] transition-all duration-300 disabled:opacity-100"
+                      title="Edit"
+                    >
+                      {editingVideoId === video.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Pencil className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  )}
                 </div>
               </Link>
             ))
