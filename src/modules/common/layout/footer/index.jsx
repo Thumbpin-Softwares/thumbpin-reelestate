@@ -32,15 +32,15 @@ const tags = [
 
 export default function Footer() {
   return (
-    <footer className="bg-neutral-900 text-white">
+    <footer className="bg-neutral-200 text-neutral-800">
       {/* Top Section */}
       <div className="max-w-7xl mx-auto px-6 md:px-12 lg:px-24 py-8 flex flex-col lg:flex-row gap-12 lg:gap-0 items-start lg:items-center justify-between">
         <div className="flex flex-col gap-4">
           <div className="flex gap-2 items-center">
-            <div className="bg-[#c7f038] flex items-center justify-center p-2 rounded-full">
+            <div className="bg-black flex items-center justify-center p-2 rounded-full">
               <RectangleGoggles
                 className="w-8 h-8"
-                fill="black"
+                fill="#c7f038"
                 stroke="none"
               />
             </div>
@@ -48,7 +48,7 @@ export default function Footer() {
             <span className="text-xl">ThumbGram</span>
           </div>
 
-          <p className="text-sm max-w-sm text-neutral-300">
+          <p className="text-sm max-w-sm text-neutral-800">
             AI-powered UGC video ad generator, built for Indian creators &
             brands.
           </p>

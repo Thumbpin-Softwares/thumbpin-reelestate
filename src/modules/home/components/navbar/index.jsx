@@ -11,8 +11,9 @@ import {
 } from "lucide-react";
 
 const navItems = [
-  { title: "How It Works", link: "#how" },
-  { title: "Testimonials", link: "#testimonials" },
+  { title: "Product", link: "#how" },
+  { title: "Use Cases", link: "#testimonials" },
+  { title: "Resources", link: ""},
   { title: "Pricing", link: "#pricing" },
 ];
 
@@ -49,7 +50,7 @@ export function Navbar() {
           </Link>
 
           {/* Desktop Nav */}
-          <ul className="hidden md:flex items-center gap-8 text-sm">
+          <ul className="hidden md:flex items-center gap-8">
             {navItems.map((item) => (
               <li key={item.title}>
                 <Link
@@ -66,7 +67,7 @@ export function Navbar() {
           <div className="hidden md:flex items-center gap-3">
             {isAuthenticated ? (
               <Link href="/app">
-                <span className="bg-[#dbfd40] text-black py-2.5 px-4 flex items-center gap-2 rounded-full shadow text-sm">
+                <span className="bg-linear-to-b from-black to-neutral-600 text-white py-2 px-4 flex items-center gap-2 rounded-full shadow">
                   <LayoutDashboard className="w-4 h-4" />
                   Dashboard
                 </span>
