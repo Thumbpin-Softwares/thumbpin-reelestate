@@ -20,42 +20,12 @@ import {
 import { useUser } from "@/hooks/use-user";
 import { Video, Building, ShoppingBag, ArrowRight, Plus, Pencil, Loader2, Play, MoreVertical } from "lucide-react";
 import { Search } from "lucide-react";
-import { clampBrollClips } from "@/lib/remotion/duration";
-
-const EDITABLE_SOURCES = {
-  "seedance-reel": { compositionKey: "seedance_composition", editPath: "/app/seedance-reel/edit" },
-  "home-tour": { compositionKey: "home_tour_composition", editPath: "/app/home-tour/edit" },
-};
-
-/** Probe video duration via browser <video> element (header only, no full download). */
-async function getVideoDuration(url) {
-  return new Promise((resolve) => {
-    if (!url) return resolve(0);
-    const video = document.createElement("video");
-    video.addEventListener("loadedmetadata", () => {
-      resolve(isFinite(video.duration) && video.duration > 0 ? video.duration : 0);
-    });
-    video.addEventListener("error", () => resolve(0));
-    video.crossOrigin = "anonymous";
-    video.preload = "metadata";
-    video.src = url;
-  });
-}
-
-/** Probe audio duration via browser <audio> element (header only, no full download). */
-async function getAudioDuration(url) {
-  return new Promise((resolve) => {
-    if (!url) return resolve(0);
-    const audio = new Audio();
-    audio.addEventListener("loadedmetadata", () => {
-      resolve(isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0);
-    });
-    audio.addEventListener("error", () => resolve(0));
-    audio.crossOrigin = "anonymous";
-    audio.preload = "metadata";
-    audio.src = url;
-  });
-}
+import {
+  EDITABLE_SOURCES,
+  COMPOSITION_STORAGE_KEY,
+  EDIT_PATH,
+  buildCompositionFromAsset,
+} from "@/lib/editable-sources";
 
 const REAL_ESTATE_TEMPLATES = [
   {
@@ -89,50 +59,21 @@ export default function DashboardPage() {
     e.preventDefault();
     e.stopPropagation();
 
-    const source = video.metadata?.source;
-    const editConfig = EDITABLE_SOURCES[source];
-    if (!editConfig || editingVideoId) return;
-
+    if (editingVideoId) return;
     setEditingVideoId(video.id);
     try {
-      const { avatarVideoUrl, walkthroughVideoUrl, ctaVideoUrl, part2AudioUrl } = video.metadata;
+      const compositionProps = await buildCompositionFromAsset(video);
+      if (!compositionProps) return;
 
-      const [avatarDur, walkthroughDur, ctaDur, part2AudioDur] = await Promise.all([
-        getVideoDuration(avatarVideoUrl),
-        getVideoDuration(walkthroughVideoUrl),
-        getVideoDuration(ctaVideoUrl),
-        getAudioDuration(part2AudioUrl),
-      ]);
-
-      const avatarDuration = avatarDur > 0 ? avatarDur : 15;
-      const ctaDuration = ctaDur > 0 ? ctaDur : 10;
-      const videoDuration = walkthroughDur > 0 ? walkthroughDur : 12;
-      const segmentDuration = part2AudioDur > 0 ? part2AudioDur : videoDuration;
-
-      const rawBrollClips = walkthroughVideoUrl
-        ? [{ url: walkthroughVideoUrl, videoDuration, segmentDuration }]
-        : [];
-      const brollClips = clampBrollClips({ avatarDuration, brollClips: rawBrollClips, ctaDuration });
-
-      const compositionProps = {
-        avatarVideoUrl: avatarVideoUrl || "",
-        brollClips,
-        ctaVideoUrl: ctaVideoUrl || "",
-        part2AudioUrl: part2AudioUrl || "",
-        avatarDuration,
-        ctaDuration,
-        ctaText: "",
-      };
-
-      sessionStorage.setItem(editConfig.compositionKey, JSON.stringify(compositionProps));
-      router.push(editConfig.editPath);
+      sessionStorage.setItem(COMPOSITION_STORAGE_KEY, JSON.stringify(compositionProps));
+      router.push(EDIT_PATH);
     } finally {
       setEditingVideoId(null);
     }
   };
 
   const renderVideoCard = (video) => (
-    <Link key={video.id} href="/app/history" className="block group">
+    <Link key={video.id} href={EDIT_PATH} className="block group">
       <div className="aspect-9/16 bg-muted rounded-2xl overflow-hidden relative border border-transparent group-hover:border-[#c7f038]/60 group-hover:shadow-xl transition-all duration-300">
         {video.url ? (
           <video
@@ -195,7 +136,7 @@ export default function DashboardPage() {
         key={video.id}
         className="relative aspect-video w-full bg-muted rounded-2xl overflow-hidden border border-neutral-200"
       >
-        <Link href="/app/history" className="absolute inset-0 block">
+        <Link href={EDIT_PATH} className="absolute inset-0 block">
           {video.url ? (
             <video
               src={video.url}

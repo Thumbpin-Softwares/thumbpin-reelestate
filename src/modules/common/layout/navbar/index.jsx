@@ -7,7 +7,7 @@ import { useSession, signOut } from "next-auth/react";
 import {
   FolderOpen,
   Plus,
-  Clock,
+  Pencil,
   Megaphone,
   User as UserIcon,
   LogOut,
@@ -52,7 +52,7 @@ import { CreditsBadge } from "@/components/dashboard/credits-badge";
 const navItems = [
   { label: "Get Started", href: "/app", icon: Plus },
   { label: "Library", href: "/app/assets", icon: FolderOpen },
-  { label: "History", href: "/app/history", icon: Clock },
+  { label: "Edit", href: "/app/edit", icon: Pencil },
   { label: "What's New", href: "/app/whats-new", icon: Megaphone },
 ];
 

@@ -10,7 +10,7 @@ import {
   PenTool,
   ShoppingBag,
   FolderOpen,
-  Clock,
+  Pencil,
   CreditCard,
   User,
   Sparkles,
@@ -47,7 +47,7 @@ const mainNav = [
 
 const libraryNav = [
   { title: "Asset Library", href: "/app/assets", icon: FolderOpen },
-  { title: "Video History", href: "/app/history", icon: Clock },
+  { title: "Edit", href: "/app/edit", icon: Pencil },
   { title: "Credits", href: "/app/credits", icon: CreditCard },
   { title: "Profile", href: "/app/profile", icon: User },
 ];

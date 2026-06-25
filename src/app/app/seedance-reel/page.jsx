@@ -144,6 +144,7 @@ function SeedanceReelContent() {
           <GenerationProgress
             generationParams={generationParams}
             onReset={handleReset}
+            source="seedance-reel"
           />
         )}
       </div>

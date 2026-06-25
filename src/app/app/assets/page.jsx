@@ -2,12 +2,16 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { clampBrollClips } from "@/lib/remotion/duration";
+import {
+  EDITABLE_SOURCES,
+  COMPOSITION_STORAGE_KEY,
+  EDIT_PATH,
+  buildCompositionFromAsset,
+} from "@/lib/editable-sources";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -42,41 +46,6 @@ import {
 } from "lucide-react";
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
-
-const EDITABLE_SOURCES = {
-  "seedance-reel": { compositionKey: "seedance_composition", editPath: "/app/seedance-reel/edit" },
-  "home-tour": { compositionKey: "home_tour_composition", editPath: "/app/home-tour/edit" },
-};
-
-/** Probe video duration via browser <video> element (header only, no full download). */
-async function getVideoDuration(url) {
-  return new Promise((resolve) => {
-    if (!url) return resolve(0);
-    const video = document.createElement("video");
-    video.addEventListener("loadedmetadata", () => {
-      resolve(isFinite(video.duration) && video.duration > 0 ? video.duration : 0);
-    });
-    video.addEventListener("error", () => resolve(0));
-    video.crossOrigin = "anonymous";
-    video.preload = "metadata";
-    video.src = url;
-  });
-}
-
-/** Probe audio duration via browser <audio> element (header only, no full download). */
-async function getAudioDuration(url) {
-  return new Promise((resolve) => {
-    if (!url) return resolve(0);
-    const audio = new Audio();
-    audio.addEventListener("loadedmetadata", () => {
-      resolve(isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0);
-    });
-    audio.addEventListener("error", () => resolve(0));
-    audio.crossOrigin = "anonymous";
-    audio.preload = "metadata";
-    audio.src = url;
-  });
-}
 
 // ─── Presenter Collection Card ────────────────────────────────────────────────
 function PresenterCollectionCard({ asset, onRename, onDelete, deleting }) {
@@ -364,43 +333,14 @@ export default function AssetLibraryPage() {
   const fileInputRef = useRef(null);
 
   const handleEditVideo = async (asset) => {
-    const source = asset.metadata?.source;
-    const editConfig = EDITABLE_SOURCES[source];
-    if (!editConfig || editingVideoId) return;
-
+    if (editingVideoId) return;
     setEditingVideoId(asset.id);
     try {
-      const { avatarVideoUrl, walkthroughVideoUrl, ctaVideoUrl, part2AudioUrl } = asset.metadata;
+      const compositionProps = await buildCompositionFromAsset(asset);
+      if (!compositionProps) return;
 
-      const [avatarDur, walkthroughDur, ctaDur, part2AudioDur] = await Promise.all([
-        getVideoDuration(avatarVideoUrl),
-        getVideoDuration(walkthroughVideoUrl),
-        getVideoDuration(ctaVideoUrl),
-        getAudioDuration(part2AudioUrl),
-      ]);
-
-      const avatarDuration = avatarDur > 0 ? avatarDur : 15;
-      const ctaDuration = ctaDur > 0 ? ctaDur : 10;
-      const videoDuration = walkthroughDur > 0 ? walkthroughDur : 12;
-      const segmentDuration = part2AudioDur > 0 ? part2AudioDur : videoDuration;
-
-      const rawBrollClips = walkthroughVideoUrl
-        ? [{ url: walkthroughVideoUrl, videoDuration, segmentDuration }]
-        : [];
-      const brollClips = clampBrollClips({ avatarDuration, brollClips: rawBrollClips, ctaDuration });
-
-      const compositionProps = {
-        avatarVideoUrl: avatarVideoUrl || "",
-        brollClips,
-        ctaVideoUrl: ctaVideoUrl || "",
-        part2AudioUrl: part2AudioUrl || "",
-        avatarDuration,
-        ctaDuration,
-        ctaText: "",
-      };
-
-      sessionStorage.setItem(editConfig.compositionKey, JSON.stringify(compositionProps));
-      router.push(editConfig.editPath);
+      sessionStorage.setItem(COMPOSITION_STORAGE_KEY, JSON.stringify(compositionProps));
+      router.push(EDIT_PATH);
     } finally {
       setEditingVideoId(null);
     }
@@ -499,12 +439,16 @@ export default function AssetLibraryPage() {
     if (isVideo) {
       const canEdit = !!EDITABLE_SOURCES[asset.metadata?.source];
 
+      const isDeleting = deleting === asset.id;
+
       return (
         <div
           className={`group cursor-pointer aspect-video sm:aspect-9/16 bg-muted rounded-2xl overflow-hidden relative border transition-all duration-300 ${
+            isDeleting ? "animate-pulse pointer-events-none" : ""
+          } ${
             isSelected ? "border-primary ring-2 ring-primary" : "border-transparent hover:border-[#c7f038]/60 hover:shadow-xl"
           }`}
-          onClick={() => { setSelectedAsset(asset); setPreviewAsset(asset); }}
+          onClick={() => { if (!isDeleting) { setSelectedAsset(asset); setPreviewAsset(asset); } }}
         >
           <video
             src={asset.url}
@@ -519,6 +463,13 @@ export default function AssetLibraryPage() {
               e.currentTarget.currentTime = 0;
             }}
           />
+
+          {isDeleting && (
+            <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-2 z-10">
+              <Loader2 className="w-6 h-6 text-white animate-spin" />
+              <p className="text-xs text-white font-medium">Deleting…</p>
+            </div>
+          )}
 
           {/* Title bar: top on mobile, bottom on sm+ */}
           <div className="sm:hidden absolute inset-x-0 top-0 bg-linear-to-b from-black/70 via-black/30 to-transparent p-3 pr-12">
@@ -689,7 +640,7 @@ export default function AssetLibraryPage() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in py-12 min-h-screen">
+    <div className="space-y-6 animate-fade-in sm:pt-0 pt-4 min-h-screen">
       <input
         ref={fileInputRef}
         type="file"
@@ -740,18 +691,8 @@ export default function AssetLibraryPage() {
       )}
 
       {loading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {[...Array(10)].map((_, i) => (
-            <Card key={i} className="border-border/50">
-              <CardContent className="p-0">
-                <Skeleton className="aspect-square w-full" />
-                <div className="p-3 space-y-2">
-                  <Skeleton className="h-4 w-3/4" />
-                  <Skeleton className="h-3 w-1/2" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+        <div className="flex items-center justify-center py-24">
+          <Loader2 className="w-8 h-8 animate-spin text-[#c7f038]" />
         </div>
       ) : (
         <Tabs defaultValue="all" className="w-full">
