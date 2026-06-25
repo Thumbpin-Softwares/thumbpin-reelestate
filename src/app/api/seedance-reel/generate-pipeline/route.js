@@ -8,7 +8,10 @@ import SeedanceJob from "@/models/SeedanceJob";
 import dbConnect from "@/lib/mongodb";
 import { uploadToR2, buildUserKey } from "@/lib/r2-upload";
 import { R2_PUBLIC_URL } from "@/lib/r2";
-import { consumeCreditsForAction, refundCreditsForAction } from "@/lib/credit-system";
+import {
+  consumeCreditsForAction,
+  refundCreditsForAction,
+} from "@/lib/credit-system";
 import { fal } from "@fal-ai/client";
 import sharp from "sharp";
 import { ELEVENLABS_VOICE_SETTINGS } from "@/lib/elevenlabs-config";
@@ -39,15 +42,17 @@ async function callLLM(prompt) {
 }
 
 async function generateElevenLabsTTS(text, voiceId) {
-  const vs = ELEVENLABS_VOICE_SETTINGS[voiceId] ?? ELEVENLABS_VOICE_SETTINGS["dVTC43Yewy5fAIcmsISI"];
+  const vs =
+    ELEVENLABS_VOICE_SETTINGS[voiceId] ??
+    ELEVENLABS_VOICE_SETTINGS["dVTC43Yewy5fAIcmsISI"];
   const result = await fal.subscribe("fal-ai/elevenlabs/tts/multilingual-v2", {
     input: {
       text,
-      voice:            voiceId,
-      stability:        vs.stability,
+      voice: voiceId,
+      stability: vs.stability,
       similarity_boost: vs.similarity_boost,
-      style:            vs.style,
-      speed:            vs.speed,
+      style: vs.style,
+      speed: vs.speed,
     },
     logs: false,
   });
@@ -65,14 +70,18 @@ async function generateAndUploadTTS(text, voiceId, userId, keyPrefix) {
 }
 
 async function callSeedanceAndUpload(seedanceInput, userId, keyName) {
-  const result = await fal.subscribe("bytedance/seedance-2.0/fast/reference-to-video", {
-    input: seedanceInput,
-    logs: false,
-  });
+  const result = await fal.subscribe(
+    "bytedance/seedance-2.0/fast/reference-to-video",
+    {
+      input: seedanceInput,
+      logs: false,
+    },
+  );
   const falVideoUrl = result?.data?.video?.url;
   if (!falVideoUrl) throw new Error("Seedance returned no video URL");
   const videoRes = await fetch(falVideoUrl);
-  if (!videoRes.ok) throw new Error(`Failed to fetch Seedance video: ${videoRes.status}`);
+  if (!videoRes.ok)
+    throw new Error(`Failed to fetch Seedance video: ${videoRes.status}`);
   const videoBuf = Buffer.from(await videoRes.arrayBuffer());
   const key = buildUserKey(userId, "videos", "mp4", keyName);
   return uploadToR2(videoBuf, key, "video/mp4");
@@ -97,12 +106,17 @@ export async function POST(request) {
 
     const formData = await request.formData();
     const script = (formData.get("script") || "").toString().trim();
-    const voiceId = (formData.get("voiceId") || "21m00Tcm4TlvDq8ikWAM").toString();
+    const voiceId = (
+      formData.get("voiceId") || "21m00Tcm4TlvDq8ikWAM"
+    ).toString();
     const language = (formData.get("language") || "english").toString();
     const jobId = (formData.get("jobId") || "").toString().trim();
 
     if (!script || script.length < 30) {
-      return NextResponse.json({ error: "script is required (min 30 chars)" }, { status: 400 });
+      return NextResponse.json(
+        { error: "script is required (min 30 chars)" },
+        { status: 400 },
+      );
     }
     if (!jobId) {
       return NextResponse.json({ error: "jobId is required" }, { status: 400 });
@@ -113,7 +127,10 @@ export async function POST(request) {
     await dbConnect();
     const existingJob = await SeedanceJob.findOne({ jobId }).lean();
     if (existingJob) {
-      return NextResponse.json({ error: "Job already exists", jobId }, { status: 409 });
+      return NextResponse.json(
+        { error: "Job already exists", jobId },
+        { status: 409 },
+      );
     }
 
     // Collect avatar URLs — handle full https:// and relative /api/r2?key= proxy URLs
@@ -128,19 +145,27 @@ export async function POST(request) {
         if (key) avatarUrls.push(`${R2_PUBLIC_URL}/${key}`);
       }
     }
-    console.log(`[SeedanceReel] Resolved ${avatarUrls.length} avatar URL(s):`, avatarUrls);
+    console.log(
+      `[SeedanceReel] Resolved ${avatarUrls.length} avatar URL(s):`,
+      avatarUrls,
+    );
 
     // Collect location image files (up to 4)
     const locationBufs = [];
     for (let i = 0; i < 4; i++) {
       const f = formData.get(`locationImage_${i}`);
       if (f && typeof f !== "string") {
-        try { locationBufs.push(Buffer.from(await f.arrayBuffer())); } catch (_) {}
+        try {
+          locationBufs.push(Buffer.from(await f.arrayBuffer()));
+        } catch (_) {}
       }
     }
 
     if (avatarUrls.length === 0 && locationBufs.length === 0) {
-      return NextResponse.json({ error: "At least avatar URLs or location images are required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "At least avatar URLs or location images are required" },
+        { status: 400 },
+      );
     }
 
     // Debit credits before generation
@@ -150,7 +175,9 @@ export async function POST(request) {
       metadata: { endpoint: "/api/seedance-reel/generate-pipeline" },
     });
     if (!creditResult.ok) {
-      return NextResponse.json(creditResult.payload, { status: creditResult.status });
+      return NextResponse.json(creditResult.payload, {
+        status: creditResult.status,
+      });
     }
     debit = creditResult.debit;
 
@@ -167,27 +194,47 @@ export async function POST(request) {
             .resize(1080, 1920, { fit: "cover", position: "centre" })
             .jpeg({ quality: 88 })
             .toBuffer();
-          const key = buildUserKey(userId, "images", "jpg", `sreel-location-${i}`);
+          const key = buildUserKey(
+            userId,
+            "images",
+            "jpg",
+            `sreel-location-${i}`,
+          );
           const url = await uploadToR2(cropped, key, "image/jpeg");
           if (url.startsWith("http")) locationR2Urls[i] = url;
         } catch (e) {
-          console.warn(`[SeedanceReel] Failed to upload location image ${i}:`, e.message);
+          console.warn(
+            `[SeedanceReel] Failed to upload location image ${i}:`,
+            e.message,
+          );
         }
-      })
+      }),
     );
+
+    if (locationBufs.length > 0 && locationR2Urls.filter(Boolean).length === 0) {
+      console.error(
+        `[SeedanceReel] All ${locationBufs.length} location image upload(s) failed — walkthrough will have no image reference.`,
+      );
+    }
 
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
         function send(data) {
-          try { controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`)); } catch (_) {}
+          try {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify(data)}\n\n`),
+            );
+          } catch (_) {}
         }
 
         // Persists progress to Mongo so a refreshed/abandoned tab can resume
         // by polling GET /api/seedance-reel/jobs/:jobId instead of re-POSTing
         // (which would double-bill credits and double-fire fal generations).
         async function persistJob(patch) {
-          try { await SeedanceJob.updateOne({ jobId }, { $set: patch }); } catch (e) {
+          try {
+            await SeedanceJob.updateOne({ jobId }, { $set: patch });
+          } catch (e) {
             console.error("[SeedanceReel] Job persist failed:", e.message);
           }
         }
@@ -196,7 +243,10 @@ export async function POST(request) {
 
         try {
           // ── Stage 1: 3-Part Script Split via LLM ──────────────────────────
-          send({ type: "script_splitting", message: "Splitting script into 3 parts…" });
+          send({
+            type: "script_splitting",
+            message: "Splitting script into 3 parts…",
+          });
 
           const splitPrompt = `You are a video script editor. Split this real estate ad script into exactly THREE parts for a vertical reel video.
 
@@ -205,7 +255,7 @@ RULES:
 - Part 2 (WALKTHROUGH NARRATION ≤80 words): Property highlights. This plays as voiceover behind a smooth architectural walkthrough. Describes rooms, features, lifestyle.
 - Part 3 CTA (≤20 words): Punchy, humorous, memorable call-to-action delivered directly to camera. Make it witty and irresistible.
 - Do NOT change, add, or remove any words — split at natural sentence boundaries only.
-- You MAY adjust punctuation and emphasis to make the delivery sound more emotional and energetic when spoken aloud: add exclamation marks where there's excitement, ellipses (…) for dramatic pauses, and emphasis on key words. This is punctuation-only — the underlying words and meaning must stay identical.
+
 - Return ONLY valid JSON, no markdown: {"part1": "...", "part2": "...", "part3_cta": "..."}
 
 SCRIPT:
@@ -217,27 +267,37 @@ ${script}`;
 
           try {
             const splitRaw = await callLLM(splitPrompt);
-            const jsonMatch = splitRaw.replace(/^```[a-z]*\n?/i, "").replace(/\n?```$/i, "").trim().match(/\{[\s\S]*\}/);
+            const jsonMatch = splitRaw
+              .replace(/^```[a-z]*\n?/i, "")
+              .replace(/\n?```$/i, "")
+              .trim()
+              .match(/\{[\s\S]*\}/);
             if (jsonMatch) {
               const parsed = JSON.parse(jsonMatch[0]);
               if (parsed.part1 && parsed.part2 && parsed.part3_cta) {
-                part1     = parsed.part1.trim();
-                part2     = parsed.part2.trim();
+                part1 = parsed.part1.trim();
+                part2 = parsed.part2.trim();
                 part3_cta = parsed.part3_cta.trim();
               }
             }
           } catch (splitErr) {
-            console.warn("[SeedanceReel] LLM split failed, using word-count split:", splitErr.message);
+            console.warn(
+              "[SeedanceReel] LLM split failed, using word-count split:",
+              splitErr.message,
+            );
           }
 
           // Fallback: word-count split
           if (!part1 || !part2 || !part3_cta) {
             const words = script.split(/\s+/);
             const total = words.length;
-            const p1End    = Math.min(35, Math.floor(total * 0.30));
-            const p3Start  = Math.max(p1End + 1, total - Math.min(20, Math.floor(total * 0.20)));
-            part1     = words.slice(0, p1End).join(" ");
-            part2     = words.slice(p1End, p3Start).join(" ");
+            const p1End = Math.min(35, Math.floor(total * 0.3));
+            const p3Start = Math.max(
+              p1End + 1,
+              total - Math.min(20, Math.floor(total * 0.2)),
+            );
+            part1 = words.slice(0, p1End).join(" ");
+            part2 = words.slice(p1End, p3Start).join(" ");
             part3_cta = words.slice(p3Start).join(" ");
           }
 
@@ -246,19 +306,36 @@ ${script}`;
           const part3Words = part3_cta.split(/\s+/).filter(Boolean).length;
 
           // Dynamic durations
-          const seedanceDuration    = String(Math.min(20, Math.max(10, Math.ceil(part1Words / 2.5) + 3)));
+          const seedanceDuration = String(
+            Math.min(20, Math.max(10, Math.ceil(part1Words / 2.5) + 3)),
+          );
           const walkthroughDuration = "12";
-          const ctaDuration         = "10";
-          console.log(`[SeedanceReel] Durations — intro:${seedanceDuration}s wt:${walkthroughDuration}s cta:${ctaDuration}s`);
+          const ctaDuration = "10";
+          console.log(
+            `[SeedanceReel] Durations — intro:${seedanceDuration}s wt:${walkthroughDuration}s cta:${ctaDuration}s`,
+          );
 
           // ── Language adaptation: bidirectional script conversion ───────────
-          let part1_tts = part1, part2_tts = part2, part3_tts = part3_cta;
-          let part1_roman = part1, part3_roman = part3_cta;
+          let part1_tts = part1,
+            part2_tts = part2,
+            part3_tts = part3_cta;
+          let part1_roman = part1,
+            part3_roman = part3_cta;
 
           const langNameMap = {
-            english: "English", hindi: "Hindi", hinglish: "Hinglish", marathi: "Marathi",
-            tamil: "Tamil", telugu: "Telugu", kannada: "Kannada", malayalam: "Malayalam",
-            bengali: "Bengali", gujarati: "Gujarati", punjabi: "Punjabi", urdu: "Urdu", odia: "Odia",
+            english: "English",
+            hindi: "Hindi",
+            hinglish: "Hinglish",
+            marathi: "Marathi",
+            tamil: "Tamil",
+            telugu: "Telugu",
+            kannada: "Kannada",
+            malayalam: "Malayalam",
+            bengali: "Bengali",
+            gujarati: "Gujarati",
+            punjabi: "Punjabi",
+            urdu: "Urdu",
+            odia: "Odia",
           };
           const langName = langNameMap[language] || "English";
 
@@ -271,24 +348,37 @@ ${script}`;
           // Devanagari-ize plain English words, which the TTS model then mispronounces
           // as garbled Hindi — producing choppy, unnatural-sounding narration.
           const nativeScriptRule = {
-            hindi:     "Convert every Hindi/Urdu word to Devanagari script. Any English word or phrase — not just brand names, property names, and numbers — stays in Roman exactly as written.",
-            hinglish:  "Convert every Hindi/Urdu word to Devanagari script. English words stay in Roman exactly as written.",
-            marathi:   "Convert every Marathi word to Devanagari script. Any English word or phrase stays in Roman exactly as written.",
-            bengali:   "Convert every Bengali word to Bengali script (বাংলা). Any English word or phrase stays in Roman exactly as written.",
-            gujarati:  "Convert every Gujarati word to Gujarati script (ગુજરાતી). Any English word or phrase stays in Roman exactly as written.",
-            punjabi:   "Convert every Punjabi word to Gurmukhi script (ਪੰਜਾਬੀ). Any English word or phrase stays in Roman exactly as written.",
-            urdu:      "Convert every Urdu word to Nastaliq Urdu script. Any English word or phrase stays in Roman exactly as written.",
-            odia:      "Convert every Odia word to Odia script (ଓଡ଼ିଆ). Any English word or phrase stays in Roman exactly as written.",
-            tamil:     "Convert every Tamil word to Tamil script (தமிழ்). Any English word or phrase stays in Roman exactly as written.",
-            telugu:    "Convert every Telugu word to Telugu script (తెలుగు). Any English word or phrase stays in Roman exactly as written.",
-            kannada:   "Convert every Kannada word to Kannada script (ಕನ್ನಡ). Any English word or phrase stays in Roman exactly as written.",
-            malayalam: "Convert every Malayalam word to Malayalam script (മലയാളം). Any English word or phrase stays in Roman exactly as written.",
+            hindi:
+              "Convert every Hindi/Urdu word to Devanagari script.",
+            hinglish:
+              "Convert every Hindi/Urdu word to Devanagari script. English words stay in Roman exactly as written.",
+            marathi:
+              "Convert every Marathi word to Devanagari script. Any English word or phrase stays in Roman exactly as written.",
+            bengali:
+              "Convert every Bengali word to Bengali script (বাংলা). Any English word or phrase stays in Roman exactly as written.",
+            gujarati:
+              "Convert every Gujarati word to Gujarati script (ગુજરાતી). Any English word or phrase stays in Roman exactly as written.",
+            punjabi:
+              "Convert every Punjabi word to Gurmukhi script (ਪੰਜਾਬੀ). Any English word or phrase stays in Roman exactly as written.",
+            urdu: "Convert every Urdu word to Nastaliq Urdu script. Any English word or phrase stays in Roman exactly as written.",
+            odia: "Convert every Odia word to Odia script (ଓଡ଼ିଆ). Any English word or phrase stays in Roman exactly as written.",
+            tamil:
+              "Convert every Tamil word to Tamil script (தமிழ்). Any English word or phrase stays in Roman exactly as written.",
+            telugu:
+              "Convert every Telugu word to Telugu script (తెలుగు). Any English word or phrase stays in Roman exactly as written.",
+            kannada:
+              "Convert every Kannada word to Kannada script (ಕನ್ನಡ). Any English word or phrase stays in Roman exactly as written.",
+            malayalam:
+              "Convert every Malayalam word to Malayalam script (മലയാളം). Any English word or phrase stays in Roman exactly as written.",
           };
 
           if (language !== "english") {
             if (!part1HasNativeScript && nativeScriptRule[language]) {
               // Roman → native script: convert all 3 parts in one LLM call
-              send({ type: "script_adapting", message: `Converting all parts to ${langName} for TTS…` });
+              send({
+                type: "script_adapting",
+                message: `Converting all parts to ${langName} for TTS…`,
+              });
               try {
                 const adaptPrompt = `You are a script localisation tool. The following ${langName} text is in Roman transliteration.
 
@@ -307,7 +397,11 @@ ${part2}
 PART 3 CTA:
 ${part3_cta}`;
                 const adaptRaw = await callLLM(adaptPrompt);
-                const match = adaptRaw.replace(/^```[a-z]*\n?/i, "").replace(/\n?```$/i, "").trim().match(/\{[\s\S]*\}/);
+                const match = adaptRaw
+                  .replace(/^```[a-z]*\n?/i, "")
+                  .replace(/\n?```$/i, "")
+                  .trim()
+                  .match(/\{[\s\S]*\}/);
                 if (match) {
                   const parsed = JSON.parse(match[0]);
                   // All-or-nothing: if any one part fails to convert, applying the
@@ -323,15 +417,24 @@ ${part3_cta}`;
                     part2_tts = parsed.part2.trim();
                     part3_tts = parsed.part3_cta.trim();
                   } else {
-                    console.warn("[SeedanceReel] Roman→native conversion incomplete — keeping all parts in Roman for consistency:", parsed);
+                    console.warn(
+                      "[SeedanceReel] Roman→native conversion incomplete — keeping all parts in Roman for consistency:",
+                      parsed,
+                    );
                   }
                 }
               } catch (adaptErr) {
-                console.warn("[SeedanceReel] Roman→native conversion failed:", adaptErr.message);
+                console.warn(
+                  "[SeedanceReel] Roman→native conversion failed:",
+                  adaptErr.message,
+                );
               }
             } else if (part1HasNativeScript) {
               // Already native script → transliterate part1 + part3_cta to Roman for Seedance prompts
-              send({ type: "script_adapting", message: `Transliterating intro + CTA to Roman for Seedance prompts…` });
+              send({
+                type: "script_adapting",
+                message: `Transliterating intro + CTA to Roman for Seedance prompts…`,
+              });
               try {
                 const romanizePrompt = `Transliterate the following ${langName} texts from native script to Romanized Latin letters. Keep English brand names and numbers unchanged.
 Return ONLY valid JSON (no markdown):
@@ -343,63 +446,137 @@ ${part1}
 TEXT 2 (CTA):
 ${part3_cta}`;
                 const romanRaw = await callLLM(romanizePrompt);
-                const match = romanRaw.replace(/^```[a-z]*\n?/i, "").replace(/\n?```$/i, "").trim().match(/\{[\s\S]*\}/);
+                const match = romanRaw
+                  .replace(/^```[a-z]*\n?/i, "")
+                  .replace(/\n?```$/i, "")
+                  .trim()
+                  .match(/\{[\s\S]*\}/);
                 if (match) {
                   const parsed = JSON.parse(match[0]);
-                  if (parsed.part1_roman?.trim().length > 5) part1_roman = parsed.part1_roman.trim();
-                  if (parsed.part3_roman?.trim().length > 5) part3_roman = parsed.part3_roman.trim();
+                  if (parsed.part1_roman?.trim().length > 5)
+                    part1_roman = parsed.part1_roman.trim();
+                  if (parsed.part3_roman?.trim().length > 5)
+                    part3_roman = parsed.part3_roman.trim();
                 }
               } catch (romanErr) {
-                console.warn("[SeedanceReel] Native→Roman transliteration failed:", romanErr.message);
+                console.warn(
+                  "[SeedanceReel] Native→Roman transliteration failed:",
+                  romanErr.message,
+                );
               }
             }
           }
 
-          send({ type: "script_split", part1, part2, part3_cta, part1Words, part2Words, part3Words });
-          await persistJob({ status: "splitting", part1, part2, part3Cta: part3_cta });
+          send({
+            type: "script_split",
+            part1,
+            part2,
+            part3_cta,
+            part1Words,
+            part2Words,
+            part3Words,
+          });
+          await persistJob({
+            status: "splitting",
+            part1,
+            part2,
+            part3Cta: part3_cta,
+          });
 
           // ── Stage 2: Generate all 3 TTS in parallel ───────────────────────
-          send({ type: "voice_generating", message: "Generating voiceovers for all 3 parts in parallel…" });
+          send({
+            type: "voice_generating",
+            message: "Generating voiceovers for all 3 parts in parallel…",
+          });
 
-          const [p1TtsResult, p2TtsResult, p3TtsResult] = await Promise.allSettled([
-            generateAndUploadTTS(part1_tts,  voiceId, userId, "sreel-part1-voice"),
-            generateAndUploadTTS(part2_tts,  voiceId, userId, "sreel-part2-voice"),
-            generateAndUploadTTS(part3_tts,  voiceId, userId, "sreel-part3-voice"),
-          ]);
+          const [p1TtsResult, p2TtsResult, p3TtsResult] =
+            await Promise.allSettled([
+              generateAndUploadTTS(
+                part1_tts,
+                voiceId,
+                userId,
+                "sreel-part1-voice",
+              ),
+              generateAndUploadTTS(
+                part2_tts,
+                voiceId,
+                userId,
+                "sreel-part2-voice",
+              ),
+              generateAndUploadTTS(
+                part3_tts,
+                voiceId,
+                userId,
+                "sreel-part3-voice",
+              ),
+            ]);
 
-          let part1AudioUrl = null, part2AudioUrl = null, part3AudioUrl = null;
-          if (p1TtsResult.status === "fulfilled") { part1AudioUrl = p1TtsResult.value; }
-          else console.error("[SeedanceReel] Part 1 TTS failed:", p1TtsResult.reason?.message);
-          if (p2TtsResult.status === "fulfilled") { part2AudioUrl = p2TtsResult.value; }
-          else console.error("[SeedanceReel] Part 2 TTS failed:", p2TtsResult.reason?.message);
-          if (p3TtsResult.status === "fulfilled") { part3AudioUrl = p3TtsResult.value; }
-          else console.error("[SeedanceReel] Part 3 TTS failed:", p3TtsResult.reason?.message);
+          let part1AudioUrl = null,
+            part2AudioUrl = null,
+            part3AudioUrl = null;
+          if (p1TtsResult.status === "fulfilled") {
+            part1AudioUrl = p1TtsResult.value;
+          } else
+            console.error(
+              "[SeedanceReel] Part 1 TTS failed:",
+              p1TtsResult.reason?.message,
+            );
+          if (p2TtsResult.status === "fulfilled") {
+            part2AudioUrl = p2TtsResult.value;
+          } else
+            console.error(
+              "[SeedanceReel] Part 2 TTS failed:",
+              p2TtsResult.reason?.message,
+            );
+          if (p3TtsResult.status === "fulfilled") {
+            part3AudioUrl = p3TtsResult.value;
+          } else
+            console.error(
+              "[SeedanceReel] Part 3 TTS failed:",
+              p3TtsResult.reason?.message,
+            );
 
-          send({ type: "voice_all_ready", part1AudioUrl, part2AudioUrl, part3AudioUrl });
-          await persistJob({ status: "voices", part1AudioUrl, part2AudioUrl, part3AudioUrl });
+          send({
+            type: "voice_all_ready",
+            part1AudioUrl,
+            part2AudioUrl,
+            part3AudioUrl,
+          });
+          await persistJob({
+            status: "voices",
+            part1AudioUrl,
+            part2AudioUrl,
+            part3AudioUrl,
+          });
 
           // ── Stage 3: Build 3 Seedance prompts ─────────────────────────────
-          const numAvatarImages   = avatarUrls.length;
+          const numAvatarImages = avatarUrls.length;
           const validLocationUrls = locationR2Urls.filter(Boolean);
-          const numLocImgs        = validLocationUrls.length;
+          const numLocImgs = validLocationUrls.length;
 
           // ── Prompt A: Intro avatar (car → walk → dialogue, same proven template) ──
-          const faceIdentityRef   = numAvatarImages >= 3 ? `#Image2 and #Image3` : numAvatarImages >= 2 ? `#Image1 and #Image2` : `#Image1`;
-          const locationImageRefs = validLocationUrls.map((_, i) => `#Image${numAvatarImages + 1 + i}`).join(", ");
-          const locationPhrase    = locationImageRefs ? `into the outdoor entrance area shown in ${locationImageRefs}` : "toward the outdoor entrance";
+          const faceIdentityRef =
+            numAvatarImages >= 3
+              ? `#Image2 and #Image3`
+              : numAvatarImages >= 2
+                ? `#Image1 and #Image2`
+                : `#Image1`;
+          const locationImageRefs = validLocationUrls
+            .map((_, i) => `#Image${numAvatarImages + 1 + i}`)
+            .join(", ");
+          const locationPhrase = locationImageRefs
+            ? `into the outdoor entrance area shown in ${locationImageRefs}`
+            : "toward the outdoor entrance";
 
-          const introPrompt =
-            `Simple, sleek UGC smartphone vlog footage. The very first frame already shows #Image1 halfway exited through a luxury white car door — one leg already out, body partway emerged from the vehicle, frozen at that exact midpoint as the clip begins; skip the door opening and the full exit entirely. ` +
-            `From that first frame she continues exiting and walks naturally ${locationPhrase}, speaking directly to the camera lens the whole time — talking and walking simultaneously, with dialogue starting immediately and never pausing to stand still. ` +
-            `Her face matches the exact identity, features, and smile of ${faceIdentityRef}. ` +
-            `While continuously walking toward the camera, she speaks the exact following dialogue words: "${part1_roman}". ` +
-            `Her lip movements, mouth openings, and natural facial muscles shape perfectly to the precise spoken syllables, phonetics, and cadence of #Audio1, synced throughout her walking motion. ` +
-            `In the background, bystanders casually walk past the property entrance. ` +
-            `Neutral daylight, realistic handheld camera stabilization, natural skin texture with visible pores, and clean, unedited raw video aesthetic.`;
+            const introPrompt =
+            `Simple, sleek UGC smartphone vlog footage. #Image1 shows her exiting a luxury car and walking toward the camera while speaking directly to the lens. ` +
+            `Her face matches the exact identity of ${faceIdentityRef}. ` +
+            `She speaks the following dialogue: "${part1_roman}". ` +
+            `Her lip movements sync perfectly to the audio in #Audio1. ` +
+            `Natural daylight, handheld camera, realistic raw video aesthetic.`;
 
           // ── Prompt B: Architectural walkthrough (location images only, no avatar) ──
-          let walkthroughPrompt =
-            `A seamless, continuous 12-second architectural walkthrough video with zero hard cuts. `;
+          let walkthroughPrompt = `A seamless, continuous 12-second architectural walkthrough video with zero hard cuts. `;
           if (numLocImgs >= 1)
             walkthroughPrompt += `The camera begins at the exterior facade and environment shown in #Image1, slowly pushing forward toward the main entrance. `;
           if (numLocImgs >= 2)
@@ -408,14 +585,16 @@ ${part3_cta}`;
             walkthroughPrompt += `Maintaining smooth stabilized handheld momentum, the camera pushes through an archway into the next adjoining space shown in #Image3, tracking smoothly across the room. `;
           if (numLocImgs >= 4)
             walkthroughPrompt += `The camera glides forward, transitioning effortlessly into the environment shown in #Image4, accentuating the unique spatial layout and design elements. `;
-          walkthroughPrompt +=
-            `The entire 12-second progression is one fluid, unbroken sequence — hyper-realistic textures, consistent interior lighting transitions, soft shadows, and clean 4K architectural rendering quality.`;
+          walkthroughPrompt += `The entire 12-second progression is one fluid, unbroken sequence — hyper-realistic textures, consistent interior lighting transitions, soft shadows, and clean 4K architectural rendering quality.`;
           if (part2AudioUrl)
             walkthroughPrompt += ` Camera pacing and transitions are dynamically synchronized with the rhythm of #Audio1.`;
 
           // ── Prompt C: CTA avatar (confident, charming, hooky closing) ──────
-          const ctaBgRef    = numLocImgs > 0 ? ` against the stunning property backdrop in #Image${numAvatarImages + 1}` : "";
-          const ctaPrompt   =
+          const ctaBgRef =
+            numLocImgs > 0
+              ? ` against the stunning property backdrop in #Image${numAvatarImages + 1}`
+              : "";
+          const ctaPrompt =
             `Sleek, punchy UGC smartphone vlog footage. #Image1 turns back toward the camera with a charismatic, wide grin${ctaBgRef}. ` +
             `Her face matches the exact identity and confident energy of ${faceIdentityRef}. ` +
             `She leans slightly toward the camera lens with sparkling eyes and delivers the closing line with irresistible charm: "${part3_roman}". ` +
@@ -423,22 +602,39 @@ ${part3_cta}`;
             `She finishes with a bright, unforgettable smile directly into the lens — leaving no doubt about what to do next. ` +
             `Warm, soft property bokeh background, handheld micro-movement, natural skin texture. Confident, witty, memorable.`;
 
-          send({ type: "seedance_prompt_ready", introPrompt, walkthroughPrompt, ctaPrompt, message: "All 3 Seedance prompts ready." });
+          send({
+            type: "seedance_prompt_ready",
+            introPrompt,
+            walkthroughPrompt,
+            ctaPrompt,
+            message: "All 3 Seedance prompts ready.",
+          });
 
           // ── Stage 4: All 3 Seedance calls in parallel ─────────────────────
-          send({ type: "seedance_generating", message: "Generating 3 videos in parallel via Seedance 2.0 (takes ~3–7 min)…" });
+          send({
+            type: "seedance_generating",
+            message:
+              "Generating 3 videos in parallel via Seedance 2.0 (takes ~3–7 min)…",
+          });
           await persistJob({ status: "seedance" });
 
           // Intro: avatar images + all location images; 720p; baked audio
-          const introImageUrls = [...avatarUrls.slice(0, 3), ...validLocationUrls];
+          const introImageUrls = [
+            ...avatarUrls.slice(0, 3),
+            ...validLocationUrls,
+          ];
+          // fal rejects audio_urls unless image_urls/video_urls is also present —
+          // nest audio inside the same guard so a clip never gets sent audio-only.
           const introInput = {
             prompt: introPrompt,
             aspect_ratio: "9:16",
             duration: seedanceDuration,
             resolution: "720p",
             generate_audio: true,
-            ...(introImageUrls.length > 0   && { image_urls: introImageUrls }),
-            ...(part1AudioUrl               && { audio_urls: [part1AudioUrl] }),
+            ...(introImageUrls.length > 0 && {
+              image_urls: introImageUrls,
+              ...(part1AudioUrl && { audio_urls: [part1AudioUrl] }),
+            }),
           };
 
           // Walkthrough: location images only; 480p; no baked audio (Part 2 TTS overlaid by client)
@@ -448,72 +644,116 @@ ${part3_cta}`;
             duration: walkthroughDuration,
             resolution: "480p",
             generate_audio: false,
-            ...(validLocationUrls.length > 0 && { image_urls: validLocationUrls }),
-            ...(part2AudioUrl                && { audio_urls: [part2AudioUrl] }), // pacing reference only
+            ...(validLocationUrls.length > 0 && {
+              image_urls: validLocationUrls,
+              ...(part2AudioUrl && { audio_urls: [part2AudioUrl] }), // pacing reference only
+            }),
           };
 
           // CTA: avatar images + up to 2 location images for backdrop context; 720p; baked audio
-          const ctaImageUrls = [...avatarUrls.slice(0, 3), ...validLocationUrls.slice(0, 2)];
+          const ctaImageUrls = [
+            ...avatarUrls.slice(0, 3),
+            ...validLocationUrls.slice(0, 2),
+          ];
           const ctaInput = {
             prompt: ctaPrompt,
             aspect_ratio: "9:16",
             duration: ctaDuration,
             resolution: "720p",
             generate_audio: true,
-            ...(ctaImageUrls.length > 0 && { image_urls: ctaImageUrls }),
-            ...(part3AudioUrl           && { audio_urls: [part3AudioUrl] }),
+            ...(ctaImageUrls.length > 0 && {
+              image_urls: ctaImageUrls,
+              ...(part3AudioUrl && { audio_urls: [part3AudioUrl] }),
+            }),
           };
 
-          console.log(`[SeedanceReel] Intro image_urls (${introInput.image_urls?.length ?? 0}):`, introInput.image_urls);
-          console.log(`[SeedanceReel] Walkthrough image_urls (${walkthroughInput.image_urls?.length ?? 0}):`, walkthroughInput.image_urls);
+          console.log(
+            `[SeedanceReel] Intro image_urls (${introInput.image_urls?.length ?? 0}):`,
+            introInput.image_urls,
+          );
+          console.log(
+            `[SeedanceReel] Walkthrough image_urls (${walkthroughInput.image_urls?.length ?? 0}):`,
+            walkthroughInput.image_urls,
+          );
 
-          let avatarVideoUrl     = null;
+          let avatarVideoUrl = null;
           let walkthroughVideoUrl = null;
-          let ctaVideoUrl        = null;
+          let ctaVideoUrl = null;
 
           // Fire all 3 simultaneously; send SSE events as each one resolves
           await Promise.allSettled([
             callSeedanceAndUpload(introInput, userId, "sreel-avatar")
-              .then(url => {
+              .then((url) => {
                 avatarVideoUrl = url;
                 console.log("[SeedanceReel] Intro avatar uploaded:", url);
-                send({ type: "seedance_done", avatarVideoUrl: url, message: "Intro avatar video ready!" });
+                send({
+                  type: "seedance_done",
+                  avatarVideoUrl: url,
+                  message: "Intro avatar video ready!",
+                });
                 persistJob({ avatarVideoUrl: url });
               })
-              .catch(err => {
-                console.error("[SeedanceReel] Intro Seedance failed:", err.message);
-                send({ type: "seedance_error", message: `Intro video failed: ${err.message}` });
+              .catch((err) => {
+                console.error(
+                  "[SeedanceReel] Intro Seedance failed:",
+                  err.message,
+                );
+                send({
+                  type: "seedance_error",
+                  message: `Intro video failed: ${err.message}`,
+                });
               }),
 
             callSeedanceAndUpload(walkthroughInput, userId, "sreel-walkthrough")
-              .then(url => {
+              .then((url) => {
                 walkthroughVideoUrl = url;
                 console.log("[SeedanceReel] Walkthrough uploaded:", url);
-                send({ type: "walkthrough_done", walkthroughVideoUrl: url, message: "Architectural walkthrough ready!" });
+                send({
+                  type: "walkthrough_done",
+                  walkthroughVideoUrl: url,
+                  message: "Architectural walkthrough ready!",
+                });
                 persistJob({ walkthroughVideoUrl: url });
               })
-              .catch(err => {
-                console.error("[SeedanceReel] Walkthrough Seedance failed:", err.message);
-                send({ type: "seedance_error", message: `Walkthrough failed: ${err.message}` });
+              .catch((err) => {
+                console.error(
+                  "[SeedanceReel] Walkthrough Seedance failed:",
+                  err.message,
+                );
+                send({
+                  type: "seedance_error",
+                  message: `Walkthrough failed: ${err.message}`,
+                });
               }),
 
             callSeedanceAndUpload(ctaInput, userId, "sreel-cta")
-              .then(url => {
+              .then((url) => {
                 ctaVideoUrl = url;
                 console.log("[SeedanceReel] CTA avatar uploaded:", url);
-                send({ type: "seedance_cta_done", ctaVideoUrl: url, message: "CTA avatar video ready!" });
+                send({
+                  type: "seedance_cta_done",
+                  ctaVideoUrl: url,
+                  message: "CTA avatar video ready!",
+                });
                 persistJob({ ctaVideoUrl: url });
               })
-              .catch(err => {
-                console.error("[SeedanceReel] CTA Seedance failed:", err.message);
-                send({ type: "seedance_error", message: `CTA video failed: ${err.message}` });
+              .catch((err) => {
+                console.error(
+                  "[SeedanceReel] CTA Seedance failed:",
+                  err.message,
+                );
+                send({
+                  type: "seedance_error",
+                  message: `CTA video failed: ${err.message}`,
+                });
               }),
           ]);
 
           // ── Stage 5: Save asset + finalize ────────────────────────────────
           send({ type: "uploading", message: "Saving to your Asset Library…" });
 
-          const primaryUrl = avatarVideoUrl || walkthroughVideoUrl || ctaVideoUrl;
+          const primaryUrl =
+            avatarVideoUrl || walkthroughVideoUrl || ctaVideoUrl;
           if (primaryUrl) {
             try {
               await dbConnect();
@@ -549,7 +789,13 @@ ${part3_cta}`;
             totalDuration,
             message: "All assets ready! Assembling final reel…",
           });
-          await persistJob({ status: "done", avatarVideoUrl, walkthroughVideoUrl, ctaVideoUrl, part2AudioUrl });
+          await persistJob({
+            status: "done",
+            avatarVideoUrl,
+            walkthroughVideoUrl,
+            ctaVideoUrl,
+            part2AudioUrl,
+          });
 
           send({ type: "done" });
           clearInterval(pingInterval);
@@ -557,7 +803,10 @@ ${part3_cta}`;
         } catch (err) {
           clearInterval(pingInterval);
           console.error("[SeedanceReel] Pipeline error:", err);
-          await persistJob({ status: "error", error: err.message || "Pipeline failed" });
+          await persistJob({
+            status: "error",
+            error: err.message || "Pipeline failed",
+          });
 
           if (userId && debit) {
             await refundCreditsForAction({
@@ -604,7 +853,7 @@ ${part3_cta}`;
 
     return NextResponse.json(
       { error: error.message || "Failed to start pipeline" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
