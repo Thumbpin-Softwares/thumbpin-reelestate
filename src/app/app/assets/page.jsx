@@ -1,11 +1,17 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { useRouter } from "next/navigation";
+import {
+  EDITABLE_SOURCES,
+  COMPOSITION_STORAGE_KEY,
+  EDIT_PATH,
+  buildCompositionFromAsset,
+} from "@/lib/editable-sources";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -14,6 +20,12 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useAssets } from "@/hooks/use-assets";
 import { toast } from "sonner";
 import {
@@ -26,8 +38,10 @@ import {
   ImagePlus,
   Sparkles,
   Package,
-  Video,
   PenLine,
+  Play,
+  MoreVertical,
+  Pencil,
   X,
 } from "lucide-react";
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -305,6 +319,7 @@ export default function AssetLibraryPage() {
     refetch,
   } = useAssets();
 
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [selectedAsset, setSelectedAsset] = useState(null);
   const [previewAsset, setPreviewAsset] = useState(null);
@@ -314,7 +329,22 @@ export default function AssetLibraryPage() {
   const [assetName, setAssetName] = useState("");
   const [assetType, setAssetType] = useState("avatar");
   const [deleting, setDeleting] = useState(null);
+  const [editingVideoId, setEditingVideoId] = useState(null);
   const fileInputRef = useRef(null);
+
+  const handleEditVideo = async (asset) => {
+    if (editingVideoId) return;
+    setEditingVideoId(asset.id);
+    try {
+      const compositionProps = await buildCompositionFromAsset(asset);
+      if (!compositionProps) return;
+
+      sessionStorage.setItem(COMPOSITION_STORAGE_KEY, JSON.stringify(compositionProps));
+      router.push(EDIT_PATH);
+    } finally {
+      setEditingVideoId(null);
+    }
+  };
 
   // Avatar collection upload modal
   const [avatarCollectionOpen, setAvatarCollectionOpen] = useState(false);
@@ -402,30 +432,164 @@ export default function AssetLibraryPage() {
     const isSelected = selectedAsset?.id === asset.id;
     const isVideo = asset.type === "video" || asset.type === "clip";
 
+    // Video clips: landscape card with top title bar + centered play button on
+    // mobile (matches the dashboard "Recent Creations" mobile layout, since the
+    // hover-only action icons below are unreachable on touch); 9:16 hover-to-play
+    // card on sm+ (unchanged).
+    if (isVideo) {
+      const canEdit = !!EDITABLE_SOURCES[asset.metadata?.source];
+
+      const isDeleting = deleting === asset.id;
+
+      return (
+        <div
+          className={`group cursor-pointer aspect-video sm:aspect-9/16 bg-muted rounded-2xl overflow-hidden relative border transition-all duration-300 ${
+            isDeleting ? "animate-pulse pointer-events-none" : ""
+          } ${
+            isSelected ? "border-primary ring-2 ring-primary" : "border-transparent hover:border-[#c7f038]/60 hover:shadow-xl"
+          }`}
+          onClick={() => { if (!isDeleting) { setSelectedAsset(asset); setPreviewAsset(asset); } }}
+        >
+          <video
+            src={asset.url}
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            className="w-full h-full object-cover"
+            onMouseEnter={(e) => e.currentTarget.play()}
+            onMouseLeave={(e) => {
+              e.currentTarget.pause();
+              e.currentTarget.currentTime = 0;
+            }}
+          />
+
+          {isDeleting && (
+            <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-2 z-10">
+              <Loader2 className="w-6 h-6 text-white animate-spin" />
+              <p className="text-xs text-white font-medium">Deleting…</p>
+            </div>
+          )}
+
+          {/* Title bar: top on mobile, bottom on sm+ */}
+          <div className="sm:hidden absolute inset-x-0 top-0 bg-linear-to-b from-black/70 via-black/30 to-transparent p-3 pr-12">
+            <p className="font-semibold text-sm text-white truncate">{asset.name}</p>
+            <p className="text-[11px] text-white/70">
+              {asset.is_custom ? "Added by you" : "Library Asset"}
+            </p>
+          </div>
+          <div className="hidden sm:block absolute inset-x-0 bottom-0 bg-linear-to-t from-black/80 via-black/40 to-transparent p-3 pt-8">
+            <p className="font-semibold text-sm text-white truncate">{asset.name}</p>
+            <p className="text-[11px] text-white/70">
+              {asset.is_custom ? "Added by you" : "Library Asset"}
+            </p>
+          </div>
+
+          {/* Mobile: centered play button + three-dot menu (hover icons below don't work on touch) */}
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setPreviewAsset(asset); }}
+            className="sm:hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/90 flex items-center justify-center shadow-lg"
+            title="Play"
+          >
+            <Play className="w-5 h-5 text-black fill-black" />
+          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                onClick={(e) => e.stopPropagation()}
+                className="sm:hidden absolute top-2 right-2 w-8 h-8 rounded-full bg-black/40 flex items-center justify-center text-white"
+                title="More options"
+              >
+                {deleting === asset.id || editingVideoId === asset.id ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <MoreVertical className="w-4 h-4" />
+                )}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+              <DropdownMenuItem onClick={() => setPreviewAsset(asset)} className="cursor-pointer">
+                <Eye className="mr-2 h-4 w-4" />
+                Preview
+              </DropdownMenuItem>
+              {canEdit && (
+                <DropdownMenuItem
+                  disabled={editingVideoId === asset.id}
+                  onClick={() => handleEditVideo(asset)}
+                  className="cursor-pointer"
+                >
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit
+                </DropdownMenuItem>
+              )}
+              {showDelete && (
+                <DropdownMenuItem
+                  disabled={deleting === asset.id}
+                  onClick={() => handleDelete(asset.id)}
+                  className="cursor-pointer text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Desktop: hover action icons */}
+          <div className="hidden sm:flex absolute top-3 right-3 gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-300">
+            <button
+              className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center text-muted-foreground hover:text-[#c7f038] transition-colors"
+              onClick={(e) => { e.stopPropagation(); setPreviewAsset(asset); }}
+            >
+              <Eye className="w-4 h-4" />
+            </button>
+            {canEdit && (
+              <button
+                className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center text-muted-foreground hover:text-[#c7f038] transition-colors"
+                onClick={(e) => { e.stopPropagation(); handleEditVideo(asset); }}
+                disabled={editingVideoId === asset.id}
+              >
+                {editingVideoId === asset.id ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Pencil className="w-4 h-4" />
+                )}
+              </button>
+            )}
+            {showDelete && (
+              <button
+                className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors"
+                onClick={(e) => { e.stopPropagation(); handleDelete(asset.id); }}
+                disabled={deleting === asset.id}
+              >
+                {deleting === asset.id ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4" />
+                )}
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     return (
       <Card
         className={`group cursor-pointer border-border/50 hover:shadow-lg transition-all hover:-translate-y-1 overflow-hidden ${
           isSelected ? "ring-2 ring-primary border-primary" : ""
-        } ${isVideo ? "aspect-[9/16]" : ""}`}
-        onClick={() => { setSelectedAsset(asset); if (isVideo) setPreviewAsset(asset); }}
+        }`}
+        onClick={() => setSelectedAsset(asset)}
       >
         <CardContent className="p-0">
-          <div className="aspect-square bg-gradient-to-br from-primary/10 to-accent/10 relative flex items-center justify-center overflow-hidden">
-            {isVideo ? (
-              <video
-                src={asset.url}
-                className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                muted
-                onMouseEnter={(e) => e.target.play()}
-                onMouseLeave={(e) => { e.target.pause(); e.target.currentTime = 0; }}
-              />
-            ) : (
-              <img
-                src={asset.url || asset.image_url}
-                alt={asset.name}
-                className="w-full h-full object-cover transition-transform group-hover:scale-105"
-              />
-            )}
+          <div className="aspect-square bg-linear-to-br from-primary/10 to-accent/10 relative flex items-center justify-center overflow-hidden">
+            <img
+              src={asset.url || asset.image_url}
+              alt={asset.name}
+              className="w-full h-full object-cover transition-transform group-hover:scale-105"
+            />
             {/* Hover overlay */}
             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
               <button
@@ -454,13 +618,12 @@ export default function AssetLibraryPage() {
                 </button>
               )}
             </div>
-            
+
             <div className="absolute top-2 left-2">
               <Badge className="bg-primary/80 text-white text-[10px] px-1.5 py-0.5 border-0 flex items-center gap-1">
                 {asset.type === "avatar" && <Sparkles className="w-2.5 h-2.5" />}
                 {asset.type === "product" && <Package className="w-2.5 h-2.5" />}
-                {isVideo && <Video className="w-2.5 h-2.5" />}
-                {asset.type === "avatar" ? "Avatar" : asset.type === "product" ? "Product" : "Video"}
+                {asset.type === "avatar" ? "Avatar" : "Product"}
               </Badge>
             </div>
 
@@ -477,7 +640,7 @@ export default function AssetLibraryPage() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in py-12 min-h-screen">
+    <div className="space-y-6 animate-fade-in sm:pt-0 pt-4 min-h-screen">
       <input
         ref={fileInputRef}
         type="file"
@@ -495,18 +658,7 @@ export default function AssetLibraryPage() {
             Store and reuse your product images, avatars, and videos
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            className="cursor-pointer"
-            onClick={() => {
-              setAssetType("product");
-              fileInputRef.current?.click();
-            }}
-          >
-            <Package className="w-4 h-4 mr-2" />
-            Add Product Image
-          </Button>
+        <div className="flex flex-wrap gap-2">
           <Button
             className="cursor-pointer bg-neutral-900 text-[#c7f038] shadow-lg"
             onClick={() => setAvatarCollectionOpen(true)}
@@ -539,30 +691,19 @@ export default function AssetLibraryPage() {
       )}
 
       {loading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {[...Array(10)].map((_, i) => (
-            <Card key={i} className="border-border/50">
-              <CardContent className="p-0">
-                <Skeleton className="aspect-square w-full" />
-                <div className="p-3 space-y-2">
-                  <Skeleton className="h-4 w-3/4" />
-                  <Skeleton className="h-3 w-1/2" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+        <div className="flex items-center justify-center py-24">
+          <Loader2 className="w-8 h-8 animate-spin text-[#c7f038]" />
         </div>
       ) : (
         <Tabs defaultValue="all" className="w-full">
-          <TabsList className="bg-muted/50 p-1">
-            <TabsTrigger value="all" className="cursor-pointer">All Assets ({assets.length})</TabsTrigger>
-            <TabsTrigger value="avatars" className="cursor-pointer">Avatars ({avatars.length})</TabsTrigger>
-            <TabsTrigger value="products" className="cursor-pointer">Products ({productImages.length})</TabsTrigger>
-            <TabsTrigger value="videos" className="cursor-pointer">Videos ({videos.length})</TabsTrigger>
+          <TabsList className="bg-muted/50 p-1 max-w-full overflow-x-auto justify-start">
+            <TabsTrigger value="all" className="cursor-pointer shrink-0">All Assets ({assets.length})</TabsTrigger>
+            <TabsTrigger value="avatars" className="cursor-pointer shrink-0">Avatars ({avatars.length})</TabsTrigger>
+            <TabsTrigger value="videos" className="cursor-pointer shrink-0">Videos ({videos.length})</TabsTrigger>
           </TabsList>
 
           <TabsContent value="all" className="mt-6">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {assets.filter(a => a.name.toLowerCase().includes(search.toLowerCase())).map((asset) => (
                 <AssetCard key={asset.id} asset={asset} showDelete={asset.is_custom} />
               ))}
@@ -620,7 +761,7 @@ export default function AssetLibraryPage() {
           </TabsContent>
           
           <TabsContent value="videos" className="mt-6">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {videos.filter(a => a.name.toLowerCase().includes(search.toLowerCase())).map((asset) => (
                 <AssetCard key={asset.id} asset={asset} showDelete={asset.is_custom} />
               ))}
@@ -631,7 +772,7 @@ export default function AssetLibraryPage() {
 
       {hasMore && !loading && (
         <div className="flex justify-center py-6">
-          <Button variant="outline" onClick={loadMore} disabled={loadingMore} className="cursor-pointer">
+          <button onClick={loadMore} disabled={loadingMore} className="cursor-pointer bg-linear-to-b from-black to-neutral-600 text-white px-4 py-2 rounded-full">
             {loadingMore ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -640,7 +781,7 @@ export default function AssetLibraryPage() {
             ) : (
               "Load more assets"
             )}
-          </Button>
+          </button>
         </div>
       )}
 

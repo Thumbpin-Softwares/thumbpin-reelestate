@@ -11,8 +11,9 @@ import {
 } from "lucide-react";
 
 const navItems = [
-  { title: "How It Works", link: "#how" },
-  { title: "Testimonials", link: "#testimonials" },
+  { title: "Product", link: "#how" },
+  { title: "Use Cases", link: "#testimonials" },
+  { title: "Resources", link: ""},
   { title: "Pricing", link: "#pricing" },
 ];
 
@@ -22,7 +23,7 @@ export function Navbar() {
   const isAuthenticated = status === "authenticated";
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-[#f7f5e8] border-b border-b-neutral-200">
+    <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-none border-b border-b-neutral-200">
       
       {/* Top banner */}
       <div className="flex items-center justify-center bg-black py-2 px-4 text-center">
@@ -32,12 +33,6 @@ export function Navbar() {
             Work with us
           </Link>
         </h1>
-      </div>
-
-      {/* gradient line */}
-      <div className="flex">
-        <div className="h-1 bg-linear-to-r from-purple-500 via-yellow-500 to-green-500 w-full" />
-        <div className="h-1 bg-linear-to-l from-purple-500 via-yellow-500 to-green-500 w-full" />
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -55,7 +50,7 @@ export function Navbar() {
           </Link>
 
           {/* Desktop Nav */}
-          <ul className="hidden md:flex items-center gap-8 text-sm">
+          <ul className="hidden md:flex items-center gap-8">
             {navItems.map((item) => (
               <li key={item.title}>
                 <Link
@@ -72,7 +67,7 @@ export function Navbar() {
           <div className="hidden md:flex items-center gap-3">
             {isAuthenticated ? (
               <Link href="/app">
-                <span className="bg-[#dbfd40] text-black py-2.5 px-4 flex items-center gap-2 rounded-full shadow text-sm">
+                <span className="bg-linear-to-b from-black to-neutral-600 text-white py-2 px-4 flex items-center gap-2 rounded-full shadow">
                   <LayoutDashboard className="w-4 h-4" />
                   Dashboard
                 </span>
@@ -80,21 +75,34 @@ export function Navbar() {
             ) : (
               <>
                 <Link href="/auth/login">
-                  <span className="px-4 py-2.5 border border-black rounded-full text-sm">
-                    Log In
+                  <span className="px-4 py-2 rounded-full">
+                    Login
                   </span>
                 </Link>
                 <Link href="/auth/signup">
-                  <span className="bg-[#dbfd40] text-black px-4 py-2.5 rounded-full shadow text-sm">
-                    Start Free
+                  <span className="bg-linear-to-b from-black to-neutral-600 text-white px-4 py-2 rounded-full shadow-lg">
+                    Sign Up
                   </span>
                 </Link>
               </>
             )}
           </div>
 
-          {/* Mobile Button */}
-          <div className="md:hidden">
+          {/* Mobile CTA + Button */}
+          <div className="md:hidden flex items-center gap-2">
+            {isAuthenticated ? (
+              <Link href="/app" className="">
+                <span className="bg-linear-to-b from-black to-neutral-600 text-white text-sm py-2 px-4 flex items-center justify-center rounded-full shadow">
+                  Dashboard
+                </span>
+              </Link>
+            ) : (
+              <Link href="/auth/signup">
+                <span className="bg-linear-to-b from-black to-neutral-600 text-white px-4 py-2 rounded-full shadow text-xs">
+                  Start Free
+                </span>
+              </Link>
+            )}
             <Button
               variant="ghost"
               size="icon"
@@ -108,7 +116,7 @@ export function Navbar() {
         {/* Mobile Menu */}
         {mobileOpen && (
           <div className="md:hidden pb-6 pt-2 space-y-3">
-            
+
             {/* nav links */}
             <div className="flex flex-col gap-2">
               {navItems.map((item) => (
@@ -121,32 +129,6 @@ export function Navbar() {
                   {item.title}
                 </Link>
               ))}
-            </div>
-
-            {/* CTA */}
-            <div className="flex flex-col gap-2 pt-2">
-              {isAuthenticated ? (
-                <Link href="/app" onClick={() => setMobileOpen(false)}>
-                  <span className="w-full flex items-center justify-center gap-2 bg-black text-white py-3 rounded-xl">
-                    <LayoutDashboard className="w-4 h-4" />
-                    Dashboard
-                  </span>
-                </Link>
-              ) : (
-                <>
-                  <Link href="/auth/login" onClick={() => setMobileOpen(false)}>
-                    <Button variant="outline" className="w-full">
-                      Log In
-                    </Button>
-                  </Link>
-
-                  <Link href="/auth/signup" onClick={() => setMobileOpen(false)}>
-                    <Button className="w-full bg-[#dbfd40] text-black">
-                      Start Free
-                    </Button>
-                  </Link>
-                </>
-              )}
             </div>
           </div>
         )}

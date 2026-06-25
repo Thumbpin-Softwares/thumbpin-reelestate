@@ -116,9 +116,10 @@ function formatElapsed(secs) {
 export function GenerationProgress({
   generationParams,
   apiBasePath = "/api/seedance-reel",
-  editPath = "/app/seedance-reel/edit",
+  source = "seedance-reel",
+  editPath = "/app/edit",
   jobIdKey = "seedance_job_id",
-  compositionKey = "seedance_composition",
+  compositionKey = "video_composition",
   resumeKey = "seedance_resume",
 }) {
   const router = useRouter();
@@ -439,6 +440,7 @@ export function GenerationProgress({
       const brollClips = clampBrollClips({ avatarDuration, brollClips: rawBrollClips, ctaDuration });
 
       const props = {
+        source,
         avatarVideoUrl: avUrl  || "",
         brollClips,
         ctaVideoUrl:    ctaUrl || "",

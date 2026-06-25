@@ -19,19 +19,7 @@ export default function Hero({ videos = [] }) {
   }, []);
 
   return (
-    <main className="relative bg-[#f5efe8] pt-24 md:pt-32 overflow-hidden">
-      {/* Grid */}
-      <div
-        className="absolute inset-0 opacity-30"
-        style={{
-          backgroundImage: `
-            linear-gradient(to right, #d4d4d4 1px, transparent 1px),
-            linear-gradient(to bottom, #d4d4d4 1px, transparent 1px)
-          `,
-          backgroundSize: "40px 40px",
-        }}
-      />
-
+    <main className="relative bg-neutral-100 pt-24 md:pt-32 overflow-hidden">
       <div className="relative z-10 flex flex-col items-center px-4 sm:px-6">
         {/* Rotating Badge */}
         <div className="overflow-hidden py-6 sm:py-4">

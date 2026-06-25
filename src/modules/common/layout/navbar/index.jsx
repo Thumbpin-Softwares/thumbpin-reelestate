@@ -5,18 +5,21 @@ import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import {
-  Sparkles,
-  LayoutDashboard,
   FolderOpen,
-  Clock,
-  Clapperboard,
+  Plus,
+  Pencil,
+  Megaphone,
   User as UserIcon,
   LogOut,
   Menu,
-  X,
   CreditCard,
+  HelpCircle,
+  BookOpen,
+  MessageCircle,
+  MessageSquarePlus,
+  UserPlus,
+  RectangleGoggles,
 } from "lucide-react";
-import { RectangleGoggles } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,8 +28,28 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { CreditsBadge } from "@/components/dashboard/credits-badge";
+
+const navItems = [
+  { label: "Get Started", href: "/app", icon: Plus },
+  { label: "Library", href: "/app/assets", icon: FolderOpen },
+  { label: "Edit", href: "/app/edit", icon: Pencil },
+  { label: "What's New", href: "/app/whats-new", icon: Megaphone },
+];
 
 export default function UserNav() {
   const pathname = usePathname();
@@ -42,116 +65,157 @@ export default function UserNav() {
       .toUpperCase()
       .slice(0, 2) || "U";
 
-  const navItems = [
-    { label: "Dashboard", href: "/app", icon: LayoutDashboard },
-    { label: "Library", href: "/app/assets", icon: FolderOpen },
-    { label: "History", href: "/app/history", icon: Clock },
-  ];
-
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-[#f7f5e8] border-b border-b-neutral-200">
+    <nav className="fixed top-0 left-0 right-0 z-10 bg-[#fafbfd]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 group">
-            <div className="bg-black flex items-center justify-center p-2 inset-shadow-sidebar-primary-foreground rounded-full">
-              <RectangleGoggles className="w-4 h-4" fill="#c7f038" />
-            </div>
-            <span className="text-xl font-semibold">ThumbGram</span>
-          </Link>
+        <div className="flex items-center justify-between md:justify-end h-16">
+          {/* Left: Mobile hamburger trigger */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:hidden h-8 w-8"
+            onClick={() => setMobileMenuOpen(true)}
+          >
+            <Menu className="w-5 h-5" />
+          </Button>
 
-          {/* Desktop Nav Links */}
-          <div className="hidden md:flex items-center gap-6">
+          {/* Right: User Profile + extras */}
+          <div className="flex items-center gap-2">
+            <CreditsBadge />
+
+            <div className="hidden sm:block">
+              <InviteButton />
+            </div>
+
+            <div className="hidden sm:block">
+              <HelpMenu />
+            </div>
+
+            <UserMenu user={user} initials={initials} />
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Aside Drawer */}
+      <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+        <SheetContent side="left" className="w-72 p-0">
+          <SheetHeader className="px-4 pt-4">
+            <SheetTitle asChild>
+              <Link
+                href="/app"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-2"
+              >
+                <div className="bg-black flex items-center justify-center p-2 rounded-full shrink-0">
+                  <RectangleGoggles className="w-4 h-4" fill="#c7f038" />
+                </div>
+                <span className="text-xl font-semibold">ThumbGram</span>
+              </Link>
+            </SheetTitle>
+          </SheetHeader>
+
+          <div className="px-3 flex flex-col gap-1">
             {navItems.map((item) => {
               const isActive = pathname === item.href;
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex items-center gap-8 text-sm transition-colors ${
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
                     isActive
-                      ? "underline underline-offset-4"
-                      : "text-black hover:text-foreground"
+                      ? "bg-neutral-200 text-black font-medium"
+                      : "text-neutral-700 hover:bg-neutral-100"
                   }`}
                 >
+                  <item.icon className="w-4 h-4 shrink-0" />
                   {item.label}
-                  {item.beta && (
-                    <span className="px-4 py-2 rounded-full text-[9px] font-bold bg-[#c6f036] text-black">
-                      BETA
-                    </span>
-                  )}
                 </Link>
               );
             })}
           </div>
 
-          {/* Right: User Profile + Mobile Trigger */}
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:block">
-              <UserMenu user={user} initials={initials} />
-            </div>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              className="md:hidden h-8 w-8"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          <div className="mt-auto px-3 pb-4 pt-3 border-t border-neutral-200 flex flex-col gap-1">
+            <Link
+              href="/app/profile"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-neutral-700 hover:bg-neutral-100"
             >
-              {mobileMenuOpen ? (
-                <X className="w-5 h-5" />
-              ) : (
-                <Menu className="w-5 h-5" />
-              )}
-            </Button>
+              <UserIcon className="w-4 h-4" />
+              Profile Settings
+            </Link>
+            <button
+              onClick={() => signOut({ callbackUrl: "/auth/login" })}
+              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-destructive hover:bg-neutral-100 text-left cursor-pointer"
+            >
+              <LogOut className="w-4 h-4" />
+              Log Out
+            </button>
           </div>
-        </div>
-      </div>
-
-      {/* Mobile Menu */}
-      {mobileMenuOpen && (
-        <div className="md:hidden border-b border-border/30 bg-background animate-slide-down">
-          <div className="px-4 py-4 space-y-3">
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setMobileMenuOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium ${
-                  pathname === item.href
-                    ? "bg-primary/5 text-primary"
-                    : "text-muted-foreground"
-                }`}
-              >
-                <item.icon className="w-4 h-4" />
-                {item.label}
-                {item.beta && (
-                  <span className="ml-auto px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-violet-500/15 text-violet-600 dark:text-violet-400 border border-violet-300/30">
-                    BETA
-                  </span>
-                )}
-              </Link>
-            ))}
-            <div className="pt-2 border-t border-border/20">
-              <Link
-                href="/app/profile"
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-3 px-3 py-2 text-muted-foreground text-sm font-medium"
-              >
-                <UserIcon className="w-4 h-4" />
-                Profile Settings
-              </Link>
-              <button
-                onClick={() => signOut({ callbackUrl: "/auth/login" })}
-                className="flex items-center gap-3 w-full px-3 py-2 text-destructive text-sm font-medium text-left"
-              >
-                <LogOut className="w-4 h-4" />
-                Log Out
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+        </SheetContent>
+      </Sheet>
     </nav>
+  );
+}
+
+function InviteButton() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="rounded-lg py-2 px-4 hover:bg-neutral-200 flex gap-2 items-center cursor-pointer ring-0"
+        title="Invite"
+      >
+        <UserPlus size={14} />
+        <span className="text-black text-sm">Invite</span>
+      </button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-sm text-center">
+          <DialogHeader>
+            <DialogTitle className="text-center">Invite teammates</DialogTitle>
+          </DialogHeader>
+          <p className="py-6 text-sm text-muted-foreground">Coming soon</p>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function HelpMenu() {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          className="rounded-full p-2 hover:bg-neutral-100 flex items-center cursor-pointer ring-0"
+        >
+          <HelpCircle size={18}/>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56 mt-2">
+        <DropdownMenuItem asChild className="cursor-pointer">
+          <Link href="/app/help">
+            <BookOpen className="mr-2 h-4 w-4" />
+            <span>Help Center</span>
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild className="cursor-pointer">
+          <Link href="mailto:support@thumbpin.ai">
+            <MessageCircle className="mr-2 h-4 w-4" />
+            <span>Chat with us</span>
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild className="cursor-pointer">
+          <Link href="mailto:feedback@thumbpin.ai">
+            <MessageSquarePlus className="mr-2 h-4 w-4" />
+            <span>Feedback</span>
+          </Link>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -191,6 +255,12 @@ function UserMenu({ user, initials }) {
           <Link href="/app/credits">
             <CreditCard className="mr-2 h-4 w-4" />
             <span>Billing & Credits</span>
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild className="cursor-pointer">
+          <Link href="/app/help">
+            <HelpCircle className="mr-2 h-4 w-4" />
+            <span>Support</span>
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />

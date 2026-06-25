@@ -11,9 +11,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useUser } from "@/hooks/use-user";
-import { Video, Building, ShoppingBag, ArrowRight, Plus } from "lucide-react";
+import { Video, Building, ShoppingBag, ArrowRight, Plus, Pencil, Loader2, Play, MoreVertical } from "lucide-react";
 import { Search } from "lucide-react";
+import {
+  EDITABLE_SOURCES,
+  COMPOSITION_STORAGE_KEY,
+  EDIT_PATH,
+  buildCompositionFromAsset,
+} from "@/lib/editable-sources";
 
 const REAL_ESTATE_TEMPLATES = [
   {
@@ -23,43 +35,11 @@ const REAL_ESTATE_TEMPLATES = [
     tag: "Popular",
   },
   {
-    title: "Home Tour",
+    title: "Model doing Home Tour of the property",
     href: "/app/home-tour",
-    video: null,
-    tag: "New",
-    description: "Avatar intro + walkthrough + CTA reel from your own script",
-  },
-  {
-    title: "Interior Shots",
-    href: "/app/interior-shots",
-    video: null,
-    tag: "New",
-    description: "5–6 photos → 15s cinematic walkthrough, no hard cuts",
-  },
-  {
-    title: "Exterior & Facade",
-    href: null,
-    video: null,
-    tag: "Soon",
-    description: "Stunning outside views and property facade shots",
-    comingSoon: true,
-  },
-  {
-    title: "Luxury Amenities",
-    href: null,
-    video: null,
-    tag: "Soon",
-    description: "Gym, pool, rooftop and clubhouse showcase",
-    comingSoon: true,
-  },
-  {
-    title: "New Launch Promo",
-    href: null,
-    video: null,
-    tag: "Soon",
-    description: "Countdown + reveal for new property launches",
-    comingSoon: true,
-  },
+    video: "https://content.thumbpin.in/web-assets/hometour-final-1782134969657-1782134969657-3ac17d57.mp4",
+    tag: "Popular"
+  }
 ];
 
 export default function DashboardPage() {
@@ -69,14 +49,172 @@ export default function DashboardPage() {
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const router = useRouter();
   const [query, setQuery] = useState("");
+  const [editingVideoId, setEditingVideoId] = useState(null);
+  const [playingVideo, setPlayingVideo] = useState(null);
   const filteredTemplates = REAL_ESTATE_TEMPLATES.filter((t) =>
     t.title.toLowerCase().includes(query.toLowerCase()),
   );
 
+  const handleEditVideo = async (e, video) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (editingVideoId) return;
+    setEditingVideoId(video.id);
+    try {
+      const compositionProps = await buildCompositionFromAsset(video);
+      if (!compositionProps) return;
+
+      sessionStorage.setItem(COMPOSITION_STORAGE_KEY, JSON.stringify(compositionProps));
+      router.push(EDIT_PATH);
+    } finally {
+      setEditingVideoId(null);
+    }
+  };
+
+  const renderVideoCard = (video) => (
+    <Link key={video.id} href={EDIT_PATH} className="block group">
+      <div className="aspect-9/16 bg-muted rounded-2xl overflow-hidden relative border border-transparent group-hover:border-[#c7f038]/60 group-hover:shadow-xl transition-all duration-300">
+        {video.url ? (
+          <video
+            src={video.url}
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            className="w-full h-full object-cover"
+            onMouseEnter={(e) => e.currentTarget.play()}
+            onMouseLeave={(e) => {
+              e.currentTarget.pause();
+              e.currentTarget.currentTime = 0;
+            }}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-indigo-50">
+            <Video className="w-8 h-8 text-indigo-200" />
+          </div>
+        )}
+        <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/80 via-black/40 to-transparent p-3 pt-8">
+          <p className="font-semibold text-sm text-white truncate">
+            {video.name}
+          </p>
+          <p className="text-[11px] text-white/70">
+            {new Date(video.createdAt).toLocaleDateString("en-IN", {
+              day: "numeric",
+              month: "short",
+            })}{" "}
+            · {video.type}
+          </p>
+        </div>
+        <div className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:text-[#c7f038] transition-all duration-300">
+          <ArrowRight className="w-4 h-4" />
+        </div>
+        {EDITABLE_SOURCES[video.metadata?.source] && (
+          <button
+            type="button"
+            onClick={(e) => handleEditVideo(e, video)}
+            disabled={editingVideoId === video.id}
+            className="absolute top-3 left-3 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-[#c7f038] transition-all duration-300 disabled:opacity-100"
+            title="Edit"
+          >
+            {editingVideoId === video.id ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Pencil className="w-3.5 h-3.5" />
+            )}
+          </button>
+        )}
+      </div>
+    </Link>
+  );
+
+  const renderMobileVideoCard = (video) => {
+    const canEdit = !!EDITABLE_SOURCES[video.metadata?.source];
+
+    return (
+      <div
+        key={video.id}
+        className="relative aspect-video w-full bg-muted rounded-2xl overflow-hidden border border-neutral-200"
+      >
+        <Link href={EDIT_PATH} className="absolute inset-0 block">
+          {video.url ? (
+            <video
+              src={video.url}
+              muted
+              loop
+              playsInline
+              preload="metadata"
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-indigo-50">
+              <Video className="w-8 h-8 text-indigo-200" />
+            </div>
+          )}
+
+          {/* Title bar at top */}
+          <div className="absolute inset-x-0 top-0 bg-linear-to-b from-black/70 via-black/30 to-transparent p-3 pr-12">
+            <p className="font-semibold text-sm text-white truncate">{video.name}</p>
+            <p className="text-[11px] text-white/70">
+              {new Date(video.createdAt).toLocaleDateString("en-IN", {
+                day: "numeric",
+                month: "short",
+              })}{" "}
+              · {video.type}
+            </p>
+          </div>
+
+        </Link>
+
+        {/* Centered play button — opens player instead of navigating */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setPlayingVideo(video);
+          }}
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/90 flex items-center justify-center shadow-lg"
+          title="Play"
+        >
+          <Play className="w-5 h-5 text-black fill-black" />
+        </button>
+
+        {canEdit && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/40 flex items-center justify-center text-white"
+                title="More options"
+              >
+                {editingVideoId === video.id ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <MoreVertical className="w-4 h-4" />
+                )}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                disabled={editingVideoId === video.id}
+                onClick={(e) => handleEditVideo(e, video)}
+                className="cursor-pointer"
+              >
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
+    );
+  };
+
   useEffect(() => {
     async function fetchRecentVideos() {
       try {
-        const res = await fetch("/api/user/videos?limit=3");
+        const res = await fetch("/api/user/videos?limit=4");
         if (res.ok) {
           const data = await res.json();
           setVideos(data.videos || []);
@@ -89,8 +227,6 @@ export default function DashboardPage() {
     }
     fetchRecentVideos();
   }, []);
-
-  const userName = profile?.name || profile?.email?.split("@")[0] || "there";
 
   const actions = [
     {
@@ -119,21 +255,8 @@ export default function DashboardPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 bg-[#fafbfc]">
-      {/* Zen Header */}
-      <section className="text-center space-y-4 pt-12">
-        <h1 className="text-4xl font-bold font-heading tracking-tight sm:text-5xl">
-          Create something{" "}
-          <span className="italic text-black bg-[#c7f038] px-4 py-1 rounded-lg">
-            remarkable.
-          </span>
-        </h1>
-        <p className="text-base text-muted-foreground max-w-md mx-auto">
-          Welcome back, {userName}, What are you upto today
-        </p>
-      </section>
-
       {/* Minimalism Actions */}
-      <section className="grid sm:grid-cols-3 gap-4">
+      <section className="grid sm:grid-cols-3 sm:pt-0 pt-4 gap-4">
         {actions.map((action) => {
           const Icon = action.icon;
           const isComingSoon =
@@ -141,23 +264,24 @@ export default function DashboardPage() {
 
           const content = (
             <div
-              className={`relative h-48 flex flex-col bg-white items-center p-6 space-y-4 rounded-3xl border border-neutral-200 transition-all duration-300 ${
+              className={`relative flex flex-row sm:flex-col bg-white items-center justify-between sm:justify-center p-4 sm:p-6 sm:h-48 gap-4 sm:space-y-4 rounded-3xl border border-neutral-200 transition-all duration-300 ${
                 isComingSoon
                   ? "cursor-not-allowed"
                   : "hover:border-border/40 hover:bg-white hover:shadow-xl"
               }`}
             >
-              <div className={`w-12 h-12 rounded-3xl flex items-center justify-center ${action.color} ${!isComingSoon && "group-hover:scale-110 transition-transform"}`}>
-                <Icon className="w-6 h-6" />
-              </div>
-              <div className="text-center flex flex-col gap-2">
+              <div className="order-1 sm:order-2 text-left sm:text-center flex flex-col gap-1 sm:gap-2">
                 <h3 className="font-semibold">{action.title}</h3>
                 <p className="text-sm text-neutral-500">{action.description}</p>
               </div>
 
+              <div className={`order-2 sm:order-1 shrink-0 w-12 h-12 rounded-3xl flex items-center justify-center ${action.color} ${!isComingSoon && "group-hover:scale-110 transition-transform"}`}>
+                <Icon className="w-6 h-6" />
+              </div>
+
               {isComingSoon && (
-                <div className="absolute inset-0 pt-4 flex items-center justify-center">
-                  <span className="bg-[#c7f038] text-black text-xs font-bold uppercase tracking-widest px-2 py-1 rounded-full shadow-lg">
+                <div className="absolute top-3 right-3 bottom-auto sm:pt-8 left-auto sm:inset-0 sm:flex sm:items-center sm:justify-center">
+                  <span className="bg-[#c7f038] text-black text-[10px] sm:text-xs font-bold uppercase tracking-widest px-2 py-1 rounded-full shadow-lg">
                     Coming Soon
                   </span>
                 </div>
@@ -259,69 +383,60 @@ export default function DashboardPage() {
           <h2 className="text-lg font-semibold font-heading tracking-tight">
             Recent Creations
           </h2>
-          <Link
-            href="/app/assets"
-            className="text-sm font-semibold shadow-xl text-[#c7f038] bg-neutral-900 px-4 py-2 rounded-full flex items-center gap-2"
-          >
-            View All <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
         </div>
 
-        <div className="space-y-4">
+        {/* Mobile: last 2, stacked landscape cards with a small reel preview */}
+        <div className="flex sm:hidden flex-col gap-3">
           {loadingVideos ? (
             [1, 2].map((i) => (
-              <Skeleton key={i} className="h-20 w-full rounded-xl" />
+              <Skeleton key={i} className="aspect-video w-full rounded-2xl" />
             ))
           ) : videos.length > 0 ? (
-            videos.map((video) => (
-              <Link key={video.id} href="/app/history" className="block group">
-                <div className="flex items-center justify-between p-4 rounded-xl hover:bg-white hover:shadow-md transition-all duration-300 border border-transparent hover:border-border/30">
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-muted rounded-lg overflow-hidden relative shrink-0">
-                      {video.url ? (
-                        <video
-                          src={video.url}
-                          className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-indigo-50">
-                          <Video className="w-6 h-6 text-indigo-200" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-semibold text-sm truncate">
-                        {video.name}
-                      </p>
-                      <p className="text-[12px] text-muted-foreground">
-                        {new Date(video.createdAt).toLocaleDateString("en-IN", {
-                          day: "numeric",
-                          month: "short",
-                        })}{" "}
-                        · {video.type}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="w-8 h-8 rounded-full border border-border flex items-center justify-center text-muted-foreground group-hover:text-[#c7f038] group-hover:bg-neutral-900 duration-300 transition-colors">
-                    <ArrowRight className="w-4 h-4" />
-                  </div>
-                </div>
-              </Link>
-            ))
+            videos.slice(0, 2).map((video) => renderMobileVideoCard(video))
           ) : (
             <div className="text-center py-10 bg-white/40 rounded-3xl border border-dashed border-border/40">
               <p className="text-sm text-muted-foreground">
                 No projects yet. Let&apos;s start one!
               </p>
-              <Link href="/app/veo-long-ad">
-                <Button variant="link" className="mt-2 text-primary font-bold">
-                  <Plus className="w-4 h-4 mr-1" /> Create Now
-                </Button>
-              </Link>
+            </div>
+          )}
+        </div>
+
+        {/* Desktop/tablet: full grid */}
+        <div className="hidden sm:grid grid-cols-3 md:grid-cols-4 gap-4">
+          {loadingVideos ? (
+            [1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="aspect-9/16 w-full rounded-2xl" />
+            ))
+          ) : videos.length > 0 ? (
+            videos.map((video) => renderVideoCard(video))
+          ) : (
+            <div className="col-span-full text-center py-10 bg-white/40 rounded-3xl border border-dashed border-border/40">
+              <p className="text-sm text-muted-foreground">
+                No projects yet. Let&apos;s start one!
+              </p>
             </div>
           )}
         </div>
       </section>
+
+      {/* Mobile video player */}
+      <Dialog open={!!playingVideo} onOpenChange={(open) => !open && setPlayingVideo(null)}>
+        <DialogContent className="p-0 gap-0 overflow-hidden max-w-sm border-none bg-black">
+          <DialogHeader className="sr-only">
+            <DialogTitle>{playingVideo?.name}</DialogTitle>
+          </DialogHeader>
+          {playingVideo?.url && (
+            <video
+              src={playingVideo.url}
+              controls
+              autoPlay
+              playsInline
+              className="w-full aspect-9/16 bg-black"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
