@@ -109,7 +109,7 @@ export default function UserNav() {
           <SheetHeader className="px-4 pt-4">
             <SheetTitle asChild>
               <Link
-                href="/"
+                href="/app"
                 onClick={() => setMobileMenuOpen(false)}
                 className="flex items-center gap-2"
               >

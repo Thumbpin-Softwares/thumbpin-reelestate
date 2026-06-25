@@ -44,7 +44,7 @@ export default function Aside() {
       }`}
     >
       <div className={`flex items-center gap-2 pb-6 ${collapsed ? "justify-center px-0" : "justify-between px-3"}`}>
-        <Link href="/" className="flex items-center gap-2 group min-w-0">
+        <Link href="/app" className="flex items-center gap-2 group min-w-0">
           <div className="bg-black flex items-center justify-center p-2 rounded-full shrink-0">
             <RectangleGoggles className="w-4 h-4" fill="#c7f038" />
           </div>
