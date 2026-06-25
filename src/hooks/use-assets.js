@@ -2,7 +2,13 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 
-const LIMIT = 24;
+const LIMIT_DESKTOP = 24;
+const LIMIT_MOBILE = 6;
+
+function getLimit() {
+  if (typeof window !== "undefined" && window.innerWidth < 640) return LIMIT_MOBILE;
+  return LIMIT_DESKTOP;
+}
 
 function mapAsset(a) {
   return {
@@ -28,7 +34,7 @@ export function useAssets(typeFilter = null) {
 
   const buildUrl = useCallback(
     (page) => {
-      let url = `/api/assets?page=${page}&limit=${LIMIT}`;
+      let url = `/api/assets?page=${page}&limit=${getLimit()}`;
       if (typeFilter) url += `&type=${typeFilter}`;
       return url;
     },

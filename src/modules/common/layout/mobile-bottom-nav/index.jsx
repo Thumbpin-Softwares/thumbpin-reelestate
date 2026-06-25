@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Plus, FolderOpen, Clock, Megaphone } from "lucide-react";
+import { Plus, FolderOpen, Pencil, Megaphone } from "lucide-react";
 
 const navItems = [
   { label: "Get Started", href: "/app", icon: Plus },
   { label: "Library", href: "/app/assets", icon: FolderOpen },
-  { label: "History", href: "/app/history", icon: Clock },
+  { label: "Edit", href: "/app/edit", icon: Pencil },
   { label: "What's New", href: "/app/whats-new", icon: Megaphone },
 ];
 

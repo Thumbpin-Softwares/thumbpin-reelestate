@@ -146,9 +146,8 @@ function HomeTourContent() {
             generationParams={generationParams}
             onReset={handleReset}
             apiBasePath="/api/home-tour"
-            editPath="/app/home-tour/edit"
+            source="home-tour"
             jobIdKey="home_tour_job_id"
-            compositionKey="home_tour_composition"
             resumeKey={RESUME_KEY}
           />
         )}

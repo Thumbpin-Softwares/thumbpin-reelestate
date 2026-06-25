@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   FolderOpen,
   Plus,
-  Clock,
+  Pencil,
   Megaphone,
   RectangleGoggles,
   Columns2,
@@ -17,7 +17,7 @@ const STORAGE_KEY = "aside_collapsed";
 const navItems = [
   { label: "Get Started", href: "/app", icon: Plus },
   { label: "Library", href: "/app/assets", icon: FolderOpen },
-  { label: "History", href: "/app/history", icon: Clock },
+  { label: "Edit", href: "/app/edit", icon: Pencil },
 ];
 
 const whatsNewItem = { label: "What's New", href: "/app/whats-new", icon: Megaphone };
