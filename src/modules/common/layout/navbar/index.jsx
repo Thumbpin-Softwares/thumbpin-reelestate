@@ -19,8 +19,6 @@ import {
   MessageSquarePlus,
   UserPlus,
   RectangleGoggles,
-  Languages,
-  Check,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -29,9 +27,6 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuSub,
-  DropdownMenuSubTrigger,
-  DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
 import {
   Dialog,
@@ -86,9 +81,7 @@ export default function UserNav() {
 
           {/* Right: User Profile + extras */}
           <div className="flex items-center gap-2">
-            <div className="hidden sm:block">
-              <CreditsBadge />
-            </div>
+            <CreditsBadge />
 
             <div className="hidden sm:block">
               <InviteButton />
@@ -226,23 +219,7 @@ function HelpMenu() {
   );
 }
 
-const LANGUAGE_STORAGE_KEY = "ui_language";
-const LANGUAGES = [
-  { id: "en", label: "English" },
-  { id: "hi", label: "हिंदी (Hindi)" },
-];
-
 function UserMenu({ user, initials }) {
-  const [language, setLanguage] = useState(() => {
-    if (typeof window === "undefined") return "en";
-    return localStorage.getItem(LANGUAGE_STORAGE_KEY) || "en";
-  });
-
-  const selectLanguage = (id) => {
-    setLanguage(id);
-    localStorage.setItem(LANGUAGE_STORAGE_KEY, id);
-  };
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -286,24 +263,6 @@ function UserMenu({ user, initials }) {
             <span>Support</span>
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="cursor-pointer">
-            <Languages className="mr-2 h-4 w-4" />
-            <span>Language</span>
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent>
-            {LANGUAGES.map((l) => (
-              <DropdownMenuItem
-                key={l.id}
-                className="cursor-pointer"
-                onClick={() => selectLanguage(l.id)}
-              >
-                <span className="flex-1">{l.label}</span>
-                {language === l.id && <Check className="ml-2 h-4 w-4" />}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           className="text-destructive focus:text-destructive cursor-pointer"

@@ -772,7 +772,7 @@ export default function AssetLibraryPage() {
 
       {hasMore && !loading && (
         <div className="flex justify-center py-6">
-          <Button variant="outline" onClick={loadMore} disabled={loadingMore} className="cursor-pointer">
+          <button onClick={loadMore} disabled={loadingMore} className="cursor-pointer bg-linear-to-b from-black to-neutral-600 text-white px-4 py-2 rounded-full">
             {loadingMore ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -781,7 +781,7 @@ export default function AssetLibraryPage() {
             ) : (
               "Load more assets"
             )}
-          </Button>
+          </button>
         </div>
       )}
 
