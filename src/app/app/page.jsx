@@ -11,8 +11,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useUser } from "@/hooks/use-user";
-import { Video, Building, ShoppingBag, ArrowRight, Plus, Pencil, Loader2 } from "lucide-react";
+import { Video, Building, ShoppingBag, ArrowRight, Plus, Pencil, Loader2, Play, MoreVertical } from "lucide-react";
 import { Search } from "lucide-react";
 import { clampBrollClips } from "@/lib/remotion/duration";
 
@@ -74,6 +80,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [editingVideoId, setEditingVideoId] = useState(null);
+  const [playingVideo, setPlayingVideo] = useState(null);
   const filteredTemplates = REAL_ESTATE_TEMPLATES.filter((t) =>
     t.title.toLowerCase().includes(query.toLowerCase()),
   );
@@ -180,6 +187,89 @@ export default function DashboardPage() {
     </Link>
   );
 
+  const renderMobileVideoCard = (video) => {
+    const canEdit = !!EDITABLE_SOURCES[video.metadata?.source];
+
+    return (
+      <div
+        key={video.id}
+        className="relative aspect-video w-full bg-muted rounded-2xl overflow-hidden border border-neutral-200"
+      >
+        <Link href="/app/history" className="absolute inset-0 block">
+          {video.url ? (
+            <video
+              src={video.url}
+              muted
+              loop
+              playsInline
+              preload="metadata"
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-indigo-50">
+              <Video className="w-8 h-8 text-indigo-200" />
+            </div>
+          )}
+
+          {/* Title bar at top */}
+          <div className="absolute inset-x-0 top-0 bg-linear-to-b from-black/70 via-black/30 to-transparent p-3 pr-12">
+            <p className="font-semibold text-sm text-white truncate">{video.name}</p>
+            <p className="text-[11px] text-white/70">
+              {new Date(video.createdAt).toLocaleDateString("en-IN", {
+                day: "numeric",
+                month: "short",
+              })}{" "}
+              · {video.type}
+            </p>
+          </div>
+
+        </Link>
+
+        {/* Centered play button — opens player instead of navigating */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setPlayingVideo(video);
+          }}
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/90 flex items-center justify-center shadow-lg"
+          title="Play"
+        >
+          <Play className="w-5 h-5 text-black fill-black" />
+        </button>
+
+        {canEdit && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/40 flex items-center justify-center text-white"
+                title="More options"
+              >
+                {editingVideoId === video.id ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <MoreVertical className="w-4 h-4" />
+                )}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                disabled={editingVideoId === video.id}
+                onClick={(e) => handleEditVideo(e, video)}
+                className="cursor-pointer"
+              >
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
+    );
+  };
+
   useEffect(() => {
     async function fetchRecentVideos() {
       try {
@@ -225,7 +315,7 @@ export default function DashboardPage() {
   return (
     <div className="max-w-6xl mx-auto space-y-8 bg-[#fafbfc]">
       {/* Minimalism Actions */}
-      <section className="grid sm:grid-cols-3 gap-4">
+      <section className="grid sm:grid-cols-3 sm:pt-0 pt-4 gap-4">
         {actions.map((action) => {
           const Icon = action.icon;
           const isComingSoon =
@@ -249,7 +339,7 @@ export default function DashboardPage() {
               </div>
 
               {isComingSoon && (
-                <div className="absolute top-3 right-3 sm:inset-0 sm:top-auto sm:right-auto sm:pt-4 sm:flex sm:items-center sm:justify-center">
+                <div className="absolute top-3 right-3 bottom-auto sm:pt-8 left-auto sm:inset-0 sm:flex sm:items-center sm:justify-center">
                   <span className="bg-[#c7f038] text-black text-[10px] sm:text-xs font-bold uppercase tracking-widest px-2 py-1 rounded-full shadow-lg">
                     Coming Soon
                   </span>
@@ -354,14 +444,14 @@ export default function DashboardPage() {
           </h2>
         </div>
 
-        {/* Mobile: last 2, stacked one after another */}
-        <div className="flex sm:hidden flex-col gap-4">
+        {/* Mobile: last 2, stacked landscape cards with a small reel preview */}
+        <div className="flex sm:hidden flex-col gap-3">
           {loadingVideos ? (
             [1, 2].map((i) => (
-              <Skeleton key={i} className="aspect-9/16 w-full rounded-2xl" />
+              <Skeleton key={i} className="aspect-video w-full rounded-2xl" />
             ))
           ) : videos.length > 0 ? (
-            videos.slice(0, 2).map((video) => renderVideoCard(video))
+            videos.slice(0, 2).map((video) => renderMobileVideoCard(video))
           ) : (
             <div className="text-center py-10 bg-white/40 rounded-3xl border border-dashed border-border/40">
               <p className="text-sm text-muted-foreground">
@@ -388,6 +478,24 @@ export default function DashboardPage() {
           )}
         </div>
       </section>
+
+      {/* Mobile video player */}
+      <Dialog open={!!playingVideo} onOpenChange={(open) => !open && setPlayingVideo(null)}>
+        <DialogContent className="p-0 gap-0 overflow-hidden max-w-sm border-none bg-black">
+          <DialogHeader className="sr-only">
+            <DialogTitle>{playingVideo?.name}</DialogTitle>
+          </DialogHeader>
+          {playingVideo?.url && (
+            <video
+              src={playingVideo.url}
+              controls
+              autoPlay
+              playsInline
+              className="w-full aspect-9/16 bg-black"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
