@@ -33,7 +33,7 @@ async function renderMediaWithRetry(params, attempts = 2) {
     } catch (err) {
       lastErr = err;
       console.warn(
-        `[action-reel render-remotion] renderMedia attempt ${i + 1}/${attempts} failed:`,
+        `[comedy-reel render-remotion] renderMedia attempt ${i + 1}/${attempts} failed:`,
         err.message,
       );
     }
@@ -42,10 +42,14 @@ async function renderMediaWithRetry(params, attempts = 2) {
 }
 
 /**
- * POST /api/action-reel/render-remotion
+ * POST /api/comedy-reel/render-remotion
  *
  * Body (JSON): part1VideoUrl, part2VideoUrl, part1Duration, part2Duration
  * Returns: { url } — final MP4 on R2
+ *
+ * Reuses the "ActionReel" Remotion composition — comedy-reel's output shape
+ * (two baked-audio clips, hard cut, no overlay audio) is identical to
+ * action-reel's, so no separate composition is needed.
  */
 export async function POST(request) {
   const session = await getServerSession(authOptions);
@@ -62,7 +66,7 @@ export async function POST(request) {
       inputProps,
     });
 
-    const outputPath = join(tmpdir(), `action-reel-${Date.now()}.mp4`);
+    const outputPath = join(tmpdir(), `comedy-reel-${Date.now()}.mp4`);
 
     await renderMediaWithRetry({
       composition,
@@ -80,12 +84,12 @@ export async function POST(request) {
     const videoBuf = readFileSync(outputPath);
     try { unlinkSync(outputPath); } catch (_) {}
 
-    const key = buildUserKey(userId, "videos", "mp4", `areel-final-${Date.now()}`);
+    const key = buildUserKey(userId, "videos", "mp4", `comedy-final-${Date.now()}`);
     const url = await uploadToR2(videoBuf, key, "video/mp4");
 
     return Response.json({ url });
   } catch (err) {
-    console.error("[action-reel render-remotion] Error:", err);
+    console.error("[comedy-reel render-remotion] Error:", err);
     return Response.json({ error: err.message || "Render failed" }, { status: 500 });
   }
 }

@@ -1,14 +1,15 @@
 "use client";
 
 import { useRef } from "react";
-import { Home, Building2, Star, Rocket, Lock, Zap } from "lucide-react";
+import { Home, Building2, Star, Rocket, Lock, Zap, Eye } from "lucide-react";
 
 const PLACEHOLDER_ICONS = {
-  "Interior Shots":               Home,
-  "Exterior & Facade":            Building2,
-  "Luxury Amenities":             Star,
-  "New Launch Promo":             Rocket,
+  "Interior Shots":                Home,
+  "Exterior & Facade":             Building2,
+  "Luxury Amenities":              Star,
+  "New Launch Promo":              Rocket,
   "Action-Packed Property Reveal": Zap,
+  "Nosy Padosi Comedy Reel":       Eye,
 };
 
 const TAG_STYLES = {

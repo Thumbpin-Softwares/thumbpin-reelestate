@@ -58,12 +58,12 @@ const STAGE_LABELS = {
 };
 
 const SEEDANCE_TIPS = [
-  "Seedance 2.0 is rendering both high-energy scenes simultaneously…",
-  "Choreographing the hook — hard cuts, action beats, direct-to-camera dialogue…",
+  "Seedance 2.0 is rendering both comedic scenes simultaneously…",
+  "Choreographing the hook — the door peek, the whisper, the big reveal…",
   "Building the highlights + CTA sequence from your property photos…",
   "Syncing lip movements to dialogue phonetics across both clips…",
-  "Applying fast-paced UGC camera movement and natural dynamic lighting…",
-  "Rendering hyper-realistic skin texture and interior lighting transitions…",
+  "Applying natural handheld camera movement and warm interior lighting…",
+  "Rendering hyper-realistic skin texture and comedic timing…",
 ];
 
 const ORDERED_STAGES = [
@@ -87,20 +87,16 @@ function formatElapsed(secs) {
 }
 
 /**
- * GenerationProgress for the Action Reel pipeline — forked from
- * seedance-reel's GenerationProgress because its internals (3 named video
- * slots, /app/edit handoff) are hardwired to that pipeline's 3-part shape.
- *
- * This version: 2 video slots, and on completion it calls /render-remotion
- * directly and shows an inline preview + download — there's no Remotion
- * Player/editor step for this pipeline (no broll, no intro/outro toggles).
+ * GenerationProgress for the Comedy Reel pipeline — forked from
+ * action-reel's GenerationProgress (same 2-video-slot shape, same
+ * render-remotion + inline preview/download flow, no /app/edit handoff).
  */
 export function GenerationProgress({
   generationParams,
-  apiBasePath = "/api/action-reel",
-  source = "action-reel",
-  jobIdKey = "action_reel_job_id",
-  resumeKey = "action_reel_resume",
+  apiBasePath = "/api/comedy-reel",
+  source = "comedy-reel",
+  jobIdKey = "comedy_reel_job_id",
+  resumeKey = "comedy_reel_resume",
   onReset,
 }) {
   const {
@@ -219,7 +215,7 @@ export function GenerationProgress({
         if (JOB_STATUS_TO_LOCAL[job.status]) setStatus(JOB_STATUS_TO_LOCAL[job.status]);
         setTimeout(poll, 3000);
       } catch (err) {
-        console.error("[ActionReel] Resume poll failed:", err);
+        console.error("[ComedyReel] Resume poll failed:", err);
         setTimeout(poll, 5000);
       }
     };
@@ -286,7 +282,7 @@ export function GenerationProgress({
         }
       }
     } catch (err) {
-      console.error("[ActionReel] Error:", err);
+      console.error("[ComedyReel] Error:", err);
       try { sessionStorage.removeItem(jobIdKey); } catch (_) {}
       setStatus(STATUS.ERROR);
       setError(err.message || "Pipeline failed");
@@ -392,9 +388,9 @@ export function GenerationProgress({
       try { sessionStorage.removeItem(resumeKey); } catch (_) {}
       setFinalVideoUrl(data.url);
       setStatus(STATUS.DONE);
-      toast.success("🎬 Action Reel ready!");
+      toast.success("🎬 Comedy Reel ready!");
     } catch (err) {
-      console.error("[ActionReel] renderFinal failed:", err);
+      console.error("[ComedyReel] renderFinal failed:", err);
       setStatus(STATUS.ERROR);
       setError(`Final render failed: ${err.message}`);
     }
@@ -408,10 +404,10 @@ export function GenerationProgress({
       <div className="text-center space-y-1">
         <h2 className="text-2xl font-bold font-heading tracking-tight">
           {status === STATUS.DONE
-            ? "Your Action Reel is Ready!"
+            ? "Your Comedy Reel is Ready!"
             : status === STATUS.RENDERING
             ? "Rendering Final Reel…"
-            : "Generating Action Reel"}
+            : "Generating Comedy Reel"}
         </h2>
         <p className="text-sm text-muted-foreground">
           {status === STATUS.DONE
