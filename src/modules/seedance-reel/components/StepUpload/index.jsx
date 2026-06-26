@@ -8,13 +8,21 @@ import {
   ImagePlus,
   User2,
   ChevronRight,
+  ChevronLeft,
   Loader2,
   Info,
   Plus,
+  Eye,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 /**
  * StepUpload — Step 0 for the Seedance Reel pipeline.
@@ -32,6 +40,51 @@ export function StepUpload({
   orderHint,
 }) {
   const [draggingLocation, setDraggingLocation] = useState(false);
+  const [previewCollection, setPreviewCollection] = useState(null);
+  const [previewIndex, setPreviewIndex] = useState(0);
+  const [loadedPreviewUrls, setLoadedPreviewUrls] = useState(() => new Set());
+  const touchStartXRef = useRef(null);
+
+  // Preload every photo in the collection as soon as the preview opens so
+  // swiping/clicking through them doesn't wait on a fresh network fetch.
+  useEffect(() => {
+    if (!previewCollection?.images?.length) return;
+    let cancelled = false;
+    setLoadedPreviewUrls(new Set());
+    previewCollection.images.forEach((img) => {
+      if (!img.url) return;
+      const el = new window.Image();
+      el.onload = () => {
+        if (cancelled) return;
+        setLoadedPreviewUrls((prev) => {
+          if (prev.has(img.url)) return prev;
+          const next = new Set(prev);
+          next.add(img.url);
+          return next;
+        });
+      };
+      el.src = img.url;
+    });
+    return () => { cancelled = true; };
+  }, [previewCollection]);
+
+  const handlePreviewTouchStart = (e) => {
+    touchStartXRef.current = e.touches[0].clientX;
+  };
+
+  const handlePreviewTouchEnd = (e) => {
+    const startX = touchStartXRef.current;
+    const count = previewCollection?.images?.length || 0;
+    touchStartXRef.current = null;
+    if (startX === null || count < 2) return;
+
+    const deltaX = e.changedTouches[0].clientX - startX;
+    const SWIPE_THRESHOLD = 40;
+    if (Math.abs(deltaX) < SWIPE_THRESHOLD) return;
+
+    if (deltaX < 0) setPreviewIndex((i) => (i + 1) % count);
+    else setPreviewIndex((i) => (i - 1 + count) % count);
+  };
   const [uploadItems, setUploadItems] = useState([]);
   const [collectionName, setCollectionName] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -211,7 +264,7 @@ export function StepUpload({
               <p className="text-xs text-neutral-600 leading-relaxed">
                 {orderHint === "location-first"
                   ? "Upload 2–4 property photos. Property photos are sent to the AI first, then presenter photos — that exact order is referenced inside the generated video prompts."
-                  : "Upload 2–4 property photos. Even-numbered photos become animated Hailuo B-roll clips; odd-numbered ones get a Ken Burns zoom effect. All photos are also used as background context for the avatar video."}
+                  : "Upload 2–4 property photos. All photos are used as background context for the avatar video."}
               </p>
             </div>
           </div>
@@ -273,10 +326,13 @@ export function StepUpload({
                       const selected = isCollectionSelected(col.id);
                       const thumb = col.coverImage || col.images?.[0]?.url;
                       return (
-                        <button
+                        <div
                           key={col.id}
+                          role="button"
+                          tabIndex={0}
                           onClick={() => selectCollection(col)}
-                          className={`relative rounded-3xl overflow-hidden border-2 transition-all text-left ${
+                          onKeyDown={(e) => e.key === "Enter" && selectCollection(col)}
+                          className={`relative rounded-3xl overflow-hidden border-2 transition-all text-left cursor-pointer ${
                             selected
                               ? "border-[#c7f038] ring-2 ring-[#c7f038] scale-[1.02]"
                               : "border-border/40 hover:border-[#c7f038]"
@@ -290,6 +346,14 @@ export function StepUpload({
                             </div>
                           )}
                           <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent" />
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setPreviewCollection(col); setPreviewIndex(0); }}
+                            className="absolute top-2 left-2 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80 transition-colors"
+                            title="Preview all photos"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
                           {selected && (
                             <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-neutral-900 flex items-center justify-center">
                               <CheckCircle2 className="w-3.5 h-3.5 text-[#c7f038]" />
@@ -298,7 +362,7 @@ export function StepUpload({
                           <p className="absolute bottom-2 left-2 right-2 text-[11px] text-white font-medium truncate">
                             {col.name}
                           </p>
-                        </button>
+                        </div>
                       );
                     })}
                   </div>
@@ -440,10 +504,13 @@ export function StepUpload({
                       const selected = avatarHook.isCollectionSelected(col.id);
                       const thumb = col.coverImage || col.images?.[0]?.url;
                       return (
-                        <button
+                        <div
                           key={col.id}
+                          role="button"
+                          tabIndex={0}
                           onClick={() => avatarHook.selectCollection(col)}
-                          className={`relative rounded-3xl overflow-hidden border-2 transition-all text-left ${
+                          onKeyDown={(e) => e.key === "Enter" && avatarHook.selectCollection(col)}
+                          className={`relative rounded-3xl overflow-hidden border-2 transition-all text-left cursor-pointer ${
                             selected
                               ? "border-[#c7f038] ring-2 ring-[#c7f038] scale-[1.02]"
                               : "border-border/40 hover:border-[#c7f038]"
@@ -457,6 +524,21 @@ export function StepUpload({
                             </div>
                           )}
                           <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent" />
+                          <div className="absolute top-2 left-2 flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setPreviewCollection(col); setPreviewIndex(0); }}
+                              className="w-6 h-6 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80 transition-colors"
+                              title="Preview all photos"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+                            {col.images?.length > 1 && (
+                              <div className="rounded-full bg-black/70 px-2 py-1 text-[10px] text-white">
+                                {col.images.length} photos
+                              </div>
+                            )}
+                          </div>
                           {selected && (
                             <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-neutral-900 flex items-center justify-center">
                               <CheckCircle2 className="w-3.5 h-3.5 text-[#c7f038]" />
@@ -465,12 +547,7 @@ export function StepUpload({
                           <p className="absolute bottom-2 left-2 right-2 text-[11px] text-white font-medium truncate">
                             {col.name}
                           </p>
-                          {col.images?.length > 1 && (
-                            <div className="absolute top-2 left-2 rounded-full bg-black/70 px-2 py-1 text-[10px] text-white">
-                              {col.images.length} photos
-                            </div>
-                          )}
-                        </button>
+                        </div>
                       );
                     })}
                   </div>
@@ -492,7 +569,7 @@ export function StepUpload({
         </div>
       </div>
 
-      <div className="flex justify-end pt-2">
+      <div className="flex justify-center sm:justify-end pt-2">
         <Button
           onClick={onNext}
           disabled={!isValid}
@@ -502,6 +579,77 @@ export function StepUpload({
           <ChevronRight className="w-4 h-4" />
         </Button>
       </div>
+
+      {/* Collection photo preview — carousel */}
+      <Dialog open={!!previewCollection} onOpenChange={(open) => !open && setPreviewCollection(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{previewCollection?.name}</DialogTitle>
+          </DialogHeader>
+          {previewCollection?.images?.length > 0 && (
+            <div className="space-y-3">
+              <div
+                className="relative aspect-square rounded-xl overflow-hidden border border-border/40 bg-muted touch-pan-y"
+                onTouchStart={handlePreviewTouchStart}
+                onTouchEnd={handlePreviewTouchEnd}
+              >
+                <img
+                  src={previewCollection.images[previewIndex]?.url}
+                  alt={`${previewCollection.name} ${previewIndex + 1}`}
+                  className="w-full h-full object-cover"
+                />
+
+                {!loadedPreviewUrls.has(previewCollection.images[previewIndex]?.url) && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-muted/60">
+                    <Loader2 className="w-5 h-5 animate-spin text-neutral-500" />
+                  </div>
+                )}
+
+                {previewCollection.images.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPreviewIndex((i) => (i - 1 + previewCollection.images.length) % previewCollection.images.length)
+                      }
+                      className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center text-white transition-colors"
+                      title="Previous photo"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPreviewIndex((i) => (i + 1) % previewCollection.images.length)
+                      }
+                      className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center text-white transition-colors"
+                      title="Next photo"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {previewCollection.images.length > 1 && (
+                <div className="flex items-center justify-center gap-1.5">
+                  {previewCollection.images.map((img, idx) => (
+                    <button
+                      key={img.key || img.url || idx}
+                      type="button"
+                      onClick={() => setPreviewIndex(idx)}
+                      title={`Photo ${idx + 1}`}
+                      className={`h-2 rounded-full transition-all ${
+                        idx === previewIndex ? "w-6 bg-neutral-900" : "w-2 bg-neutral-300 hover:bg-neutral-400"
+                      }`}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

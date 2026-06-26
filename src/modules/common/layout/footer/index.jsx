@@ -5,7 +5,7 @@ const fields = [
   {
     title: "Product",
     headings: ["Features", "Pricing"],
-    links: ["/", "/"],
+    links: ["/", "/pricing"],
   },
   {
     title: "Company",
@@ -64,7 +64,7 @@ export default function Footer() {
                   <li key={subindex}>
                     <Link
                       href={item.links[subindex]}
-                      className="text-neutral-500 hover:text-white transition-colors"
+                      className="text-neutral-500 hover:text-black transition-colors"
                     >
                       {subitem}
                     </Link>
@@ -100,11 +100,11 @@ export default function Footer() {
 
         <ul className="flex flex-wrap justify-center gap-4 text-neutral-500 text-sm">
           <li>
-            <Link href="/">Privacy Policy</Link>
+            <Link href="/" className="hover:text-black transition-colors">Privacy Policy</Link>
           </li>
 
           <li>
-            <Link href="/">Terms & Conditions</Link>
+            <Link href="/" className="hover:text-black transition-colors">Terms & Conditions</Link>
           </li>
         </ul>
       </div>
