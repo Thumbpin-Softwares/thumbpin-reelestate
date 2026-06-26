@@ -27,6 +27,8 @@ const SeedanceJobSchema = new mongoose.Schema(
     avatarVideoUrl: String,
     walkthroughVideoUrl: String,
     ctaVideoUrl: String,
+    part1VideoUrl: String,
+    part2VideoUrl: String,
     error: String,
   },
   {

@@ -53,3 +53,15 @@ export function calcDurationInFrames({
 
   return Math.ceil((introSeconds + avatarDuration + brollSeconds + ctaDuration + outroSeconds) * fps);
 }
+
+/**
+ * Duration calculator for the "Action Reel" composition — two independent,
+ * already-baked-audio Seedance clips back to back, no broll/intro/outro layers.
+ */
+export function calcActionReelDurationInFrames({
+  part1Duration = 15,
+  part2Duration = 15,
+  fps           = 30,
+} = {}) {
+  return Math.ceil((part1Duration + part2Duration) * fps);
+}

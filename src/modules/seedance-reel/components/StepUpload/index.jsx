@@ -29,6 +29,7 @@ export function StepUpload({
   avatarHook,
   onNext,
   isValid,
+  orderHint,
 }) {
   const [draggingLocation, setDraggingLocation] = useState(false);
   const [uploadItems, setUploadItems] = useState([]);
@@ -208,7 +209,9 @@ export function StepUpload({
             <div className="pl-3 flex items-center gap-3">
               <Info className="h-5 w-5 text-black shrink-0" />
               <p className="text-xs text-neutral-600 leading-relaxed">
-                Upload 2–4 property photos. Even-numbered photos become animated Hailuo B-roll clips; odd-numbered ones get a Ken Burns zoom effect. All photos are also used as background context for the avatar video.
+                {orderHint === "location-first"
+                  ? "Upload 2–4 property photos. Property photos are sent to the AI first, then presenter photos — that exact order is referenced inside the generated video prompts."
+                  : "Upload 2–4 property photos. Even-numbered photos become animated Hailuo B-roll clips; odd-numbered ones get a Ken Burns zoom effect. All photos are also used as background context for the avatar video."}
               </p>
             </div>
           </div>

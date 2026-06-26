@@ -15,6 +15,7 @@ export const CREDIT_ACTIONS = {
   product_video: { cost: 1, freeBucket: "video", label: "Product Video" },
   real_estate_video: { cost: 3, freeBucket: "video", label: "Real Estate Persona Video" },
   real_estate_video_batch: { cost: 3, freeBucket: "video", label: "Real Estate Batch Video", isBatch: true },
+  action_reel_video: { cost: 4, freeBucket: "video", label: "Action Reel Video" },
 
   avatar_photo: { cost: 1, freeBucket: "avatar", label: "AI Photo Avatar" },
   avatar_looks: { cost: 1, freeBucket: "avatar", label: "Avatar Look Generation" },
