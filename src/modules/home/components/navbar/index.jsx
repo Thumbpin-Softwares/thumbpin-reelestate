@@ -14,7 +14,7 @@ const navItems = [
   { title: "Product", link: "#how" },
   { title: "Use Cases", link: "#testimonials" },
   { title: "Resources", link: ""},
-  { title: "Pricing", link: "#pricing" },
+  { title: "Pricing", link: "/pricing" },
 ];
 
 export function Navbar() {
