@@ -280,7 +280,7 @@ export function GenerationProgress({
       avatarUrls.slice(0, 3).forEach((url, i) => formData.append(`avatarUrl_${i}`, url));
 
       await Promise.all(
-        locationImages.slice(0, 4).map(async (img, i) => {
+        locationImages.slice(0, 10).map(async (img, i) => {
           if (!img.file) return;
           try {
             const compressed = await compressImage(img.file);

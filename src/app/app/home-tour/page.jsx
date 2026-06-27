@@ -83,13 +83,15 @@ function HomeTourContent() {
       <div className="rounded-3xl p-5 sm:p-6">
         {step < 2 && (
           <div className="flex justify-center">
-            <StepIndicator currentStep={step} />
+            <StepIndicator currentStep={step} onStepClick={setStep} />
           </div>
         )}
       </div>
 
       <div className="p-2 sm:p-6 lg:p-7">
-        {step === 0 && (
+        {/* Steps 0/1 stay mounted (hidden, not unmounted) so their internal
+           state — script text, presenter selection, etc. — survives going back. */}
+        <div style={{ display: step === 0 ? "block" : "none" }}>
           <StepUpload
             locationImages={locationImages}
             setLocationImages={setLocationImages}
@@ -97,14 +99,14 @@ function HomeTourContent() {
             onNext={() => setStep(1)}
             isValid={step0Valid}
           />
-        )}
+        </div>
 
-        {step === 1 && (
+        <div style={{ display: step === 1 ? "block" : "none" }}>
           <StepScript
             onBack={() => setStep(0)}
             onGenerate={handleGenerate}
           />
-        )}
+        </div>
 
         {step === 2 && generationParams && (
           <GenerationProgress

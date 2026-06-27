@@ -173,9 +173,9 @@ export async function POST(request) {
       avatarUrls,
     );
 
-    // Collect location image files (up to 4)
+    // Collect location image files (up to 10)
     const locationBufs = [];
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 10; i++) {
       const f = formData.get(`locationImage_${i}`);
       if (f && typeof f !== "string") {
         try {
@@ -603,7 +603,10 @@ ${part3_cta}`;
 
           // ── Stage 3: Build 3 Seedance prompts ─────────────────────────────
           const numAvatarImages = avatarUrls.length;
-          const validLocationUrls = locationR2Urls.filter(Boolean);
+          // Up to 10 property photos can be uploaded, but the walkthrough prompt
+          // only has hand-written phrasing for #Image1–#Image4, and Seedance's
+          // reference-to-video call only accepts a handful of images reliably.
+          const validLocationUrls = locationR2Urls.filter(Boolean).slice(0, 4);
           const numLocImgs = validLocationUrls.length;
 
           // ── Prompt A: Intro avatar (door-opening home-tour walkthrough) ──

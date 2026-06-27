@@ -6,45 +6,9 @@ import { useAvatars } from "@/modules/ai-walkthrough/hooks/useAvatars";
 import { StepUpload } from "@/modules/seedance-reel/components/StepUpload";
 import { StepScript } from "@/modules/seedance-reel/components/StepScript";
 import { GenerationProgress } from "@/modules/seedance-reel/components/GenerationProgress";
+import { StepIndicator } from "@/modules/pipeline/components/StepIndicator";
 
-const STEPS = ["Upload & Presenter", "Script", "Generate"];
 const RESUME_KEY = "seedance_resume";
-
-function StepIndicator({ currentStep = 0 }) {
-  return (
-    <div className="flex items-center gap-2 rounded-full bg-neutral-100 p-2">
-      {STEPS.map((label, idx) => {
-        const active = idx === currentStep;
-        const completed = idx < currentStep;
-        return (
-          <div
-            key={idx}
-            className={`flex items-center gap-2 rounded-full px-3 py-2 transition-all duration-300 ${
-              active
-                ? "bg-[#c7f038] text-black"
-                : completed
-                ? "bg-black text-white"
-                : "bg-transparent text-neutral-500"
-            }`}
-          >
-            <div
-              className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
-                active
-                  ? "bg-black text-white"
-                  : completed
-                  ? "bg-white text-black"
-                  : "bg-neutral-200"
-              }`}
-            >
-              {completed ? "✓" : idx + 1}
-            </div>
-            <span className="hidden sm:block text-xs font-medium">{label}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 function SeedanceReelContent() {
   const [step, setStep] = useState(0);
@@ -114,17 +78,19 @@ function SeedanceReelContent() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto py-8 px-4 space-y-2 animate-fade-in">
-      <div className="rounded-3xl p-5 sm:p-6">
+    <div className="max-w-6xl mx-auto px-4 space-y-2 animate-fade-in">
+      <div className="rounded-3xl py-4">
         {step < 2 && (
           <div className="flex justify-center">
-            <StepIndicator currentStep={step} />
+            <StepIndicator currentStep={step} onStepClick={setStep} />
           </div>
         )}
       </div>
 
       <div className="p-2 sm:p-6 lg:p-7">
-        {step === 0 && (
+        {/* Steps 0/1 stay mounted (hidden, not unmounted) so their internal
+           state — script text, presenter selection, etc. — survives going back. */}
+        <div style={{ display: step === 0 ? "block" : "none" }}>
           <StepUpload
             locationImages={locationImages}
             setLocationImages={setLocationImages}
@@ -132,14 +98,14 @@ function SeedanceReelContent() {
             onNext={() => setStep(1)}
             isValid={step0Valid}
           />
-        )}
+        </div>
 
-        {step === 1 && (
+        <div style={{ display: step === 1 ? "block" : "none" }}>
           <StepScript
             onBack={() => setStep(0)}
             onGenerate={handleGenerate}
           />
-        )}
+        </div>
 
         {step === 2 && generationParams && (
           <GenerationProgress
