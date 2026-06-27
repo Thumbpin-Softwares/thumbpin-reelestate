@@ -14,7 +14,6 @@ import {
 } from "@/lib/credit-system";
 import { fal } from "@fal-ai/client";
 import sharp from "sharp";
-import { ELEVENLABS_VOICE_SETTINGS } from "@/lib/elevenlabs-config";
 
 if (process.env.FAL_KEY) {
   fal.config({ credentials: process.env.FAL_KEY });
@@ -41,9 +40,8 @@ async function callLLM(prompt) {
   return (result?.data?.output ?? result?.output ?? "").toString().trim();
 }
 
-// Per-beat excitement nudges layered on top of the tuned base voice settings —
+// Per-beat excitement nudges layered on top of the user's chosen voice settings —
 // intro/CTA need hook energy, walkthrough narration stays calm/informative.
-// These are deltas only; ELEVENLABS_VOICE_SETTINGS itself is never modified.
 const BEAT_DELIVERY_DELTAS = {
   intro: { styleDelta: 0.18, speedDelta: 0.04 }, // energetic hook
   walkthrough: { styleDelta: -0.05, speedDelta: 0 }, // measured, informative
@@ -54,10 +52,8 @@ function clamp(n, min, max) {
   return Math.min(max, Math.max(min, n));
 }
 
-async function generateElevenLabsTTS(text, voiceId, beat = null) {
-  const vs =
-    ELEVENLABS_VOICE_SETTINGS[voiceId] ??
-    ELEVENLABS_VOICE_SETTINGS["dVTC43Yewy5fAIcmsISI"];
+async function generateElevenLabsTTS(text, voiceId, beat = null, voiceSettings) {
+  const vs = voiceSettings;
   const delta = BEAT_DELIVERY_DELTAS[beat] ?? { styleDelta: 0, speedDelta: 0 };
   const result = await fal.subscribe("fal-ai/elevenlabs/tts/multilingual-v2", {
     input: {
@@ -83,8 +79,9 @@ async function generateAndUploadTTS(
   userId,
   keyPrefix,
   beat = null,
+  voiceSettings,
 ) {
-  const buf = await generateElevenLabsTTS(text, voiceId, beat);
+  const buf = await generateElevenLabsTTS(text, voiceId, beat, voiceSettings);
   const key = buildUserKey(userId, "audio", "mp3", keyPrefix);
   return uploadToR2(buf, key, "audio/mpeg");
 }
@@ -132,6 +129,11 @@ export async function POST(request) {
     const language = (formData.get("language") || "english").toString();
     const tone = (formData.get("tone") || "luxury").toString();
     const jobId = (formData.get("jobId") || "").toString().trim();
+    let voiceSettings = null;
+    try {
+      const raw = formData.get("voiceSettings");
+      if (raw) voiceSettings = JSON.parse(raw.toString());
+    } catch (_) {}
 
     if (!script || script.length < 30) {
       return NextResponse.json(
@@ -541,6 +543,7 @@ ${part3_cta}`;
                 userId,
                 "sreel-part1-voice",
                 "intro",
+                voiceSettings,
               ),
               generateAndUploadTTS(
                 part2_tts,
@@ -548,6 +551,7 @@ ${part3_cta}`;
                 userId,
                 "sreel-part2-voice",
                 "walkthrough",
+                voiceSettings,
               ),
               generateAndUploadTTS(
                 part3_tts,
@@ -555,6 +559,7 @@ ${part3_cta}`;
                 userId,
                 "sreel-part3-voice",
                 "cta",
+                voiceSettings,
               ),
             ]);
 

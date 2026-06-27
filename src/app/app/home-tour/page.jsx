@@ -37,7 +37,7 @@ function HomeTourContent() {
 
   const step0Valid = locationImages.length >= 1 && avatarHook.selectedAvatars.length >= 1;
 
-  const handleGenerate = ({ script, voiceId, language, tone }) => {
+  const handleGenerate = ({ script, voiceId, language, tone, voiceSettings }) => {
     const avatarUrls = avatarHook.selectedAvatars
       .slice(0, 3)
       .map((av) => av.url)
@@ -48,6 +48,7 @@ function HomeTourContent() {
       voiceId,
       language,
       tone,
+      voiceSettings,
       locationImages,
       avatarUrls,
     });
@@ -56,7 +57,7 @@ function HomeTourContent() {
     try {
       sessionStorage.setItem(
         RESUME_KEY,
-        JSON.stringify({ generationParams: { script, voiceId, language, tone, avatarUrls } })
+        JSON.stringify({ generationParams: { script, voiceId, language, tone, voiceSettings, avatarUrls } })
       );
     } catch (_) {}
   };
