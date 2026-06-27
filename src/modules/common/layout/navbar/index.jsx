@@ -48,6 +48,8 @@ const navItems = [
   { label: "Get Started", href: "/app", icon: Plus },
   { label: "Library", href: "/app/assets", icon: FolderOpen },
   { label: "Edit", href: "/app/edit", icon: Pencil },
+  { label: "Help Center", href: "/app/help", icon: BookOpen },
+  { label: "Chat with us", href: "mailto:support@thumbpin.ai", icon: MessageCircle },
   { label: "What's New", href: "/app/whats-new", icon: Megaphone },
 ];
 

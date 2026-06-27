@@ -582,21 +582,21 @@ export function StepUpload({
 
       {/* Collection photo preview — carousel */}
       <Dialog open={!!previewCollection} onOpenChange={(open) => !open && setPreviewCollection(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-xs">
           <DialogHeader>
             <DialogTitle>{previewCollection?.name}</DialogTitle>
           </DialogHeader>
           {previewCollection?.images?.length > 0 && (
             <div className="space-y-3">
               <div
-                className="relative aspect-square rounded-xl overflow-hidden border border-border/40 bg-muted touch-pan-y"
+                className="relative h-64 rounded-xl overflow-hidden border border-border/40 bg-muted touch-pan-y"
                 onTouchStart={handlePreviewTouchStart}
                 onTouchEnd={handlePreviewTouchEnd}
               >
                 <img
                   src={previewCollection.images[previewIndex]?.url}
                   alt={`${previewCollection.name} ${previewIndex + 1}`}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain"
                 />
 
                 {!loadedPreviewUrls.has(previewCollection.images[previewIndex]?.url) && (

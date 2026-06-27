@@ -10,6 +10,8 @@ import {
   Megaphone,
   RectangleGoggles,
   Columns2,
+  BookOpen,
+  MessageCircle,
 } from "lucide-react";
 
 const STORAGE_KEY = "aside_collapsed";
@@ -18,6 +20,8 @@ const navItems = [
   { label: "Get Started", href: "/app", icon: Plus },
   { label: "Library", href: "/app/assets", icon: FolderOpen },
   { label: "Edit", href: "/app/edit", icon: Pencil },
+  { label: "Help Center", href: "/app/help", icon: BookOpen },
+  { label: "Chat with us", href: "mailto:support@thumbpin.ai", icon: MessageCircle },
 ];
 
 const whatsNewItem = { label: "What's New", href: "/app/whats-new", icon: Megaphone };

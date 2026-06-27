@@ -18,7 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useUser } from "@/hooks/use-user";
-import { Video, Building, ShoppingBag, ArrowRight, Plus, Pencil, Loader2, Play, MoreVertical } from "lucide-react";
+import { Video, ArrowRight, Plus, Pencil, Loader2, Play, MoreVertical, Share2 } from "lucide-react";
 import { Search } from "lucide-react";
 import {
   EDITABLE_SOURCES,
@@ -242,25 +242,25 @@ export default function DashboardPage() {
 
   const actions = [
     {
-      title: "Real Estate",
+      title: "AI Reel Generator",
       description:
-        "Build stunning real estate social media post that grabs users attentiton.",
+        "Build stunning real estate reels that grab users' attention.",
       href: null,
-      icon: Building,
+      icon: Video,
       color: "bg-amber-50 text-amber-600",
     },
     {
-      title: "UGC Video",
-      description: "Convert your script to video of your liking",
-      href: "/app/ugc-creator",
-      icon: Video,
+      title: "Social Media Posts",
+      description: "Generate ready-to-post social media creatives",
+      href: null,
+      icon: Share2,
       color: "bg-indigo-50 text-indigo-600",
     },
     {
-      title: "Product Ad",
-      description: "Showcase physical items",
-      href: "/app/product-to-video",
-      icon: ShoppingBag,
+      title: "Edit Your Reels",
+      description: "Fine-tune and download your generated reels",
+      href: "/app/edit",
+      icon: Pencil,
       color: "bg-emerald-50 text-emerald-600",
     },
   ];
@@ -271,8 +271,7 @@ export default function DashboardPage() {
       <section className="grid sm:grid-cols-3 sm:pt-0 pt-4 gap-4">
         {actions.map((action) => {
           const Icon = action.icon;
-          const isComingSoon =
-            action.title === "UGC Video" || action.title === "Product Ad";
+          const isComingSoon = action.title === "Social Media Posts";
 
           const content = (
             <div
@@ -292,8 +291,8 @@ export default function DashboardPage() {
               </div>
 
               {isComingSoon && (
-                <div className="absolute top-3 right-3 bottom-auto sm:pt-8 left-auto sm:inset-0 sm:flex sm:items-center sm:justify-center">
-                  <span className="bg-[#c7f038] text-black text-[10px] sm:text-xs font-bold uppercase tracking-widest px-2 py-1 rounded-full shadow-lg">
+                <div className="absolute top-3 right-3 bottom-auto sm:pt-5 left-auto sm:inset-0 sm:flex sm:items-center sm:justify-center">
+                  <span className="bg-[#c7f038] text-black text-[10px] sm:text-xs font-bold uppercase tracking-widest px-8 py-1 rounded-full shadow-lg">
                     Coming Soon
                   </span>
                 </div>
@@ -303,7 +302,7 @@ export default function DashboardPage() {
 
           if (isComingSoon) return <div key={action.title}>{content}</div>;
 
-          if (action.title === "Real Estate") {
+          if (action.title === "AI Reel Generator") {
             return (
               <button
                 key={action.title}
