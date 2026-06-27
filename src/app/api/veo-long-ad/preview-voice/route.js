@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { fal } from "@fal-ai/client";
-import { ELEVENLABS_VOICE_SETTINGS } from "@/lib/elevenlabs-config";
 
 if (process.env.FAL_KEY) {
   fal.config({ credentials: process.env.FAL_KEY });
@@ -10,10 +9,16 @@ export async function POST(request) {
     return NextResponse.json({ error: "FAL_KEY not configured" }, { status: 503 });
   }
 
-  const { voiceId, voiceLabel = "your narrator", language = "english" } = await request.json();
+  const { voiceId, voiceLabel = "your narrator", language = "english", voiceSettings, text } = await request.json();
   if (!voiceId) {
     return NextResponse.json({ error: "voiceId is required" }, { status: 400 });
   }
+
+  const vs = voiceSettings;
+
+  // When previewing the user's own script (not the canned sample), speak the
+  // whole thing — they're fine-tuning wording/voice settings, not just auditioning.
+  const userScriptText = text?.trim();
 
   const PREVIEW_TEXTS = {
     hindi:    "यह शानदार प्रॉपर्टी लग्जरी और आराम का परफेक्ट मेल है! — आज ही अपनी साइट विजिट बुक करें!",
@@ -26,16 +31,16 @@ export async function POST(request) {
     punjabi:  "ਇਹ ਸ਼ਾਨਦਾਰ ਸੰਪਤੀ ਲਗਜ਼ਰੀ ਅਤੇ ਆਰਾਮ ਦਾ ਸੰਪੂਰਨ ਮੇਲ ਦਿੰਦੀ ਹੈ। ਅੱਜ ਹੀ ਸਾਈਟ ਵਿਜ਼ਿਟ ਬੁੱਕ ਕਰੋ!",
     english:  `Hi, I'm ${voiceLabel}. This stunning property offers the perfect blend of luxury and comfort. Book your site visit today!`,
   };
-  const previewText = PREVIEW_TEXTS[language] ?? PREVIEW_TEXTS.english;
+  const previewText = userScriptText || (PREVIEW_TEXTS[language] ?? PREVIEW_TEXTS.english);
 
   const result = await fal.subscribe("fal-ai/elevenlabs/tts/multilingual-v2", {
     input: {
       text: previewText,
       voice: voiceId,
-      stability:        ELEVENLABS_VOICE_SETTINGS.stability,
-      similarity_boost: ELEVENLABS_VOICE_SETTINGS.similarity_boost,
-      style:            ELEVENLABS_VOICE_SETTINGS.style,
-      speed:            ELEVENLABS_VOICE_SETTINGS.speed,
+      stability:        vs.stability,
+      similarity_boost: vs.similarity_boost,
+      style:            vs.style,
+      speed:            vs.speed,
     },
     logs: false,
   });

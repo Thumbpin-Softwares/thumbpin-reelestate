@@ -14,7 +14,6 @@ import {
 } from "@/lib/credit-system";
 import { fal } from "@fal-ai/client";
 import sharp from "sharp";
-import { ELEVENLABS_VOICE_SETTINGS } from "@/lib/elevenlabs-config";
 
 if (process.env.FAL_KEY) {
   fal.config({ credentials: process.env.FAL_KEY });
@@ -41,10 +40,8 @@ async function callLLM(prompt) {
   return (result?.data?.output ?? result?.output ?? "").toString().trim();
 }
 
-async function generateElevenLabsTTS(text, voiceId) {
-  const vs =
-    ELEVENLABS_VOICE_SETTINGS[voiceId] ??
-    ELEVENLABS_VOICE_SETTINGS["dVTC43Yewy5fAIcmsISI"];
+async function generateElevenLabsTTS(text, voiceId, voiceSettings) {
+  const vs = voiceSettings;
   const result = await fal.subscribe("fal-ai/elevenlabs/tts/multilingual-v2", {
     input: {
       text,
@@ -63,8 +60,8 @@ async function generateElevenLabsTTS(text, voiceId) {
   return Buffer.from(await res.arrayBuffer());
 }
 
-async function generateAndUploadTTS(text, voiceId, userId, keyPrefix) {
-  const buf = await generateElevenLabsTTS(text, voiceId);
+async function generateAndUploadTTS(text, voiceId, userId, keyPrefix, voiceSettings) {
+  const buf = await generateElevenLabsTTS(text, voiceId, voiceSettings);
   const key = buildUserKey(userId, "audio", "mp3", keyPrefix);
   return uploadToR2(buf, key, "audio/mpeg");
 }
@@ -111,6 +108,11 @@ export async function POST(request) {
     ).toString();
     const language = (formData.get("language") || "english").toString();
     const jobId = (formData.get("jobId") || "").toString().trim();
+    let voiceSettings = null;
+    try {
+      const raw = formData.get("voiceSettings");
+      if (raw) voiceSettings = JSON.parse(raw.toString());
+    } catch (_) {}
 
     if (!script || script.length < 30) {
       return NextResponse.json(
@@ -496,18 +498,21 @@ ${part3_cta}`;
                 voiceId,
                 userId,
                 "sreel-part1-voice",
+                voiceSettings,
               ),
               generateAndUploadTTS(
                 part2_tts,
                 voiceId,
                 userId,
                 "sreel-part2-voice",
+                voiceSettings,
               ),
               generateAndUploadTTS(
                 part3_tts,
                 voiceId,
                 userId,
                 "sreel-part3-voice",
+                voiceSettings,
               ),
             ]);
 

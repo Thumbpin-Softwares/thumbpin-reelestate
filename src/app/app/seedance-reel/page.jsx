@@ -73,7 +73,7 @@ function SeedanceReelContent() {
 
   const step0Valid = locationImages.length >= 1 && avatarHook.selectedAvatars.length >= 1;
 
-  const handleGenerate = ({ script, voiceId, language }) => {
+  const handleGenerate = ({ script, voiceId, language, voiceSettings }) => {
     const avatarUrls = avatarHook.selectedAvatars
       .slice(0, 3)
       .map((av) => av.url)
@@ -83,6 +83,7 @@ function SeedanceReelContent() {
       script,
       voiceId,
       language,
+      voiceSettings,
       locationImages,
       avatarUrls,
     });
@@ -91,7 +92,7 @@ function SeedanceReelContent() {
     try {
       sessionStorage.setItem(
         RESUME_KEY,
-        JSON.stringify({ generationParams: { script, voiceId, language, avatarUrls } })
+        JSON.stringify({ generationParams: { script, voiceId, language, voiceSettings, avatarUrls } })
       );
     } catch (_) {}
   };

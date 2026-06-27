@@ -13,11 +13,19 @@ import {
   Globe2,
   Mic,
   Play,
+  Square,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { LANGUAGES } from "@/utils/constants";
-import { ELEVENLABS_VOICES } from "@/lib/elevenlabs-config";
+import { ELEVENLABS_VOICES, ELEVENLABS_VOICE_SETTINGS } from "@/lib/elevenlabs-config";
+
+const VOICE_SLIDERS = [
+  { key: "stability", label: "Stability", min: 0, max: 1, step: 0.01 },
+  { key: "similarity_boost", label: "Similarity", min: 0, max: 1, step: 0.01 },
+  { key: "style", label: "Style", min: 0, max: 1, step: 0.01 },
+  { key: "speed", label: "Speed", min: 0.7, max: 1.6, step: 0.01 },
+];
 
 const MIN_SCRIPT_WORDS = 20;
 const MAX_SCRIPT_WORDS = 300;
@@ -50,8 +58,28 @@ export function StepScript({ onBack, onGenerate }) {
   const [mode, setMode] = useState("manual");
   const [language, setLanguage] = useState("english");
   const [elevenLabsVoice, setElevenLabsVoice] = useState(ELEVENLABS_VOICES[0].id);
+  const [voiceSettings, setVoiceSettings] = useState(() => ({
+    ...ELEVENLABS_VOICE_SETTINGS[ELEVENLABS_VOICES[0].id],
+  }));
   const [previewingVoice, setPreviewingVoice] = useState(false);
   const previewAudioRef = useRef(null);
+  const previewAbortRef = useRef(null);
+
+  const stopPreviewVoice = () => {
+    previewAbortRef.current?.abort();
+    previewAbortRef.current = null;
+    if (previewAudioRef.current) {
+      previewAudioRef.current.pause();
+      URL.revokeObjectURL(previewAudioRef.current.src);
+    }
+    setPreviewingVoice(false);
+  };
+
+  const handleVoiceChange = (voiceId) => {
+    stopPreviewVoice();
+    setElevenLabsVoice(voiceId);
+    setVoiceSettings({ ...(ELEVENLABS_VOICE_SETTINGS[voiceId] || ELEVENLABS_VOICE_SETTINGS[ELEVENLABS_VOICES[0].id]) });
+  };
 
   const [manualScript, setManualScript] = useState("");
 
@@ -65,6 +93,7 @@ export function StepScript({ onBack, onGenerate }) {
     cta: "Book a site visit today!",
   });
   const [tone, setTone] = useState("luxury");
+  const [showAiForm, setShowAiForm] = useState(true);
   const [generatingScript, setGeneratingScript] = useState(false);
   const [aiGeneratedScript, setAiGeneratedScript] = useState("");
   const [scriptWordCount, setScriptWordCount] = useState(0);
@@ -77,19 +106,25 @@ export function StepScript({ onBack, onGenerate }) {
   const handlePreviewVoice = async () => {
     if (previewingVoice) return;
     setPreviewingVoice(true);
+    const controller = new AbortController();
+    previewAbortRef.current = controller;
     try {
       const voice = ELEVENLABS_VOICES.find((v) => v.id === elevenLabsVoice);
       const res = await fetch("/api/veo-long-ad/preview-voice", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           voiceId: elevenLabsVoice,
           voiceLabel: voice?.label?.split(" (")[0],
           language,
+          voiceSettings,
+          text: activeScript.trim() || undefined,
         }),
       });
       if (!res.ok) throw new Error("Preview failed");
       const blob = await res.blob();
+      if (controller.signal.aborted) return;
       const url = URL.createObjectURL(blob);
       if (previewAudioRef.current) {
         previewAudioRef.current.pause();
@@ -101,6 +136,7 @@ export function StepScript({ onBack, onGenerate }) {
       audio.onerror = () => setPreviewingVoice(false);
       await audio.play();
     } catch (err) {
+      if (err.name === "AbortError") return;
       toast.error("Could not preview voice", { description: err.message });
       setPreviewingVoice(false);
     }
@@ -132,6 +168,7 @@ export function StepScript({ onBack, onGenerate }) {
       setAiGeneratedScript(data.script || "");
       setScriptWordCount(data.wordCount || 0);
       setScriptEstDuration(data.estimatedDuration || 0);
+      setShowAiForm(false);
       toast.success(`Script ready — ${data.wordCount} words · ~${data.estimatedDuration}s`);
     } catch (err) {
       toast.error("Script generation failed", { description: err.message });
@@ -142,7 +179,7 @@ export function StepScript({ onBack, onGenerate }) {
 
   const handleGenerate = () => {
     if (!isScriptReady) return;
-    onGenerate({ script: activeScript.trim(), voiceId: elevenLabsVoice, language, tone });
+    onGenerate({ script: activeScript.trim(), voiceId: elevenLabsVoice, language, tone, voiceSettings });
   };
 
   return (
@@ -150,95 +187,12 @@ export function StepScript({ onBack, onGenerate }) {
       <div className="text-center space-y-1">
         <h2 className="text-2xl font-bold font-heading tracking-tight">Script</h2>
         <p className="text-sm text-muted-foreground">
-          Paste your property script or let AI write one. The pipeline will split it automatically.
+          Let{"\'"}s give voice to your reel.
         </p>
       </div>
 
-      {/* Language, Voice row + mode toggle */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex gap-3 flex-wrap">
-          {/* Language */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-neutral-500 flex items-center gap-1.5">
-              <Globe2 className="w-3.5 h-3.5" />
-              Language
-            </label>
-            <div className="relative">
-              <select
-                value={language}
-                onChange={(e) => setLanguage(e.target.value)}
-                className="w-40 appearance-none text-sm rounded-xl border border-neutral-200 bg-white px-3 py-2 pr-10 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#c7f038]/40 focus:border-[#c7f038]"
-              >
-                {LANGUAGES.map((l) => (
-                  <option key={l.id} value={l.id}>{l.label}</option>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400">
-                <ChevronDown />
-              </div>
-            </div>
-          </div>
-
-          {/* Voice */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-neutral-500 flex items-center gap-1.5">
-              <Mic className="w-3.5 h-3.5" />
-              Voice
-            </label>
-            <div className="flex gap-1.5">
-              <div className="relative">
-                <select
-                  value={elevenLabsVoice}
-                  onChange={(e) => { setElevenLabsVoice(e.target.value); setPreviewingVoice(false); }}
-                  className="w-44 appearance-none text-sm rounded-xl border border-neutral-200 bg-white px-3 py-2 pr-10 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#c7f038]/40 focus:border-[#c7f038]"
-                >
-                  {ELEVENLABS_VOICES.map((v) => (
-                    <option key={v.id} value={v.id}>{v.label}</option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400">
-                  <ChevronDown />
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={handlePreviewVoice}
-                disabled={previewingVoice}
-                title="Preview this voice"
-                className="shrink-0 flex items-center justify-center w-9 h-9 rounded-xl border border-neutral-200 bg-white shadow-sm text-neutral-500 hover:text-[#c7f038] hover:border-[#c7f038] disabled:opacity-50 transition-colors"
-              >
-                {previewingVoice
-                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  : <Play className="w-3.5 h-3.5 ml-0.5" />
-                }
-              </button>
-            </div>
-          </div>
-
-          {/* Tone — applies to both AI-written and pasted scripts (affects delivery/punctuation, not the words) */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-neutral-500 flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5" />
-              Tone
-            </label>
-            <div className="relative">
-              <select
-                value={tone}
-                onChange={(e) => setTone(e.target.value)}
-                className="w-44 appearance-none text-sm rounded-xl border border-neutral-200 bg-white px-3 py-2 pr-10 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#c7f038]/40 focus:border-[#c7f038]"
-              >
-                {TONE_OPTIONS.map((t) => (
-                  <option key={t.id} value={t.id}>{t.label}</option>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400">
-                <ChevronDown />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Mode toggle */}
+      {/* Mode toggle */}
+      <div className="flex justify-center">
         <div className="relative inline-flex rounded-full bg-neutral-100 p-1">
           {mode === "manual" && (
             <motion.div
@@ -269,127 +223,238 @@ export function StepScript({ onBack, onGenerate }) {
         </div>
       </div>
 
-      {/* ── Manual Mode ─────────────────────────────────────────────────────── */}
-      {mode === "manual" && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-medium text-muted-foreground">Property Script</label>
-            <span className={`text-xs font-medium ${
-              wordCount > MAX_SCRIPT_WORDS
-                ? "text-destructive"
-                : wordCount >= MIN_SCRIPT_WORDS
-                ? "text-emerald-500"
-                : "text-neutral-500"
-            }`}>
-              {wordCount} / {MAX_SCRIPT_WORDS} words
-            </span>
-          </div>
-          <textarea
-            value={manualScript}
-            onChange={(e) => setManualScript(e.target.value)}
-            placeholder={`Paste your full property script here…\n\nThe pipeline will automatically split it:\n• Part 1 (~15s) → Avatar presenter speaks to camera\n• Part 2 (rest) → B-roll footage with voiceover`}
-            rows={12}
-            className="w-full text-sm border border-border/60 rounded-3xl bg-background px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-[#c7f038] leading-relaxed placeholder:text-muted-foreground/50"
-          />
-          {wordCount > MAX_SCRIPT_WORDS && (
-            <p className="text-[11px] text-destructive">
-              Script is too long. Maximum {MAX_SCRIPT_WORDS} words. Please trim it down.
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* ── AI Mode ─────────────────────────────────────────────────────────── */}
-      {mode === "ai" && (
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-border/50 bg-card/60 p-4 space-y-4">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              Property Details
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { key: "propertyName", label: "Property Name *", placeholder: "e.g. M3M Opus" },
-                { key: "location", label: "Location *", placeholder: "e.g. Sector 67, Gurugram" },
-                { key: "type", label: "Type", placeholder: "e.g. 3 BHK Luxury Apartment" },
-                { key: "size", label: "Size", placeholder: "e.g. 2400–3200 sq ft" },
-                { key: "price", label: "Price", placeholder: "e.g. ₹7 Cr onwards" },
-                { key: "cta", label: "Call-to-Action", placeholder: "e.g. Book a site visit today!" },
-              ].map(({ key, label, placeholder }) => (
-                <div key={key} className="space-y-1.5">
-                  <label className="text-xs font-medium">{label}</label>
-                  <input
-                    value={qaAnswers[key]}
-                    onChange={(e) => setQaAnswers((prev) => ({ ...prev, [key]: e.target.value }))}
-                    placeholder={placeholder}
-                    className="w-full text-sm border border-border/60 rounded-xl bg-background px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  />
-                </div>
-              ))}
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium">
-                Key USPs / Features <span className="text-muted-foreground">(one per line)</span>
-              </label>
-              <textarea
-                value={qaAnswers.usps}
-                onChange={(e) => setQaAnswers((prev) => ({ ...prev, usps: e.target.value }))}
-                placeholder={"270-degree views of Aravalli Hills\nSingaporean-style boutique luxury\n100+ world-class amenities\nGolf Course Extension Road connectivity"}
-                rows={4}
-                className="w-full text-sm border border-border/60 rounded-2xl bg-background px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 placeholder:text-muted-foreground/50"
-              />
-            </div>
-            <Button
-              onClick={handleGenerateAiScript}
-              disabled={!qaAnswers.propertyName || !qaAnswers.location || generatingScript}
-              className="w-full gradient-bg text-white hover:opacity-90 disabled:opacity-40 gap-2"
-            >
-              {generatingScript ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> Writing script with AI…</>
-              ) : (
-                <><Wand2 className="w-4 h-4" /> Generate Script with AI</>
-              )}
-            </Button>
-          </div>
-
-          {aiGeneratedScript && (
+      {/* ── Script (left) + Language/Voice/Tone (right) ─────────────────────── */}
+      <div className="grid md:grid-cols-3 gap-6">
+        <div className="md:col-span-2 space-y-4">
+          {/* ── Manual Mode ───────────────────────────────────────────────── */}
+          {mode === "manual" && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  Script generated — {scriptWordCount} words · ~{scriptEstDuration}s
-                </div>
-                <button
-                  onClick={handleGenerateAiScript}
-                  disabled={generatingScript}
-                  className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1"
-                >
-                  <RefreshCcw className="w-3 h-3" />
-                  Regenerate
-                </button>
+                <label className="text-xs font-medium text-muted-foreground">Property Script</label>
+                <span className={`text-xs font-medium ${
+                  wordCount > MAX_SCRIPT_WORDS
+                    ? "text-destructive"
+                    : wordCount >= MIN_SCRIPT_WORDS
+                    ? "text-emerald-500"
+                    : "text-neutral-500"
+                }`}>
+                  {wordCount} / {MAX_SCRIPT_WORDS} words
+                </span>
               </div>
               <textarea
-                value={aiGeneratedScript}
-                onChange={(e) => setAiGeneratedScript(e.target.value)}
-                rows={10}
-                className="w-full text-sm border border-border/60 rounded-2xl bg-background px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 leading-relaxed"
+                value={manualScript}
+                onChange={(e) => setManualScript(e.target.value)}
+                placeholder={`Paste your full property script here…\n\nThe pipeline will automatically split it:\n• Part 1 (~15s) → Avatar presenter speaks to camera\n• Part 2 (rest) → B-roll footage with voiceover`}
+                rows={14}
+                className="w-full text-sm border border-border/60 rounded-3xl bg-background px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-[#c7f038] leading-relaxed placeholder:text-muted-foreground/50"
               />
-              <p className="text-[11px] text-muted-foreground">
-                You can edit the script above before generating.
-              </p>
+              {wordCount > MAX_SCRIPT_WORDS && (
+                <p className="text-[11px] text-destructive">
+                  Script is too long. Maximum {MAX_SCRIPT_WORDS} words. Please trim it down.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* ── AI Mode ───────────────────────────────────────────────────── */}
+          {mode === "ai" && (
+            <div className="space-y-4">
+              {showAiForm && (
+                <div className="rounded-2xl border border-border/50 bg-card/60 p-4 space-y-4">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Property Details
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { key: "propertyName", label: "Property Name *", placeholder: "e.g. M3M Opus" },
+                      { key: "location", label: "Location *", placeholder: "e.g. Sector 67, Gurugram" },
+                      { key: "type", label: "Type", placeholder: "e.g. 3 BHK Luxury Apartment" },
+                      { key: "size", label: "Size", placeholder: "e.g. 2400–3200 sq ft" },
+                      { key: "price", label: "Price", placeholder: "e.g. ₹7 Cr onwards" },
+                      { key: "cta", label: "Call-to-Action", placeholder: "e.g. Book a site visit today!" },
+                    ].map(({ key, label, placeholder }) => (
+                      <div key={key} className="space-y-1.5">
+                        <label className="text-xs font-medium">{label}</label>
+                        <input
+                          value={qaAnswers[key]}
+                          onChange={(e) => setQaAnswers((prev) => ({ ...prev, [key]: e.target.value }))}
+                          placeholder={placeholder}
+                          className="w-full text-sm border border-border/60 rounded-xl bg-background px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium">
+                      Key USPs / Features <span className="text-muted-foreground">(one per line)</span>
+                    </label>
+                    <textarea
+                      value={qaAnswers.usps}
+                      onChange={(e) => setQaAnswers((prev) => ({ ...prev, usps: e.target.value }))}
+                      placeholder={"270-degree views of Aravalli Hills\nSingaporean-style boutique luxury\n100+ world-class amenities\nGolf Course Extension Road connectivity"}
+                      rows={4}
+                      className="w-full text-sm border border-border/60 rounded-2xl bg-background px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 placeholder:text-muted-foreground/50"
+                    />
+                  </div>
+                  <Button
+                    onClick={handleGenerateAiScript}
+                    disabled={!qaAnswers.propertyName || !qaAnswers.location || generatingScript}
+                    className="w-full gradient-bg text-white hover:opacity-90 disabled:opacity-40 gap-2"
+                  >
+                    {generatingScript ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Writing script with AI…</>
+                    ) : (
+                      <><Wand2 className="w-4 h-4" /> Generate Script with AI</>
+                    )}
+                  </Button>
+                </div>
+              )}
+
+              {aiGeneratedScript && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Script generated — {scriptWordCount} words · ~{scriptEstDuration}s
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {!showAiForm && (
+                        <button
+                          onClick={() => setShowAiForm(true)}
+                          className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1"
+                        >
+                          Edit Details
+                        </button>
+                      )}
+                      <button
+                        onClick={handleGenerateAiScript}
+                        disabled={generatingScript}
+                        className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1"
+                      >
+                        <RefreshCcw className="w-3 h-3" />
+                        Regenerate
+                      </button>
+                    </div>
+                  </div>
+                  <textarea
+                    value={aiGeneratedScript}
+                    onChange={(e) => setAiGeneratedScript(e.target.value)}
+                    rows={10}
+                    className="w-full text-sm border border-border/60 rounded-2xl bg-background px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 leading-relaxed"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    You can edit the script above before generating.
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>
-      )}
 
-      {/* Pipeline info */}
-      {isScriptReady && (
-        <div className="rounded-xl border border-[#c7f038]/30 bg-[#c7f038]/5 p-3 flex gap-2">
-          <Sparkles className="w-3.5 h-3.5 text-[#c7f038] shrink-0 mt-0.5" />
-          <p className="text-[11px] text-neutral-700 leading-relaxed">
-            <strong>Seedance Reel pipeline:</strong> The script will be automatically split — the first ~15 seconds become the avatar talking section (generated by Seedance 2.0 with your identity images), and the rest plays as ElevenLabs voiceover behind property B-roll clips.
-          </p>
+        {/* ── Language / Voice / Tone ─────────────────────────────────────── */}
+        <div className="space-y-4 rounded-2xl border border-border/50 bg-card/40 p-4 h-fit">
+          {/* Language */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-neutral-500 flex items-center gap-1.5">
+              <Globe2 className="w-3.5 h-3.5" />
+              Language
+            </label>
+            <div className="relative">
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                className="w-full appearance-none text-sm rounded-xl border border-neutral-200 bg-white px-3 py-2 pr-10 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#c7f038]/40 focus:border-[#c7f038]"
+              >
+                {LANGUAGES.map((l) => (
+                  <option key={l.id} value={l.id}>{l.label}</option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400">
+                <ChevronDown />
+              </div>
+            </div>
+          </div>
+
+          {/* Tone — applies to both AI-written and pasted scripts (affects delivery/punctuation, not the words) */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-neutral-500 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5" />
+              Tone
+            </label>
+            <div className="relative">
+              <select
+                value={tone}
+                onChange={(e) => setTone(e.target.value)}
+                className="w-full appearance-none text-sm rounded-xl border border-neutral-200 bg-white px-3 py-2 pr-10 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#c7f038]/40 focus:border-[#c7f038]"
+              >
+                {TONE_OPTIONS.map((t) => (
+                  <option key={t.id} value={t.id}>{t.label}</option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400">
+                <ChevronDown />
+              </div>
+            </div>
+          </div>
+
+          {/* Voice */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-neutral-500 flex items-center gap-1.5">
+              <Mic className="w-3.5 h-3.5" />
+              Voice
+            </label>
+            <div className="flex gap-1.5">
+              <div className="relative flex-1">
+                <select
+                  value={elevenLabsVoice}
+                  onChange={(e) => handleVoiceChange(e.target.value)}
+                  className="w-full appearance-none text-sm rounded-xl border border-neutral-200 bg-white px-3 py-2 pr-10 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#c7f038]/40 focus:border-[#c7f038]"
+                >
+                  {ELEVENLABS_VOICES.map((v) => (
+                    <option key={v.id} value={v.id}>{v.label}</option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400">
+                  <ChevronDown />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Voice tuning sliders — adjust, then hit Preview to hear the result */}
+          <div className="space-y-3 rounded-xl border border-neutral-200 bg-white p-3">
+            {VOICE_SLIDERS.map(({ key, label, min, max, step }) => (
+              <div key={key} className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-medium text-neutral-500">{label}</label>
+                  <span className="text-[11px] font-mono text-neutral-400">{voiceSettings[key]?.toFixed(2)}</span>
+                </div>
+                <input
+                  type="range"
+                  min={min}
+                  max={max}
+                  step={step}
+                  value={voiceSettings[key] ?? min}
+                  onChange={(e) =>
+                    setVoiceSettings((prev) => ({ ...prev, [key]: parseFloat(e.target.value) }))
+                  }
+                  className="w-full h-1.5 rounded-full accent-[#c7f038] cursor-pointer"
+                />
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={previewingVoice ? stopPreviewVoice : handlePreviewVoice}
+              className="w-full flex items-center justify-center gap-2 text-xs font-medium rounded-lg border border-neutral-200 bg-neutral-50 hover:bg-neutral-100 py-2 text-neutral-700 transition-colors"
+            >
+              {previewingVoice
+                ? <><Square className="w-3.5 h-3.5" /> Stop</>
+                : <><Play className="w-3.5 h-3.5" /> {activeScript.trim() ? "Preview with My Script" : "Preview Voice"}</>
+              }
+            </button>
+          </div>
         </div>
-      )}
+      </div>
 
       <div className="flex items-center justify-between pt-2">
         <Button variant="ghost" onClick={onBack} className="gap-2 text-muted-foreground">
