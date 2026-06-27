@@ -1,15 +1,21 @@
 const DEFAULT_STEPS = ["Upload & Presenter", "Script", "Generate"];
 
-export function StepIndicator({ currentStep = 0, steps = DEFAULT_STEPS }) {
+export function StepIndicator({ currentStep = 0, steps = DEFAULT_STEPS, onStepClick = null }) {
   return (
     <div className="flex items-center gap-2 rounded-full bg-neutral-100 p-2">
       {steps.map((label, idx) => {
         const active = idx === currentStep;
         const completed = idx < currentStep;
+        const clickable = !!onStepClick && completed;
         return (
-          <div
+          <button
             key={idx}
+            type="button"
+            disabled={!clickable}
+            onClick={() => clickable && onStepClick(idx)}
             className={`flex items-center gap-2 rounded-full px-3 py-2 transition-all duration-300 ${
+              clickable ? "cursor-pointer hover:opacity-80" : "cursor-default"
+            } ${
               active
                 ? "bg-[#c7f038] text-black"
                 : completed
@@ -29,7 +35,7 @@ export function StepIndicator({ currentStep = 0, steps = DEFAULT_STEPS }) {
               {completed ? "✓" : idx + 1}
             </div>
             <span className="hidden sm:block text-xs font-medium">{label}</span>
-          </div>
+          </button>
         );
       })}
     </div>

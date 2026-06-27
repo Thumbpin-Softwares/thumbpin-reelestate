@@ -123,8 +123,8 @@ export function StepUpload({
     (files) => {
       const validFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
       if (validFiles.length === 0) return toast.error("Please upload image files.");
-      if (locationImages.length + validFiles.length > 4) {
-        return toast.error("Maximum 4 location images allowed.");
+      if (locationImages.length + validFiles.length > 10) {
+        return toast.error("Maximum 10 location images allowed.");
       }
       const withPreview = validFiles.map((f) => ({
         file: f,
@@ -183,7 +183,7 @@ export function StepUpload({
             </div>
             <h3 className="text-sm font-semibold">Property Photos</h3>
             <span className="ml-auto text-xs font-medium text-neutral-500">
-              {locationImages.length}/4
+              {locationImages.length}/10
             </span>
           </div>
 
@@ -233,7 +233,7 @@ export function StepUpload({
                       </button>
                     </div>
                   ))}
-                  {locationImages.length < 4 && (
+                  {locationImages.length < 10 && (
                     <label className="aspect-square rounded-xl border-2 border-dashed border-border/50 flex items-center justify-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all">
                       <ImagePlus className="w-5 h-5 text-muted-foreground" />
                       <input
@@ -332,7 +332,7 @@ export function StepUpload({
                           tabIndex={0}
                           onClick={() => selectCollection(col)}
                           onKeyDown={(e) => e.key === "Enter" && selectCollection(col)}
-                          className={`relative rounded-3xl overflow-hidden border-2 transition-all text-left cursor-pointer ${
+                          className={`group relative rounded-3xl overflow-hidden border-2 transition-all text-left cursor-pointer ${
                             selected
                               ? "border-[#c7f038] ring-2 ring-[#c7f038] scale-[1.02]"
                               : "border-border/40 hover:border-[#c7f038]"
@@ -346,14 +346,16 @@ export function StepUpload({
                             </div>
                           )}
                           <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent" />
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); setPreviewCollection(col); setPreviewIndex(0); }}
-                            className="absolute top-2 left-2 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80 transition-colors"
-                            title="Preview all photos"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                          </button>
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setPreviewCollection(col); setPreviewIndex(0); }}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white text-black text-xs font-medium shadow-lg hover:bg-[#c7f038] transition-colors"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              View
+                            </button>
+                          </div>
                           {selected && (
                             <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-neutral-900 flex items-center justify-center">
                               <CheckCircle2 className="w-3.5 h-3.5 text-[#c7f038]" />
@@ -510,7 +512,7 @@ export function StepUpload({
                           tabIndex={0}
                           onClick={() => avatarHook.selectCollection(col)}
                           onKeyDown={(e) => e.key === "Enter" && avatarHook.selectCollection(col)}
-                          className={`relative rounded-3xl overflow-hidden border-2 transition-all text-left cursor-pointer ${
+                          className={`group relative rounded-3xl overflow-hidden border-2 transition-all text-left cursor-pointer ${
                             selected
                               ? "border-[#c7f038] ring-2 ring-[#c7f038] scale-[1.02]"
                               : "border-border/40 hover:border-[#c7f038]"
@@ -524,21 +526,21 @@ export function StepUpload({
                             </div>
                           )}
                           <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent" />
-                          <div className="absolute top-2 left-2 flex items-center gap-1.5">
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/40">
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); setPreviewCollection(col); setPreviewIndex(0); }}
-                              className="w-6 h-6 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80 transition-colors"
-                              title="Preview all photos"
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white text-black text-xs font-medium shadow-lg hover:bg-[#c7f038] transition-colors"
                             >
                               <Eye className="w-3.5 h-3.5" />
+                              View
                             </button>
-                            {col.images?.length > 1 && (
-                              <div className="rounded-full bg-black/70 px-2 py-1 text-[10px] text-white">
-                                {col.images.length} photos
-                              </div>
-                            )}
                           </div>
+                          {col.images?.length > 1 && (
+                            <div className="absolute top-2 left-2 rounded-full bg-black/70 px-2 py-1 text-[10px] text-white">
+                              {col.images.length} photos
+                            </div>
+                          )}
                           {selected && (
                             <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-neutral-900 flex items-center justify-center">
                               <CheckCircle2 className="w-3.5 h-3.5 text-[#c7f038]" />
