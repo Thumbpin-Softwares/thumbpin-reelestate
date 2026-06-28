@@ -263,8 +263,8 @@ export function StepUpload({
               <Info className="h-5 w-5 text-black shrink-0" />
               <p className="text-xs text-neutral-600 leading-relaxed">
                 {orderHint === "location-first"
-                  ? "Upload 2–4 property photos. Property photos are sent to the AI first, then presenter photos — that exact order is referenced inside the generated video prompts."
-                  : "Upload 2–4 property photos. All photos are used as background context for the avatar video."}
+                  ? "Upload 2–10 property photos. Property photos are sent to the AI first, then presenter photos — that exact order is referenced inside the generated video prompts."
+                  : "Upload 2–10 property photos. All photos are used as background context for the avatar video."}
               </p>
             </div>
           </div>
