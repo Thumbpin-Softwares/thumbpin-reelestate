@@ -1,9 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import TemplateCard from "@/modules/dashboard/components/template-card";
 import {
   Dialog,
@@ -11,21 +9,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useUser } from "@/hooks/use-user";
-import { Video, ArrowRight, Plus, Pencil, Loader2, Play, MoreVertical, Share2 } from "lucide-react";
+import { Video, Pencil, Share2 } from "lucide-react";
 import { Search } from "lucide-react";
-import {
-  EDITABLE_SOURCES,
-  COMPOSITION_STORAGE_KEY,
-  EDIT_PATH,
-  buildCompositionFromAsset,
-} from "@/lib/editable-sources";
 
 const REAL_ESTATE_TEMPLATES = [
   {
@@ -55,190 +40,12 @@ const REAL_ESTATE_TEMPLATES = [
 ];
 
 export default function DashboardPage() {
-  const { profile } = useUser();
-  const [videos, setVideos] = useState([]);
-  const [loadingVideos, setLoadingVideos] = useState(true);
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const [editingVideoId, setEditingVideoId] = useState(null);
-  const [playingVideo, setPlayingVideo] = useState(null);
   const filteredTemplates = REAL_ESTATE_TEMPLATES.filter((t) =>
     t.title.toLowerCase().includes(query.toLowerCase()),
   );
-
-  const handleEditVideo = async (e, video) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (editingVideoId) return;
-    setEditingVideoId(video.id);
-    try {
-      const compositionProps = await buildCompositionFromAsset(video);
-      if (!compositionProps) return;
-
-      sessionStorage.setItem(COMPOSITION_STORAGE_KEY, JSON.stringify(compositionProps));
-      router.push(EDIT_PATH);
-    } finally {
-      setEditingVideoId(null);
-    }
-  };
-
-  const renderVideoCard = (video) => (
-    <Link key={video.id} href={EDIT_PATH} className="block group">
-      <div className="aspect-9/16 bg-muted rounded-2xl overflow-hidden relative border border-transparent group-hover:border-[#c7f038]/60 group-hover:shadow-xl transition-all duration-300">
-        {video.url ? (
-          <video
-            src={video.url}
-            muted
-            loop
-            playsInline
-            preload="metadata"
-            className="w-full h-full object-cover"
-            onMouseEnter={(e) => e.currentTarget.play()}
-            onMouseLeave={(e) => {
-              e.currentTarget.pause();
-              e.currentTarget.currentTime = 0;
-            }}
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-indigo-50">
-            <Video className="w-8 h-8 text-indigo-200" />
-          </div>
-        )}
-        <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/80 via-black/40 to-transparent p-3 pt-8">
-          <p className="font-semibold text-sm text-white truncate">
-            {video.name}
-          </p>
-          <p className="text-[11px] text-white/70">
-            {new Date(video.createdAt).toLocaleDateString("en-IN", {
-              day: "numeric",
-              month: "short",
-            })}{" "}
-            · {video.type}
-          </p>
-        </div>
-        <div className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:text-[#c7f038] transition-all duration-300">
-          <ArrowRight className="w-4 h-4" />
-        </div>
-        {EDITABLE_SOURCES[video.metadata?.source] && (
-          <button
-            type="button"
-            onClick={(e) => handleEditVideo(e, video)}
-            disabled={editingVideoId === video.id}
-            className="absolute top-3 left-3 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-[#c7f038] transition-all duration-300 disabled:opacity-100"
-            title="Edit"
-          >
-            {editingVideoId === video.id ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Pencil className="w-3.5 h-3.5" />
-            )}
-          </button>
-        )}
-      </div>
-    </Link>
-  );
-
-  const renderMobileVideoCard = (video) => {
-    const canEdit = !!EDITABLE_SOURCES[video.metadata?.source];
-
-    return (
-      <div
-        key={video.id}
-        className="relative aspect-video w-full bg-muted rounded-2xl overflow-hidden border border-neutral-200"
-      >
-        <Link href={EDIT_PATH} className="absolute inset-0 block">
-          {video.url ? (
-            <video
-              src={video.url}
-              muted
-              loop
-              playsInline
-              preload="metadata"
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center bg-indigo-50">
-              <Video className="w-8 h-8 text-indigo-200" />
-            </div>
-          )}
-
-          {/* Title bar at top */}
-          <div className="absolute inset-x-0 top-0 bg-linear-to-b from-black/70 via-black/30 to-transparent p-3 pr-12">
-            <p className="font-semibold text-sm text-white truncate">{video.name}</p>
-            <p className="text-[11px] text-white/70">
-              {new Date(video.createdAt).toLocaleDateString("en-IN", {
-                day: "numeric",
-                month: "short",
-              })}{" "}
-              · {video.type}
-            </p>
-          </div>
-
-        </Link>
-
-        {/* Centered play button — opens player instead of navigating */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setPlayingVideo(video);
-          }}
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/90 flex items-center justify-center shadow-lg"
-          title="Play"
-        >
-          <Play className="w-5 h-5 text-black fill-black" />
-        </button>
-
-        {canEdit && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/40 flex items-center justify-center text-white"
-                title="More options"
-              >
-                {editingVideoId === video.id ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <MoreVertical className="w-4 h-4" />
-                )}
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                disabled={editingVideoId === video.id}
-                onClick={(e) => handleEditVideo(e, video)}
-                className="cursor-pointer"
-              >
-                <Pencil className="mr-2 h-4 w-4" />
-                Edit
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-      </div>
-    );
-  };
-
-  useEffect(() => {
-    async function fetchRecentVideos() {
-      try {
-        const res = await fetch("/api/user/videos?limit=4");
-        if (res.ok) {
-          const data = await res.json();
-          setVideos(data.videos || []);
-        }
-      } catch (err) {
-        console.error("Failed to fetch videos:", err);
-      } finally {
-        setLoadingVideos(false);
-      }
-    }
-    fetchRecentVideos();
-  }, []);
 
   const actions = [
     {
@@ -266,9 +73,9 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 bg-[#fafbfc]">
+    <div className="min-h-[calc(100vh-6rem)] flex items-center justify-center bg-[#fafbfc]">
       {/* Minimalism Actions */}
-      <section className="grid sm:grid-cols-3 sm:pt-0 pt-4 gap-4">
+      <section className="w-full max-w-6xl grid sm:grid-cols-3 sm:pt-0 pt-4 gap-4 px-4">
         {actions.map((action) => {
           const Icon = action.icon;
           const isComingSoon = action.title === "Social Media Posts";
@@ -385,67 +192,6 @@ export default function DashboardPage() {
               )}
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Elegant Recents */}
-      <section className="space-y-6">
-        <div className="flex items-center justify-between border-b border-neutral-300 pb-4">
-          <h2 className="text-lg font-semibold font-heading tracking-tight">
-            Recent Creations
-          </h2>
-        </div>
-
-        {/* Mobile: last 2, stacked landscape cards with a small reel preview */}
-        <div className="flex sm:hidden flex-col gap-3">
-          {loadingVideos ? (
-            [1, 2].map((i) => (
-              <Skeleton key={i} className="aspect-video w-full rounded-2xl" />
-            ))
-          ) : videos.length > 0 ? (
-            videos.slice(0, 2).map((video) => renderMobileVideoCard(video))
-          ) : (
-            <div className="text-center py-10 bg-white/40 rounded-3xl border border-dashed border-border/40">
-              <p className="text-sm text-muted-foreground">
-                No projects yet. Let&apos;s start one!
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Desktop/tablet: full grid */}
-        <div className="hidden sm:grid grid-cols-3 md:grid-cols-4 gap-4">
-          {loadingVideos ? (
-            [1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} className="aspect-9/16 w-full rounded-2xl" />
-            ))
-          ) : videos.length > 0 ? (
-            videos.map((video) => renderVideoCard(video))
-          ) : (
-            <div className="col-span-full text-center py-10 bg-white/40 rounded-3xl border border-dashed border-border/40">
-              <p className="text-sm text-muted-foreground">
-                No projects yet. Let&apos;s start one!
-              </p>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* Mobile video player */}
-      <Dialog open={!!playingVideo} onOpenChange={(open) => !open && setPlayingVideo(null)}>
-        <DialogContent className="p-0 gap-0 overflow-hidden max-w-sm border-none bg-black">
-          <DialogHeader className="sr-only">
-            <DialogTitle>{playingVideo?.name}</DialogTitle>
-          </DialogHeader>
-          {playingVideo?.url && (
-            <video
-              src={playingVideo.url}
-              controls
-              autoPlay
-              playsInline
-              className="w-full aspect-9/16 bg-black"
-            />
-          )}
         </DialogContent>
       </Dialog>
     </div>

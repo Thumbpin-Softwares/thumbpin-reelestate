@@ -1,12 +1,16 @@
 const DEFAULT_STEPS = ["Upload & Presenter", "Script", "Generate"];
 
-export function StepIndicator({ currentStep = 0, steps = DEFAULT_STEPS, onStepClick = null }) {
+export function StepIndicator({ currentStep = 0, steps = DEFAULT_STEPS, maxStep, onStepClick = null }) {
+  // `maxStep` is the furthest step the user has already filled in — lets them
+  // hop forward to it again, not just back. Callers that don't pass it keep
+  // the original back-only behavior (only steps strictly before currentStep).
+  const reachable = maxStep ?? currentStep - 1;
   return (
     <div className="flex items-center gap-2 rounded-full bg-neutral-100 p-2">
       {steps.map((label, idx) => {
         const active = idx === currentStep;
         const completed = idx < currentStep;
-        const clickable = !!onStepClick && completed;
+        const clickable = !!onStepClick && idx <= reachable && idx !== currentStep;
         return (
           <button
             key={idx}
