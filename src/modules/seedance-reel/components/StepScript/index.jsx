@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   Wand2,
   FileText,
@@ -9,7 +9,6 @@ import {
   Loader2,
   CheckCircle2,
   RefreshCcw,
-  Sparkles,
   Globe2,
   Mic,
   Play,
@@ -30,15 +29,16 @@ const VOICE_SLIDERS = [
 const MIN_SCRIPT_WORDS = 20;
 const MAX_SCRIPT_WORDS = 300;
 
-const TONE_OPTIONS = [
-  { id: "luxury", label: "Luxury", description: "Ultra-premium, aspirational, exclusive" },
-  { id: "professional", label: "Professional", description: "Confident, credible, trust-building" },
-  { id: "energetic", label: "Energetic", description: "Fast-paced, exciting, hype energy" },
-  { id: "casual", label: "Casual", description: "Friendly, conversational, relatable" },
-  { id: "storytelling", label: "Storytelling", description: "Narrative-driven, emotional, lifestyle-focused" },
-  { id: "urgent", label: "Urgent", description: "FOMO-heavy, limited inventory, act-now" },
-  { id: "aspirational", label: "Aspirational", description: "Dream-home feeling, lifestyle upgrade" },
-];
+export const SCRIPT_DRAFT_KEY = "seedance_script_draft";
+
+function loadScriptDraft() {
+  try {
+    const raw = sessionStorage.getItem(SCRIPT_DRAFT_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) {
+    return null;
+  }
+}
 
 const ChevronDown = () => (
   <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
@@ -55,11 +55,17 @@ const ChevronDown = () => (
  * - Output: { script, voiceId, language } passed directly to GenerationProgress
  */
 export function StepScript({ onBack, onGenerate }) {
-  const [mode, setMode] = useState("manual");
-  const [language, setLanguage] = useState("english");
-  const [elevenLabsVoice, setElevenLabsVoice] = useState(ELEVENLABS_VOICES[0].id);
+  // Read once on mount so a page refresh mid-edit doesn't lose the script,
+  // voice choice, or AI-form answers (Step 0/1 elsewhere stay mounted, so
+  // this draft is only needed to survive an actual reload).
+  const [draft] = useState(loadScriptDraft);
+
+  const [mode, setMode] = useState(draft?.mode || "manual");
+  const [language, setLanguage] = useState(draft?.language || "english");
+  const [elevenLabsVoice, setElevenLabsVoice] = useState(draft?.elevenLabsVoice || ELEVENLABS_VOICES[0].id);
   const [voiceSettings, setVoiceSettings] = useState(() => ({
-    ...ELEVENLABS_VOICE_SETTINGS[ELEVENLABS_VOICES[0].id],
+    ...(ELEVENLABS_VOICE_SETTINGS[draft?.elevenLabsVoice] || ELEVENLABS_VOICE_SETTINGS[ELEVENLABS_VOICES[0].id]),
+    ...(draft?.voiceSettings || {}),
   }));
   const [previewingVoice, setPreviewingVoice] = useState(false);
   const previewAudioRef = useRef(null);
@@ -81,9 +87,9 @@ export function StepScript({ onBack, onGenerate }) {
     setVoiceSettings({ ...(ELEVENLABS_VOICE_SETTINGS[voiceId] || ELEVENLABS_VOICE_SETTINGS[ELEVENLABS_VOICES[0].id]) });
   };
 
-  const [manualScript, setManualScript] = useState("");
+  const [manualScript, setManualScript] = useState(draft?.manualScript || "");
 
-  const [qaAnswers, setQaAnswers] = useState({
+  const [qaAnswers, setQaAnswers] = useState(draft?.qaAnswers || {
     propertyName: "",
     location: "",
     type: "",
@@ -92,16 +98,27 @@ export function StepScript({ onBack, onGenerate }) {
     usps: "",
     cta: "Book a site visit today!",
   });
-  const [tone, setTone] = useState("luxury");
-  const [showAiForm, setShowAiForm] = useState(true);
+  const tone = "luxury";
+  const [showAiForm, setShowAiForm] = useState(draft?.showAiForm ?? true);
   const [generatingScript, setGeneratingScript] = useState(false);
-  const [aiGeneratedScript, setAiGeneratedScript] = useState("");
-  const [scriptWordCount, setScriptWordCount] = useState(0);
-  const [scriptEstDuration, setScriptEstDuration] = useState(0);
+  const [aiGeneratedScript, setAiGeneratedScript] = useState(draft?.aiGeneratedScript || "");
+  const [scriptWordCount, setScriptWordCount] = useState(draft?.scriptWordCount || 0);
+  const [scriptEstDuration, setScriptEstDuration] = useState(draft?.scriptEstDuration || 0);
 
   const activeScript = mode === "manual" ? manualScript : aiGeneratedScript;
   const wordCount = activeScript.trim().split(/\s+/).filter(Boolean).length;
   const isScriptReady = wordCount >= MIN_SCRIPT_WORDS && wordCount <= MAX_SCRIPT_WORDS;
+
+  // Persist the in-progress draft so a page refresh doesn't lose it.
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(SCRIPT_DRAFT_KEY, JSON.stringify({
+        mode, language, elevenLabsVoice, voiceSettings,
+        manualScript, qaAnswers, showAiForm, aiGeneratedScript,
+        scriptWordCount, scriptEstDuration,
+      }));
+    } catch (_) {}
+  }, [mode, language, elevenLabsVoice, voiceSettings, manualScript, qaAnswers, showAiForm, aiGeneratedScript, scriptWordCount, scriptEstDuration]);
 
   const handlePreviewVoice = async () => {
     if (previewingVoice) return;
@@ -375,28 +392,6 @@ export function StepScript({ onBack, onGenerate }) {
             </div>
           </div>
 
-          {/* Tone — applies to both AI-written and pasted scripts (affects delivery/punctuation, not the words) */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-neutral-500 flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5" />
-              Tone
-            </label>
-            <div className="relative">
-              <select
-                value={tone}
-                onChange={(e) => setTone(e.target.value)}
-                className="w-full appearance-none text-sm rounded-xl border border-neutral-200 bg-white px-3 py-2 pr-10 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#c7f038]/40 focus:border-[#c7f038]"
-              >
-                {TONE_OPTIONS.map((t) => (
-                  <option key={t.id} value={t.id}>{t.label}</option>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400">
-                <ChevronDown />
-              </div>
-            </div>
-          </div>
-
           {/* Voice */}
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-neutral-500 flex items-center gap-1.5">
@@ -464,10 +459,10 @@ export function StepScript({ onBack, onGenerate }) {
         <Button
           onClick={handleGenerate}
           disabled={!isScriptReady}
-          className="gradient-bg text-white hover:opacity-90 disabled:opacity-40 shadow-lg gap-2 px-6"
+          className="bg-neutral-900 text-[#c7f038] hover:opacity-90 disabled:opacity-50 hover:bg-neutral-900 shadow-lg gap-2 px-6"
         >
-          <Sparkles className="w-4 h-4" />
-          Generate Seedance Reel
+          Continue to Finalize
+          <ChevronLeft className="w-4 h-4 rotate-180" />
         </Button>
       </div>
     </div>
