@@ -14,7 +14,7 @@ export default function DashboardLayout({ children }) {
 
         <main className="relative flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden px-6">
           <PipelineBreadcrumb />
-          <div className="animate-fade-in flex-1 min-h-0 overflow-y-auto py-8 sm:py-12 pb-20 md:pb-12">
+          <div className="animate-fade-in flex-1 min-h-0 overflow-hidden">
             {children}
           </div>
         </main>

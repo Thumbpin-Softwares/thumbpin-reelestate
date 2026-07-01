@@ -13,7 +13,7 @@ import { StepIndicator } from "@/modules/pipeline/components/StepIndicator";
 import { loadDraft, saveDraft, clearDraft, fileToDataUrl } from "@/modules/seedance-reel/utils/draft";
 
 const RESUME_KEY = "seedance_resume";
-const STEP_LABELS = ["Upload & Presenter", "Script", "Finalize"];
+const STEP_LABELS = ["Add Assets", "Script", "Finalize"];
 
 function SeedanceReelContent() {
   const [step, setStep] = useState(0);
@@ -183,56 +183,56 @@ function SeedanceReelContent() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 space-y-2 animate-fade-in">
-      <div className="rounded-3xl py-4">
-        {step < 3 && (
-          <div className="flex justify-center">
-            <StepIndicator currentStep={step} maxStep={maxStep} steps={STEP_LABELS} onStepClick={setStep} />
+    <div className="h-full max-w-4xl mx-auto px-4 flex flex-col animate-fade-in">
+      {step < 3 && (
+        <div className="shrink-0 flex justify-center py-3">
+          <StepIndicator currentStep={step} maxStep={maxStep} steps={STEP_LABELS} onStepClick={setStep} />
+        </div>
+      )}
+
+      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide">
+        <div className="min-h-full flex flex-col justify-center px-2 sm:px-6 lg:px-7 py-4 pb-20 md:pb-4">
+          {/* Steps 0/1 stay mounted (hidden, not unmounted) so their internal
+             state — script text, presenter selection, etc. — survives going back. */}
+          <div style={{ display: step === 0 ? "block" : "none" }}>
+            <StepUpload
+              locationImages={locationImages}
+              setLocationImages={setLocationImages}
+              avatarHook={avatarHook}
+              onNext={() => goToStep(1)}
+              isValid={step0Valid}
+            />
           </div>
-        )}
-      </div>
 
-      <div className="p-2 sm:p-6 lg:p-7">
-        {/* Steps 0/1 stay mounted (hidden, not unmounted) so their internal
-           state — script text, presenter selection, etc. — survives going back. */}
-        <div style={{ display: step === 0 ? "block" : "none" }}>
-          <StepUpload
-            locationImages={locationImages}
-            setLocationImages={setLocationImages}
-            avatarHook={avatarHook}
-            onNext={() => goToStep(1)}
-            isValid={step0Valid}
-          />
+          <div style={{ display: step === 1 ? "block" : "none" }}>
+            <StepScript
+              onBack={() => setStep(0)}
+              onGenerate={handleScriptDone}
+            />
+          </div>
+
+          {step === 2 && scriptParams && (
+            <StepFinalize
+              locationImages={locationImages}
+              selectedAvatars={avatarHook.selectedAvatars}
+              scriptParams={scriptParams}
+              script={finalizeScript}
+              onScriptChange={setFinalizeScript}
+              quality={quality}
+              onQualityChange={setQuality}
+              onBack={() => setStep(1)}
+              onGenerate={handleGenerate}
+            />
+          )}
+
+          {step === 3 && generationParams && (
+            <GenerationProgress
+              generationParams={generationParams}
+              onReset={handleReset}
+              source="seedance-reel"
+            />
+          )}
         </div>
-
-        <div style={{ display: step === 1 ? "block" : "none" }}>
-          <StepScript
-            onBack={() => setStep(0)}
-            onGenerate={handleScriptDone}
-          />
-        </div>
-
-        {step === 2 && scriptParams && (
-          <StepFinalize
-            locationImages={locationImages}
-            selectedAvatars={avatarHook.selectedAvatars}
-            scriptParams={scriptParams}
-            script={finalizeScript}
-            onScriptChange={setFinalizeScript}
-            quality={quality}
-            onQualityChange={setQuality}
-            onBack={() => setStep(1)}
-            onGenerate={handleGenerate}
-          />
-        )}
-
-        {step === 3 && generationParams && (
-          <GenerationProgress
-            generationParams={generationParams}
-            onReset={handleReset}
-            source="seedance-reel"
-          />
-        )}
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-const DEFAULT_STEPS = ["Upload & Presenter", "Script", "Generate"];
+const DEFAULT_STEPS = ["Add Assets", "Script", "Generate"];
 
 export function StepIndicator({ currentStep = 0, steps = DEFAULT_STEPS, maxStep, onStepClick = null }) {
   // `maxStep` is the furthest step the user has already filled in — lets them

@@ -66,7 +66,7 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="min-h-[calc(100vh-6rem)] flex items-center justify-center bg-[#fafbfc]">
+    <div className="h-full flex items-center justify-center bg-[#fafbfc]">
       {/* Minimalism Actions */}
       <section className="w-full max-w-2xl grid sm:grid-cols-2 sm:pt-0 pt-4 gap-4 px-4">
         {actions.map((action) => {
