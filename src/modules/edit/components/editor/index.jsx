@@ -147,8 +147,15 @@ export function Editor({ compositionProps, onExit }) {
   const togglePlay = () => {
     const player = playerRef.current;
     if (!player) return;
-    if (playing) player.pause();
-    else player.play();
+    if (playing) {
+      player.pause();
+    } else {
+      if (frame < trim.in) {
+        player.seekTo(trim.in);
+        setFrame(trim.in);
+      }
+      player.play();
+    }
   };
 
   const handleDownload = async () => {
@@ -298,7 +305,7 @@ export function Editor({ compositionProps, onExit }) {
               {playing ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3 ml-0.5" />}
             </button>
             <span className="text-xs text-muted-foreground tabular-nums">
-              {formatTime(frame / FPS)} / {formatTime(durationInFrames / FPS)}
+              {formatTime(Math.max(0, frame - trim.in) / FPS)} / {formatTime(((trim.out > 0 ? trim.out : durationInFrames) - trim.in) / FPS)}
             </span>
           </div>
         </div>
@@ -359,6 +366,7 @@ export function Editor({ compositionProps, onExit }) {
           durationInFrames={durationInFrames}
           frame={frame}
           fps={FPS}
+          audioUrl={compositionProps.avatarVideoUrl || null}
           onSeek={(f) => {
             setFrame(f);
             playerRef.current?.seekTo(f);

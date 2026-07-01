@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Captions, Music, Scissors, Type } from "lucide-react";
 
 const TOOLBAR_ACTIONS = [
@@ -11,6 +11,108 @@ const TOOLBAR_ACTIONS = [
 ];
 
 const HANDLE_HIT_PX = 10;
+const PEAK_BUCKETS  = 300;
+
+function useWaveformPeaks(audioUrl) {
+  const [peaks, setPeaks]     = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!audioUrl) return;
+    let cancelled = false;
+    setLoading(true);
+    setPeaks(null);
+
+    (async () => {
+      try {
+        const res = await fetch(audioUrl);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const buf     = await res.arrayBuffer();
+        if (cancelled) return;
+        const actx    = new AudioContext();
+        const decoded = await actx.decodeAudioData(buf);
+        if (cancelled) return;
+
+        const data      = decoded.getChannelData(0);
+        const blockSize = Math.max(1, Math.floor(data.length / PEAK_BUCKETS));
+        const result    = new Float32Array(PEAK_BUCKETS);
+        for (let i = 0; i < PEAK_BUCKETS; i++) {
+          let max = 0;
+          const start = i * blockSize;
+          const end   = Math.min(start + blockSize, data.length);
+          for (let j = start; j < end; j++) {
+            const abs = Math.abs(data[j]);
+            if (abs > max) max = abs;
+          }
+          result[i] = max;
+        }
+        if (!cancelled) setPeaks(result);
+      } catch (err) {
+        console.error("[Waveform] failed to load audio peaks:", err.message, audioUrl);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [audioUrl]);
+
+  return { peaks, loading };
+}
+
+function Waveform({ peaks, loading, trimIn, trimOut, durationInFrames }) {
+  if (!durationInFrames) return null;
+
+  const inIdx  = Math.floor((trimIn  / durationInFrames) * PEAK_BUCKETS);
+  const outIdx = Math.ceil( (trimOut / durationInFrames) * PEAK_BUCKETS);
+
+  if (loading) {
+    return (
+      <div className="absolute inset-y-1 left-0 right-0 flex items-center gap-px px-1 pointer-events-none overflow-hidden"
+           style={{ left: `${(trimIn / durationInFrames) * 100}%`, width: `${((trimOut - trimIn) / durationInFrames) * 100}%`, position: "absolute" }}>
+        {Array.from({ length: 32 }).map((_, i) => (
+          <div
+            key={i}
+            className="flex-1 rounded-full bg-neutral-400/50 animate-pulse"
+            style={{ height: `${25 + Math.abs(Math.sin(i * 0.9)) * 50}%` }}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  if (!peaks) return null;
+
+  const slice    = Array.from(peaks).slice(inIdx, outIdx);
+  const maxPeak  = Math.max(...slice, 0.01);
+  const trimPct  = (trimIn  / durationInFrames) * 100;
+  const widthPct = ((trimOut - trimIn) / durationInFrames) * 100;
+  const n        = slice.length || 1;
+
+  return (
+    <svg
+      className="absolute inset-0 pointer-events-none"
+      style={{ left: `${trimPct}%`, width: `${widthPct}%`, top: 0, bottom: 0, height: "100%" }}
+      viewBox={`0 0 ${n} 100`}
+      preserveAspectRatio="none"
+    >
+      {slice.map((peak, i) => {
+        const barH = Math.max(3, (peak / maxPeak) * 76);
+        return (
+          <rect
+            key={i}
+            x={i + 0.1}
+            y={(100 - barH) / 2}
+            width={0.8}
+            height={barH}
+            fill="#166534"
+            opacity={0.8}
+          />
+        );
+      })}
+    </svg>
+  );
+}
 
 export function Timeline({
   durationInFrames,
@@ -19,28 +121,28 @@ export function Timeline({
   onSeek,
   onToolbarAction,
   onTrimChange,
+  audioUrl  = null,
   captions  = [],
   music     = [],
   overlays  = [],
 }) {
-  // "trim" is selected by default so users land in trim mode immediately.
   const [activeAction, setActiveAction] = useState("trim");
 
   const [trimIn,  setTrimIn]  = useState(0);
   const [trimOut, setTrimOut] = useState(durationInFrames);
-  // When durationInFrames first becomes valid, treat trimOut===0 as "not yet set"
-  // and fall back to the full duration — no effect needed.
   const effectiveTrimOut = trimOut > 0 ? trimOut : durationInFrames;
 
-  const totalSeconds   = durationInFrames / fps;
-  const tickCount      = Math.ceil(totalSeconds) + 1;
-  const playheadPct    = durationInFrames > 0 ? (frame / durationInFrames) * 100 : 0;
-  const trimInPct      = durationInFrames > 0 ? (trimIn          / durationInFrames) * 100 : 0;
-  const trimOutPct     = durationInFrames > 0 ? (effectiveTrimOut / durationInFrames) * 100 : 100;
+  const { peaks, loading: waveformLoading } = useWaveformPeaks(audioUrl);
 
-  const scrubRef      = useRef(null);
-  const dragging      = useRef(false);
-  const draggingTrim  = useRef(null); // null | "in" | "out"
+  const totalSeconds = durationInFrames / fps;
+  const tickCount    = Math.ceil(totalSeconds) + 1;
+  const playheadPct  = durationInFrames > 0 ? (frame / durationInFrames) * 100 : 0;
+  const trimInPct    = durationInFrames > 0 ? (trimIn          / durationInFrames) * 100 : 0;
+  const trimOutPct   = durationInFrames > 0 ? (effectiveTrimOut / durationInFrames) * 100 : 100;
+
+  const scrubRef     = useRef(null);
+  const dragging     = useRef(false);
+  const draggingTrim = useRef(null);
 
   const frameFromPointer = (e) => {
     const el = scrubRef.current;
@@ -75,7 +177,7 @@ export function Timeline({
     dragging.current = true;
     el.setPointerCapture(e.pointerId);
     const f = frameFromPointer(e);
-    if (f !== null) onSeek(f);
+    if (f !== null) onSeek(Math.max(trimIn, Math.min(effectiveTrimOut, f)));
   };
 
   const onPointerMove = (e) => {
@@ -95,12 +197,12 @@ export function Timeline({
     }
     if (dragging.current) {
       const f = frameFromPointer(e);
-      if (f !== null) onSeek(f);
+      if (f !== null) onSeek(Math.max(trimIn, Math.min(effectiveTrimOut, f)));
     }
   };
 
   const onPointerUp = () => {
-    dragging.current    = false;
+    dragging.current     = false;
     draggingTrim.current = null;
   };
 
@@ -135,7 +237,6 @@ export function Timeline({
           );
         })}
 
-        {/* Trim time display — only shown when trim is active */}
         {activeAction === "trim" && durationInFrames > 0 && (
           <span className="ml-auto text-[11px] tabular-nums text-muted-foreground">
             {formatTime(trimIn / fps)} – {formatTime(effectiveTrimOut / fps)}
@@ -145,11 +246,10 @@ export function Timeline({
 
       {/* Ruler + optional track */}
       <div className="flex">
-        {/* Left label column — trim and other tracks */}
         {(showTrack || showTrim) && (
           <div className="w-28 shrink-0 border-r border-border/50">
-            <div className="h-6 border-b border-border/40 bg-muted/30" />
-            <div className="h-10 flex items-center px-3 text-[11px] text-muted-foreground font-medium capitalize">
+            <div className="h-8 border-b border-border/40 bg-muted/30" />
+            <div className="h-20 flex items-center px-3 text-[11px] text-muted-foreground font-medium capitalize">
               {activeAction}
             </div>
           </div>
@@ -164,7 +264,7 @@ export function Timeline({
           onPointerUp={onPointerUp}
         >
           {/* Time ruler */}
-          <div className="relative h-6 border-b border-border/40 bg-muted/30">
+          <div className="relative h-8 border-b border-border/40 bg-muted/30">
             {Array.from({ length: tickCount }).map((_, i) => {
               const isMajor = i % 5 === 0;
               const pct = (i / Math.max(totalSeconds, 1)) * 100;
@@ -184,7 +284,6 @@ export function Timeline({
               );
             })}
 
-            {/* Dim regions on the ruler when trim is active */}
             {showTrim && durationInFrames > 0 && (
               <>
                 <div className="absolute inset-y-0 left-0 bg-black/20 pointer-events-none" style={{ width: `${trimInPct}%` }} />
@@ -193,9 +292,9 @@ export function Timeline({
             )}
           </div>
 
-          {/* Trim track row — same h-10 as other tracks */}
+          {/* Trim track row */}
           {showTrim && (
-            <div className="relative h-10 bg-white">
+            <div className="relative h-20 bg-white">
               {durationInFrames > 0 && (
                 <>
                   {/* Dimmed region before in-point */}
@@ -205,13 +304,21 @@ export function Timeline({
                   />
                   {/* Active trim region bar */}
                   <div
-                    className="absolute inset-y-2 bg-[#c7f038]/30 border border-[#c7f038]/60 rounded-sm pointer-events-none"
+                    className="absolute inset-y-3 bg-[#c7f038]/30 border border-[#c7f038]/60 rounded-sm pointer-events-none"
                     style={{ left: `${trimInPct}%`, width: `${trimOutPct - trimInPct}%` }}
                   />
                   {/* Dimmed region after out-point */}
                   <div
                     className="absolute inset-y-0 bg-black/10 pointer-events-none"
                     style={{ left: `${trimOutPct}%`, right: 0 }}
+                  />
+                  {/* Waveform — rendered only within trim region */}
+                  <Waveform
+                    peaks={peaks}
+                    loading={waveformLoading}
+                    trimIn={trimIn}
+                    trimOut={effectiveTrimOut}
+                    durationInFrames={durationInFrames}
                   />
                 </>
               )}
@@ -220,7 +327,7 @@ export function Timeline({
 
           {/* Active track row (captions / music / overlays) */}
           {showTrack && (
-            <div className="relative h-10 bg-white">
+            <div className="relative h-20 bg-white">
               {activeItems.length === 0 ? (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <button
@@ -253,7 +360,7 @@ export function Timeline({
             </div>
           )}
 
-          {/* Trim handles — span full height of ruler + track row */}
+          {/* Trim handles */}
           {showTrim && durationInFrames > 0 && (
             <>
               {/* In-point handle */}
@@ -298,8 +405,8 @@ export function Timeline({
 
 function formatTime(seconds) {
   const clamped = Math.max(0, seconds);
-  const m = Math.floor(clamped / 60);
-  const s = Math.floor(clamped % 60);
+  const m  = Math.floor(clamped / 60);
+  const s  = Math.floor(clamped % 60);
   const ms = Math.floor((clamped % 1) * 1000);
   return `${m}:${String(s).padStart(2, "0")}.${String(ms).padStart(3, "0")}`;
 }
