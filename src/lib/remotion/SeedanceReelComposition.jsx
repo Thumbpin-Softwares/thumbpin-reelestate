@@ -4,8 +4,11 @@ import {
   useVideoConfig,
   useCurrentFrame,
   interpolate,
+  // eslint-disable-next-line remotion/no-legacy-video
+  Video,
+  getRemotionEnvironment,
+  OffthreadVideo,
 } from "remotion";
-import { OffthreadVideo } from "remotion";
 import { Audio } from "@remotion/media";
 import { IntroAnimation } from "./IntroAnimation";
 import { OutroAnimation } from "./OutroAnimation";
@@ -52,6 +55,8 @@ export function SeedanceReelComposition({
   outroBrandText = "thumbpin.ai",
 }) {
   const { fps } = useVideoConfig();
+  const { isRendering } = getRemotionEnvironment();
+  const VideoComponent = isRendering ? OffthreadVideo : Video;
 
   const introFrames  = showIntro ? Math.round(INTRO_S * fps) : 0;
   const avatarFrames = Math.round(avatarDuration * fps);
@@ -108,7 +113,7 @@ export function SeedanceReelComposition({
         <Sequence from={avatarAt} durationInFrames={avatarFrames}>
           <FadeContent totalFrames={avatarFrames} fade={FADE} fadeIn fadeOut={false}>
             <AbsoluteFill>
-              <OffthreadVideo
+              <VideoComponent
                 src={avatarVideoUrl}
                 objectFit="cover"
                 style={{ width: "100%", height: "100%" }}
@@ -131,7 +136,7 @@ export function SeedanceReelComposition({
             >
               <FadeContent totalFrames={clip.segFrames} fade={FADE} fadeIn={false} fadeOut={false}>
                 <AbsoluteFill>
-                  <OffthreadVideo
+                  <VideoComponent
                     src={clip.url}
                     playbackRate={clip.rate}
                     muted
@@ -150,7 +155,7 @@ export function SeedanceReelComposition({
         <Sequence from={ctaAt} durationInFrames={ctaFrames}>
           <FadeContent totalFrames={ctaFrames} fade={FADE} fadeIn={false} fadeOut>
             <AbsoluteFill>
-              <OffthreadVideo
+              <VideoComponent
                 src={ctaVideoUrl}
                 objectFit="cover"
                 style={{ width: "100%", height: "100%" }}
