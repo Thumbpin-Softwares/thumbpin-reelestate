@@ -77,6 +77,7 @@ export async function buildCompositionFromAsset(asset) {
 
   return {
     source,
+    name: asset.name || "",
     avatarVideoUrl: avatarVideoUrl || "",
     brollClips,
     ctaVideoUrl: ctaVideoUrl || "",

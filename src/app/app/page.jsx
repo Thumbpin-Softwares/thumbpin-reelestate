@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Video, Pencil, Share2 } from "lucide-react";
+import { Video, Pencil } from "lucide-react";
 import { Search } from "lucide-react";
 
 const REAL_ESTATE_TEMPLATES = [
@@ -57,13 +57,6 @@ export default function DashboardPage() {
       color: "bg-amber-50 text-amber-600",
     },
     {
-      title: "Social Media Posts",
-      description: "Generate ready-to-post social media creatives",
-      href: null,
-      icon: Share2,
-      color: "bg-indigo-50 text-indigo-600",
-    },
-    {
       title: "Edit Your Reels",
       description: "Fine-tune and download your generated reels",
       href: "/app/edit",
@@ -75,39 +68,22 @@ export default function DashboardPage() {
   return (
     <div className="min-h-[calc(100vh-6rem)] flex items-center justify-center bg-[#fafbfc]">
       {/* Minimalism Actions */}
-      <section className="w-full max-w-6xl grid sm:grid-cols-3 sm:pt-0 pt-4 gap-4 px-4">
+      <section className="w-full max-w-2xl grid sm:grid-cols-2 sm:pt-0 pt-4 gap-4 px-4">
         {actions.map((action) => {
           const Icon = action.icon;
-          const isComingSoon = action.title === "Social Media Posts";
 
           const content = (
-            <div
-              className={`relative flex flex-row sm:flex-col bg-white items-center justify-between sm:justify-center p-4 sm:p-6 sm:h-48 gap-4 sm:space-y-4 rounded-3xl border border-neutral-200 transition-all duration-300 ${
-                isComingSoon
-                  ? "cursor-not-allowed"
-                  : "hover:border-border/40 hover:bg-white hover:shadow-xl"
-              }`}
-            >
+            <div className="relative flex flex-row sm:flex-col bg-white items-center justify-between sm:justify-center p-4 sm:p-6 sm:h-48 gap-4 sm:space-y-4 rounded-3xl border border-neutral-200 transition-all duration-300 hover:border-border/40 hover:bg-white hover:shadow-xl">
               <div className="order-1 sm:order-2 text-left sm:text-center flex flex-col gap-1 sm:gap-2">
                 <h3 className="font-semibold">{action.title}</h3>
                 <p className="text-sm text-neutral-500">{action.description}</p>
               </div>
 
-              <div className={`order-2 sm:order-1 shrink-0 w-12 h-12 rounded-3xl flex items-center justify-center ${action.color} ${!isComingSoon && "group-hover:scale-110 transition-transform"}`}>
+              <div className={`order-2 sm:order-1 shrink-0 w-12 h-12 rounded-3xl flex items-center justify-center ${action.color} group-hover:scale-110 transition-transform`}>
                 <Icon className="w-6 h-6" />
               </div>
-
-              {isComingSoon && (
-                <div className="absolute top-3 right-3 bottom-auto sm:pt-5 left-auto sm:inset-0 sm:flex sm:items-center sm:justify-center">
-                  <span className="bg-[#c7f038] text-black text-[10px] sm:text-xs font-bold uppercase tracking-widest px-8 py-1 rounded-full shadow-lg">
-                    Coming Soon
-                  </span>
-                </div>
-              )}
             </div>
           );
-
-          if (isComingSoon) return <div key={action.title}>{content}</div>;
 
           if (action.title === "AI Reel Generator") {
             return (

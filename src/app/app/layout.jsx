@@ -6,15 +6,15 @@ import { AdminModal } from "@/components/dashboard/admin-modal";
 
 export default function DashboardLayout({ children }) {
   return (
-    <div className="min-h-screen bg-[#fafbfc]">
+    <div className="h-screen flex flex-col overflow-hidden bg-[#fafbfc]">
       <UserNav />
 
-      <div className="flex py-4">
+      <div className="flex flex-1 min-h-0 py-4">
         <Aside />
 
-        <main className="flex-1 max-w-5xl mx-auto px-4 py-8 sm:py-12 pb-20 md:pb-12">
+        <main className="relative flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden px-6">
           <PipelineBreadcrumb />
-          <div className="animate-fade-in">
+          <div className="animate-fade-in flex-1 min-h-0 overflow-y-auto py-8 sm:py-12 pb-20 md:pb-12">
             {children}
           </div>
         </main>
