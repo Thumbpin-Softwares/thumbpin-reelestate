@@ -164,16 +164,7 @@ export function StepUpload({
   );
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      <div className="text-center space-y-1">
-        <h2 className="text-2xl font-bold font-heading tracking-tight">
-          Upload Property & Presenter
-        </h2>
-        <p className="text-sm text-neutral-500">
-          Add property shots and select a presenter. Seedance AI will compose the scene.
-        </p>
-      </div>
-
+    <div className="space-y-4 animate-fade-in">
       <div className="grid md:grid-cols-2 gap-6">
         {/* ── Left: Location Images ───────────────────────────────────────── */}
         <div className="space-y-3">
@@ -218,6 +209,10 @@ export function StepUpload({
               </label>
             ) : (
               <div className="p-3 space-y-2">
+                <div
+                  className="max-h-64 overflow-y-auto overscroll-contain scrollbar-hide"
+                  onWheel={(e) => e.stopPropagation()}
+                >
                 <div className="grid grid-cols-3 gap-2">
                   {locationImages.map((img, idx) => (
                     <div
@@ -245,6 +240,7 @@ export function StepUpload({
                       />
                     </label>
                   )}
+                </div>
                 </div>
               </div>
             )}
@@ -278,9 +274,6 @@ export function StepUpload({
             </div>
             <div>
               <h3 className="text-sm font-semibold">Presenter / Avatar</h3>
-              <p className="text-[11px] text-muted-foreground">
-                Choose from RE Agents or use your own (up to 3 photos sent to Seedance)
-              </p>
             </div>
           </div>
 

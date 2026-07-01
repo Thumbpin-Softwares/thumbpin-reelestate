@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Player } from "@remotion/player";
 import {
-  Plus,
   ArrowLeft,
   Loader2,
   Download,
@@ -12,13 +11,11 @@ import {
   Eye,
   ExternalLink,
   Video,
+  Play,
+  Pause,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -71,17 +68,30 @@ export default function EditPage() {
 }
 
 // ─── Editor ───────────────────────────────────────────────────────────────
+const FPS = 30;
+
+function formatTime(seconds) {
+  const total = Math.max(0, Math.floor(seconds));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
 function Editor({ compositionProps, onExit }) {
   const [rendering, setRendering] = useState(false);
   const [renderError, setRenderError] = useState(null);
 
-  const [showIntro, setShowIntro] = useState(false);
-  const [showOutro, setShowOutro] = useState(false);
-  const [introTitle, setIntroTitle] = useState("Luxury");
-  const [introSubtitle, setIntroSubtitle] = useState("Living");
-  const [introTagline, setIntroTagline] = useState("Where Every Detail Matters");
-  const [outroCtaText, setOutroCtaText] = useState(compositionProps.ctaText || "");
-  const [outroBrandText, setOutroBrandText] = useState("thumbpin.ai");
+  const playerRef = useRef(null);
+  const [playing, setPlaying] = useState(false);
+  const [frame, setFrame] = useState(0);
+
+  const showIntro = false;
+  const showOutro = false;
+  const introTitle = "";
+  const introSubtitle = "";
+  const introTagline = "";
+  const outroCtaText = compositionProps.ctaText || "";
+  const outroBrandText = "thumbpin.ai";
 
   const sourceConfig = EDITABLE_SOURCES[compositionProps.source] || {};
 
@@ -163,138 +173,226 @@ function Editor({ compositionProps, onExit }) {
     showOutro,
   });
 
+  useEffect(() => {
+    const player = playerRef.current;
+    if (!player) return;
+    const onPlay = () => setPlaying(true);
+    const onPause = () => setPlaying(false);
+    const onFrameUpdate = (e) => setFrame(e.detail.frame);
+    player.addEventListener("play", onPlay);
+    player.addEventListener("pause", onPause);
+    player.addEventListener("frameupdate", onFrameUpdate);
+    return () => {
+      player.removeEventListener("play", onPlay);
+      player.removeEventListener("pause", onPause);
+      player.removeEventListener("frameupdate", onFrameUpdate);
+    };
+  }, []);
+
+  const togglePlay = () => {
+    const player = playerRef.current;
+    if (!player) return;
+    if (playing) player.pause();
+    else player.play();
+  };
+
+
   return (
-    <div className="max-w-6xl mx-auto py-8 px-4">
+    <div className="absolute inset-x-0 bottom-0 top-12 z-10 bg-[#fafbfc] flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-8">
-        <Button variant="ghost" size="sm" onClick={onExit} className="gap-2">
-          <ArrowLeft className="w-4 h-4" />
-          Back
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold font-heading tracking-tight">Edit Reel</h1>
-          <p className="text-sm text-muted-foreground">Preview your reel and add optional clips at the start or end</p>
+      <div className="flex items-center justify-between gap-2 px-6 py-2 shrink-0 border-b border-border/40">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={onExit} className="gap-1.5 h-8 text-xs">
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Back
+          </Button>
+          <div>
+            <h1 className="text-base font-bold font-heading tracking-tight">Edit Reel</h1>
+            <p className="text-xs text-muted-foreground truncate max-w-xs">{compositionProps.name || "Untitled reel"}</p>
+          </div>
+        </div>
+        <div className="flex flex-col items-end gap-1">
+          <Button onClick={handleDownload} disabled={rendering} className="gap-2 bg-linear-to-b from-black to-neutral-600 text-[#c7f038]">
+            {rendering ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Rendering…
+              </>
+            ) : (
+              <>
+                <Download className="w-4 h-4" />
+                Export
+              </>
+            )}
+          </Button>
+          {renderError && (
+            <div className="flex items-start gap-1 text-xs text-destructive">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              <span>{renderError}</span>
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-8 items-start justify-center">
-        {/* Preview column */}
-        <div className="flex flex-col items-center gap-3 w-full max-w-xs mx-auto lg:mx-0">
-          <AddSlot label="Add intro clip" />
-
-          <div className="w-full rounded-3xl overflow-hidden border border-border/50 bg-black shadow-2xl">
+      {/* Preview — fills remaining space above timeline */}
+      <div className="flex-1 min-h-0 flex items-center justify-center overflow-hidden py-3">
+        <div className="flex flex-col items-center gap-2 h-full">
+          <div className="rounded-2xl overflow-hidden border border-border/50 bg-black shadow-xl flex-1 min-h-0" style={{ aspectRatio: "9/16" }}>
             <Player
+              ref={playerRef}
               component={SeedanceReelComposition}
               inputProps={previewProps}
               durationInFrames={durationInFrames}
               compositionWidth={1080}
               compositionHeight={1920}
-              fps={30}
-              style={{ width: "100%", aspectRatio: "9/16" }}
-              controls
+              fps={FPS}
+              style={{ width: "100%", height: "100%", display: "block" }}
               loop
               clickToPlay
             />
           </div>
 
-          <AddSlot label="Add outro clip" />
-        </div>
-
-        {/* Controls column */}
-        <div className="flex-1 w-full lg:max-w-sm space-y-4">
-          <div className="rounded-2xl border border-border/50 bg-muted/20 p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-semibold">Intro title card</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Optional white title card before the reel starts.
-                </p>
-              </div>
-              <Switch checked={showIntro} onCheckedChange={setShowIntro} />
-            </div>
-            {showIntro && (
-              <div className="space-y-2.5 pt-1">
-                <div className="space-y-1">
-                  <Label htmlFor="intro-title" className="text-xs">Title</Label>
-                  <Input id="intro-title" value={introTitle} onChange={(e) => setIntroTitle(e.target.value)} />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="intro-subtitle" className="text-xs">Subtitle</Label>
-                  <Input id="intro-subtitle" value={introSubtitle} onChange={(e) => setIntroSubtitle(e.target.value)} />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="intro-tagline" className="text-xs">Tagline</Label>
-                  <Input id="intro-tagline" value={introTagline} onChange={(e) => setIntroTagline(e.target.value)} />
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="rounded-2xl border border-border/50 bg-muted/20 p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-semibold">Outro title card</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Optional white CTA card after the reel ends.
-                </p>
-              </div>
-              <Switch checked={showOutro} onCheckedChange={setShowOutro} />
-            </div>
-            {showOutro && (
-              <div className="space-y-2.5 pt-1">
-                <div className="space-y-1">
-                  <Label htmlFor="outro-cta" className="text-xs">CTA text</Label>
-                  <Textarea id="outro-cta" value={outroCtaText} onChange={(e) => setOutroCtaText(e.target.value)} rows={3} />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="outro-brand" className="text-xs">Brand text</Label>
-                  <Input id="outro-brand" value={outroBrandText} onChange={(e) => setOutroBrandText(e.target.value)} />
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="rounded-2xl border border-border/50 bg-muted/20 p-4 space-y-3">
-            <div>
-              <h3 className="text-sm font-semibold">Download reel</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Renders the final MP4 with Remotion — takes 1–3 minutes.
-              </p>
-            </div>
-            <Button onClick={handleDownload} disabled={rendering} className="w-full gap-2">
-              {rendering ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Rendering…
-                </>
-              ) : (
-                <>
-                  <Download className="w-4 h-4" />
-                  Download MP4
-                </>
-              )}
-            </Button>
-            {renderError && (
-              <div className="flex items-start gap-2 text-xs text-destructive">
-                <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                <span>{renderError}</span>
-              </div>
-            )}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={togglePlay}
+              className="h-7 w-7 rounded-full bg-neutral-900 text-white flex items-center justify-center hover:bg-neutral-800 transition-colors shrink-0"
+            >
+              {playing ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3 ml-0.5" />}
+            </button>
+            <span className="text-xs text-muted-foreground tabular-nums">
+              {formatTime(frame / FPS)} / {formatTime(durationInFrames / FPS)}
+            </span>
           </div>
         </div>
+      </div>
+
+      {/* Timeline — in flow at bottom */}
+      <div className="shrink-0 px-6 pb-3 pt-2 bg-[#fafbfc] border-t border-border/50">
+        <Timeline
+          durationInFrames={durationInFrames}
+          frame={frame}
+          fps={FPS}
+          onSeek={(f) => {
+            setFrame(f);
+            playerRef.current?.seekTo(f);
+          }}
+          onDownload={handleDownload}
+          rendering={rendering}
+        />
       </div>
     </div>
   );
 }
 
-function AddSlot({ label }) {
+// ─── Timeline ─────────────────────────────────────────────────────────────
+const TRACKS = [
+  { id: "segments",      label: "Segments",      bar: "bg-neutral-800" },
+  { id: "captions",      label: "Captions",      bar: "bg-[#c7f038]" },
+  { id: "text-overlays", label: "Text Overlays", bar: "bg-neutral-300" },
+];
+
+function Timeline({ durationInFrames, frame, fps, onSeek, onDownload, rendering }) {
+  const totalSeconds = durationInFrames / fps;
+  const tickCount = Math.ceil(totalSeconds) + 1;
+  const playheadPct = durationInFrames > 0 ? (frame / durationInFrames) * 100 : 0;
+  const scrubRef = useRef(null);
+  const dragging = useRef(false);
+
+  const seekFromPointer = (e) => {
+    const el = scrubRef.current;
+    if (!el || durationInFrames === 0) return;
+    const { left, width } = el.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (e.clientX - left) / width));
+    onSeek(Math.round(ratio * (durationInFrames - 1)));
+  };
+
+  const onPointerDown = (e) => {
+    dragging.current = true;
+    scrubRef.current?.setPointerCapture(e.pointerId);
+    seekFromPointer(e);
+  };
+  const onPointerMove = (e) => { if (dragging.current) seekFromPointer(e); };
+  const onPointerUp   = () => { dragging.current = false; };
+
   return (
-    <button className="w-full flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border/50 hover:border-primary/50 hover:bg-primary/5 transition-all py-3 px-4 text-sm text-muted-foreground hover:text-primary group">
-      <div className="w-6 h-6 rounded-full border-2 border-current flex items-center justify-center group-hover:bg-primary group-hover:border-primary group-hover:text-white transition-all">
-        <Plus className="w-3.5 h-3.5" />
+    <div className="w-full rounded-2xl border border-border/50 bg-white overflow-hidden">
+      {/* Toolbar */}
+      <div className="flex items-center gap-3 px-3 py-2 border-b border-border/50 text-xs text-muted-foreground">
+        <span className="cursor-pointer hover:text-foreground transition-colors">+ Add Text</span>
+        <span className="text-border">|</span>
+        <span className="cursor-pointer hover:text-foreground transition-colors">+ Add Image</span>
+        <span className="text-border">|</span>
+        <span>{TRACKS.length} tracks</span>
       </div>
-      {label}
-    </button>
+
+      {/* Ruler + tracks */}
+      <div className="flex">
+        {/* Left labels column */}
+        <div className="w-28 shrink-0 border-r border-border/50">
+          <div className="h-6 border-b border-border/40 bg-muted/30" />
+          {TRACKS.map((track) => (
+            <div
+              key={track.id}
+              className="h-9 flex items-center px-3 border-b border-border/40 text-[11px] text-muted-foreground font-medium truncate"
+            >
+              {track.label}
+            </div>
+          ))}
+        </div>
+
+        {/* Scrubable timeline area */}
+        <div
+          ref={scrubRef}
+          className="flex-1 overflow-x-auto relative cursor-col-resize select-none"
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+        >
+          {/* Time ruler */}
+          <div className="relative h-6 border-b border-border/40 bg-muted/30">
+            {Array.from({ length: tickCount }).map((_, i) => {
+              const isMajor = i % 5 === 0;
+              const pct = (i / Math.max(totalSeconds, 1)) * 100;
+              return (
+                <div
+                  key={i}
+                  className="absolute top-0 h-full flex flex-col items-start"
+                  style={{ left: `${pct}%` }}
+                >
+                  <div className={`w-px ${isMajor ? "h-3 bg-border" : "h-1.5 bg-border/40"}`} />
+                  {isMajor && (
+                    <span className="text-[9px] text-muted-foreground ml-1 tabular-nums whitespace-nowrap">
+                      {i === 0 ? "0:00" : `${Math.floor(i / 60)}:${String(i % 60).padStart(2, "0")}`}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Track rows */}
+          {TRACKS.map((track) => (
+            <div key={track.id} className="relative h-9 border-b border-border/40 bg-white">
+              <div
+                className={`absolute inset-y-2 left-0.5 right-0.5 rounded-md ${track.bar} flex items-center px-2.5`}
+              >
+                <span className={`text-[10px] font-medium truncate ${track.id === "captions" ? "text-neutral-800" : track.id === "text-overlays" ? "text-neutral-500" : "text-white"}`}>
+                  {track.label}
+                </span>
+              </div>
+            </div>
+          ))}
+
+          {/* Playhead */}
+          <div
+            className="absolute top-0 bottom-0 w-px bg-neutral-900 z-10 pointer-events-none"
+            style={{ left: `${playheadPct}%` }}
+          >
+            <div className="w-3 h-3 bg-neutral-900 rounded-full -translate-x-[5px] -translate-y-px" />
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

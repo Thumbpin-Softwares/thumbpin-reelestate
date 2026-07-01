@@ -43,7 +43,7 @@ export default function Aside() {
 
   return (
     <aside
-      className={`hidden md:flex flex-col shrink-0 sticky top-0 z-20 h-screen shadow-xl border border-neutral-100 bg-white rounded-2xl px-3 py-6 gap-1 transition-all duration-200 ${
+      className={`hidden md:flex flex-col shrink-0 sticky top-0 z-50 h-screen shadow-xl border border-neutral-100 bg-white rounded-2xl px-3 py-6 gap-1 transition-all duration-200 ${
         collapsed ? "w-16" : "w-56"
       }`}
     >

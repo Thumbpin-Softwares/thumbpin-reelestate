@@ -79,45 +79,45 @@ function HomeTourContent() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto py-8 px-4 space-y-2 animate-fade-in">
-      <div className="rounded-3xl p-5 sm:p-6">
-        {step < 2 && (
-          <div className="flex justify-center">
-            <StepIndicator currentStep={step} onStepClick={setStep} />
+    <div className="h-full max-w-4xl mx-auto px-4 flex flex-col animate-fade-in">
+      {step < 2 && (
+        <div className="shrink-0 flex justify-center py-3">
+          <StepIndicator currentStep={step} onStepClick={setStep} />
+        </div>
+      )}
+
+      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide">
+        <div className="min-h-full flex flex-col justify-center px-2 sm:px-6 lg:px-7 py-4 pb-20 md:pb-4">
+          {/* Steps 0/1 stay mounted (hidden, not unmounted) so their internal
+             state — script text, presenter selection, etc. — survives going back. */}
+          <div style={{ display: step === 0 ? "block" : "none" }}>
+            <StepUpload
+              locationImages={locationImages}
+              setLocationImages={setLocationImages}
+              avatarHook={avatarHook}
+              onNext={() => setStep(1)}
+              isValid={step0Valid}
+            />
           </div>
-        )}
-      </div>
 
-      <div className="p-2 sm:p-6 lg:p-7">
-        {/* Steps 0/1 stay mounted (hidden, not unmounted) so their internal
-           state — script text, presenter selection, etc. — survives going back. */}
-        <div style={{ display: step === 0 ? "block" : "none" }}>
-          <StepUpload
-            locationImages={locationImages}
-            setLocationImages={setLocationImages}
-            avatarHook={avatarHook}
-            onNext={() => setStep(1)}
-            isValid={step0Valid}
-          />
+          <div style={{ display: step === 1 ? "block" : "none" }}>
+            <StepScript
+              onBack={() => setStep(0)}
+              onGenerate={handleGenerate}
+            />
+          </div>
+
+          {step === 2 && generationParams && (
+            <GenerationProgress
+              generationParams={generationParams}
+              onReset={handleReset}
+              apiBasePath="/api/home-tour"
+              source="home-tour"
+              jobIdKey="home_tour_job_id"
+              resumeKey={RESUME_KEY}
+            />
+          )}
         </div>
-
-        <div style={{ display: step === 1 ? "block" : "none" }}>
-          <StepScript
-            onBack={() => setStep(0)}
-            onGenerate={handleGenerate}
-          />
-        </div>
-
-        {step === 2 && generationParams && (
-          <GenerationProgress
-            generationParams={generationParams}
-            onReset={handleReset}
-            apiBasePath="/api/home-tour"
-            source="home-tour"
-            jobIdKey="home_tour_job_id"
-            resumeKey={RESUME_KEY}
-          />
-        )}
       </div>
     </div>
   );

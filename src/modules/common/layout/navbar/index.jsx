@@ -68,7 +68,7 @@ export default function UserNav() {
       .slice(0, 2) || "U";
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-10 bg-[#fafbfd]">
+    <nav className="fixed top-0 left-0 right-0 z-40 bg-[#fafbfd]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between md:justify-end h-16">
           {/* Left: Mobile hamburger trigger */}
