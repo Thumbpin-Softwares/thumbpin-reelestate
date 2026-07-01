@@ -16,12 +16,32 @@ import { authOptions } from "@/lib/auth-config";
  *   { success: true, script: string, wordCount: number }
  */
 
-async function callFal(prompt, { temperature = 0.7 } = {}) {
+// Primary model is claude-sonnet-4.6 via openrouter/router — same model the
+// action-reel pipeline's callLLM uses. The previously-exclusive fal-ai/any-llm
+// + claude-3-5-haiku path is too weak a model to reliably follow this route's
+// multi-constraint prompts (tone, structure, USPs, non-negotiable price all
+// at once), so it's now only a fallback if openrouter/router errors out.
+async function callFal(prompt, { temperature = 0.7, max_tokens = 4096 } = {}) {
   fal.config({ credentials: process.env.FAL_KEY });
-  const result = await fal.subscribe("fal-ai/any-llm", {
-    input: { model: "anthropic/claude-3-5-haiku", prompt, max_tokens: 4096, temperature },
-  });
-  return (result?.data?.output ?? result?.output ?? "").toString().trim();
+  try {
+    const result = await fal.subscribe("openrouter/router", {
+      input: { model: "anthropic/claude-sonnet-4.6", prompt, max_tokens, temperature },
+      logs: false,
+    });
+    if (result?.data?.error) throw new Error(result.data.error);
+    const output = (result?.data?.output ?? result?.output ?? "").toString().trim();
+    if (output) return output;
+    throw new Error("openrouter/router returned empty output");
+  } catch (err) {
+    console.warn(
+      "[VeoLongAd] openrouter/router call failed, falling back to fal-ai/any-llm:",
+      err.message,
+    );
+    const fallback = await fal.subscribe("fal-ai/any-llm", {
+      input: { model: "anthropic/claude-3-5-haiku", prompt, max_tokens, temperature },
+    });
+    return (fallback?.data?.output ?? fallback?.output ?? "").toString().trim();
+  }
 }
 
 // LLM self-judge for "soft" gibberish that the regex heuristic above misses —

@@ -18,6 +18,11 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { LANGUAGES } from "@/utils/constants";
 import { ELEVENLABS_VOICES } from "@/lib/elevenlabs-config";
+import { SARVAM_VOICES } from "@/lib/sarvam-config";
+
+// Combined voice catalog across providers — the provider is an internal
+// routing detail (see lib/voice-tts.js), never surfaced in this dropdown.
+const ALL_VOICES = [...ELEVENLABS_VOICES, ...SARVAM_VOICES];
 
 const MIN_SCRIPT_WORDS = 20;
 const MAX_SCRIPT_WORDS = 300;
@@ -51,7 +56,7 @@ const ChevronDown = () => (
 export function StepScript({ onBack, onGenerate }) {
   const [mode, setMode] = useState("manual");
   const [language, setLanguage] = useState("english");
-  const [elevenLabsVoice, setElevenLabsVoice] = useState(ELEVENLABS_VOICES[0].id);
+  const [elevenLabsVoice, setElevenLabsVoice] = useState(ALL_VOICES[0].id);
   const [previewingVoice, setPreviewingVoice] = useState(false);
   const [previewingScript, setPreviewingScript] = useState(false);
   const previewAudioRef = useRef(null);
@@ -82,7 +87,7 @@ export function StepScript({ onBack, onGenerate }) {
     if (previewingVoice) return;
     setPreviewingVoice(true);
     try {
-      const voice = ELEVENLABS_VOICES.find((v) => v.id === elevenLabsVoice);
+      const voice = ALL_VOICES.find((v) => v.id === elevenLabsVoice);
       const res = await fetch("/api/veo-long-ad/preview-voice", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -228,7 +233,7 @@ export function StepScript({ onBack, onGenerate }) {
                   onChange={(e) => { setElevenLabsVoice(e.target.value); setPreviewingVoice(false); }}
                   className="w-44 appearance-none text-sm rounded-xl border border-neutral-200 bg-white px-3 py-2 pr-10 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#c7f038]/40 focus:border-[#c7f038]"
                 >
-                  {ELEVENLABS_VOICES.map((v) => (
+                  {ALL_VOICES.map((v) => (
                     <option key={v.id} value={v.id}>{v.label}</option>
                   ))}
                 </select>

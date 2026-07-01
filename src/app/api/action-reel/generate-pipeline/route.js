@@ -14,7 +14,7 @@ import {
 } from "@/lib/credit-system";
 import { fal } from "@fal-ai/client";
 import sharp from "sharp";
-import { ELEVENLABS_VOICE_SETTINGS } from "@/lib/elevenlabs-config";
+import { synthesizeVoice } from "@/lib/voice-tts";
 
 if (process.env.FAL_KEY) {
   fal.config({ credentials: process.env.FAL_KEY });
@@ -70,32 +70,10 @@ async function callLLM(prompt) {
   }
 }
 
-async function generateElevenLabsTTS(text, voiceId) {
-  const vs =
-    ELEVENLABS_VOICE_SETTINGS[voiceId] ??
-    ELEVENLABS_VOICE_SETTINGS["dVTC43Yewy5fAIcmsISI"];
-  const result = await fal.subscribe("fal-ai/elevenlabs/tts/multilingual-v2", {
-    input: {
-      text,
-      voice: voiceId,
-      stability: vs.stability,
-      similarity_boost: vs.similarity_boost,
-      style: vs.style,
-      speed: vs.speed,
-    },
-    logs: false,
-  });
-  const audioUrl = result?.data?.audio_url || result?.data?.audio?.url;
-  if (!audioUrl) throw new Error("ElevenLabs returned no audio URL");
-  const res = await fetch(audioUrl);
-  if (!res.ok) throw new Error(`Failed to download TTS audio: ${res.status}`);
-  return Buffer.from(await res.arrayBuffer());
-}
-
-async function generateAndUploadTTS(text, voiceId, userId, keyPrefix) {
-  const buf = await generateElevenLabsTTS(text, voiceId);
-  const key = buildUserKey(userId, "audio", "mp3", keyPrefix);
-  return uploadToR2(buf, key, "audio/mpeg");
+async function generateAndUploadTTS(text, voiceId, userId, keyPrefix, language) {
+  const { buffer, contentType, ext } = await synthesizeVoice({ text, voiceId, language });
+  const key = buildUserKey(userId, "audio", ext, keyPrefix);
+  return uploadToR2(buffer, key, contentType);
 }
 
 async function callSeedanceAndUpload(seedanceInput, userId, keyName) {
@@ -117,7 +95,7 @@ async function callSeedanceAndUpload(seedanceInput, userId, keyName) {
 }
 
 // ── Fixed master templates — reproduced as-is except for the quoted dialogue ─
-const MASTER_TEMPLATE_A = `A hyper-realistic, vertical (9:16) UGC-style action real estate vlog. Natural, dynamic lighting. It looks like a high-budget smartphone video.
+const MASTER_TEMPLATE_A = `A hyper-realistic, vertical (9:16) UGC-style action real estate vlog. Natural, dynamic lighting. It looks like a high-budget smartphone video. All spoken dialogue is delivered in a natural, conversational Hindi accent — casual everyday rhythm and pacing, like a real person talking to a friend, not overly enunciated or textbook-perfect.
 
 [0:00 - 0:05] The video opens with an action-packed, fast-paced shot. A sleek black luxury helicopter hovers just above the ground. The female agent, Anvi (using #image7 for her facial features and #image5 for her black outfit), dramatically slides down a thick rope from the helicopter door. The moment her feet hit the ground, she immediately grabs the camera selfie-style. With her hair blowing wildly from the helicopter blades, she looks directly into the lens with intense high energy and says: "Kya aap bhi usi purani balcony se shehar ki bheed dekh kar bore ho gaye hain? Hello, main hoon Anvi..."
 
@@ -127,7 +105,7 @@ const MASTER_TEMPLATE_A = `A hyper-realistic, vertical (9:16) UGC-style action r
 
 [0:11 - 0:15] Hard cut. Back to the agent Anvi (#image7 and #image5) standing on the ground. The helicopter is still hovering in the background behind her. She smiles confidently, holding the camera selfie-style, and finishes her sentence: "...aapki real estate expert, aur aaj main aapko dikhane waali hoon aapka naya ultra-luxury ghar!" She stops speaking at exactly 13 seconds and spends the final 2 seconds simply holding a bright, confident smile at the camera as the wind blows her hair, ending the video naturally.`;
 
-const MASTER_TEMPLATE_B = `A hyper-realistic, vertical (9:16) UGC-style high-energy real estate vlog. Dynamic, fast-paced cinematic editing. Natural interior lighting.
+const MASTER_TEMPLATE_B = `A hyper-realistic, vertical (9:16) UGC-style high-energy real estate vlog. Dynamic, fast-paced cinematic editing. Natural interior lighting. All spoken dialogue is delivered in a natural, conversational Hindi accent — casual everyday rhythm and pacing, like a real person talking to a friend, not overly enunciated or textbook-perfect.
 
 [0:00 - 0:03] The video opens with a fast, FPV drone-style sweeping shot moving towards the modern luxury villa exterior, matching exactly with #image1. The voiceover starts: "Zara sochiye... aapka apna ultra-luxury ghar..."
 
@@ -571,8 +549,8 @@ ${part2}`;
           });
 
           const [p1TtsResult, p2TtsResult] = await Promise.allSettled([
-            generateAndUploadTTS(part1_tts, voiceId, userId, "areel-part1-voice"),
-            generateAndUploadTTS(part2_tts, voiceId, userId, "areel-part2-voice"),
+            generateAndUploadTTS(part1_tts, voiceId, userId, "areel-part1-voice", language),
+            generateAndUploadTTS(part2_tts, voiceId, userId, "areel-part2-voice", language),
           ]);
 
           let part1AudioUrl = null,
@@ -711,6 +689,16 @@ ${part2}`;
                 });
               }),
           ]);
+
+          // Both allSettled branches only warn+send on failure so one part
+          // failing doesn't take down the other — but if NEITHER succeeded,
+          // this must surface as a real pipeline failure (refund + error
+          // event), not silently persist as "done" with two null videos.
+          if (!part1VideoUrl && !part2VideoUrl) {
+            throw new Error(
+              "Both Seedance video generations failed — see server logs for details.",
+            );
+          }
 
           // ── Stage 5: Save asset + finalize ────────────────────────────────
           send({ type: "uploading", message: "Saving to your Asset Library…" });

@@ -1,20 +1,15 @@
 import { NextResponse } from "next/server";
 import { fal } from "@fal-ai/client";
+import { synthesizeVoice } from "@/lib/voice-tts";
 
 if (process.env.FAL_KEY) {
   fal.config({ credentials: process.env.FAL_KEY });
 }
 export async function POST(request) {
-  if (!process.env.FAL_KEY) {
-    return NextResponse.json({ error: "FAL_KEY not configured" }, { status: 503 });
-  }
-
-  const { voiceId, voiceLabel = "your narrator", language = "english", voiceSettings, text } = await request.json();
+  const { voiceId, voiceLabel = "your narrator", language = "english", text } = await request.json();
   if (!voiceId) {
     return NextResponse.json({ error: "voiceId is required" }, { status: 400 });
   }
-
-  const vs = voiceSettings;
 
   // When previewing the user's own script (not the canned sample), speak the
   // whole thing — they're fine-tuning wording/voice settings, not just auditioning.
@@ -33,35 +28,23 @@ export async function POST(request) {
   };
   const previewText = userScriptText || (PREVIEW_TEXTS[language] ?? PREVIEW_TEXTS.english);
 
-  const result = await fal.subscribe("fal-ai/elevenlabs/tts/multilingual-v2", {
-    input: {
+  try {
+    const { buffer, contentType } = await synthesizeVoice({
       text: previewText,
-      voice: voiceId,
-      stability:        vs.stability,
-      similarity_boost: vs.similarity_boost,
-      style:            vs.style,
-      speed:            vs.speed,
-    },
-    logs: false,
-  });
+      voiceId,
+      language,
+    });
 
-  const audioUrl = result?.data?.audio_url || result?.data?.audio?.url;
-  if (!audioUrl) {
-    return NextResponse.json({ error: "fal ElevenLabs returned no audio URL" }, { status: 502 });
+    return new Response(buffer, {
+      status: 200,
+      headers: {
+        "Content-Type": contentType,
+        "Content-Length": String(buffer.length),
+        "Cache-Control": "public, max-age=3600",
+      },
+    });
+  } catch (err) {
+    console.error("[preview-voice] failed:", err.message);
+    return NextResponse.json({ error: err.message || "Preview failed" }, { status: 500 });
   }
-
-  const res = await fetch(audioUrl);
-  if (!res.ok) {
-    return NextResponse.json({ error: `Failed to fetch preview audio: ${res.status}` }, { status: 502 });
-  }
-
-  const audioBuf = Buffer.from(await res.arrayBuffer());
-  return new Response(audioBuf, {
-    status: 200,
-    headers: {
-      "Content-Type": "audio/mpeg",
-      "Content-Length": String(audioBuf.length),
-      "Cache-Control": "public, max-age=3600",
-    },
-  });
 }

@@ -135,6 +135,12 @@ export function GenerationProgress({
   const [fakeBonus, setFakeBonus]             = useState(0);
 
   const hasStarted = useRef(false);
+  // Set once the stream reaches a real terminal event ("video_ready" or
+  // "error") — lets startPipeline tell a clean finish apart from the
+  // connection just dropping mid-generation (proxy/function timeout etc.),
+  // which otherwise looks identical (reader.read() returning done:true) but
+  // would silently freeze the UI on whatever stage it was in.
+  const reachedTerminalEvent = useRef(false);
 
   useEffect(() => {
     if (status === STATUS.SEEDANCE) {
@@ -238,6 +244,7 @@ export function GenerationProgress({
 
     const jobId = crypto.randomUUID();
     try { sessionStorage.setItem(jobIdKey, jobId); } catch (_) {}
+    reachedTerminalEvent.current = false;
 
     try {
       const formData = new FormData();
@@ -284,6 +291,21 @@ export function GenerationProgress({
             try { handleEvent(JSON.parse(line.slice(6))); } catch (_) {}
           }
         }
+      }
+
+      // Stream closed without ever reaching "video_ready" or "error" — the
+      // connection dropped (e.g. a serverless function timeout) mid-generation
+      // rather than the pipeline finishing cleanly. Surface it instead of
+      // leaving the UI frozen on whatever stage it was last in. Deliberately
+      // skip clearing jobIdKey (unlike the catch block below) — a refresh will
+      // try to resume this job, since it may still be running server-side.
+      if (!reachedTerminalEvent.current) {
+        const message =
+          "Lost connection to the server mid-generation. Refresh this page — it'll try to resume the job in progress.";
+        console.error("[ActionReel] Stream ended without a terminal event");
+        setStatus(STATUS.ERROR);
+        setError(message);
+        toast.error("Connection lost", { description: message });
       }
     } catch (err) {
       console.error("[ActionReel] Error:", err);
@@ -340,10 +362,12 @@ export function GenerationProgress({
         break;
 
       case "video_ready":
+        reachedTerminalEvent.current = true;
         renderFinal(event.part1VideoUrl, event.part2VideoUrl);
         break;
 
       case "error":
+        reachedTerminalEvent.current = true;
         try { sessionStorage.removeItem(jobIdKey); } catch (_) {}
         setStatus(STATUS.ERROR);
         setError(event.message || "Pipeline failed");
