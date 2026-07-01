@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, memo, useEffect, useRef, useState } from "react";
 import { Player } from "@remotion/player";
 import {
   AlertCircle,
@@ -24,10 +24,11 @@ import { Timeline } from "@/modules/edit/components/timeline-ruler";
 const FPS = 30;
 
 function formatTime(seconds) {
-  const total = Math.max(0, Math.floor(seconds));
-  const m = Math.floor(total / 60);
-  const s = total % 60;
-  return `${m}:${String(s).padStart(2, "0")}`;
+  const clamped = Math.max(0, seconds);
+  const m = Math.floor(clamped / 60);
+  const s = Math.floor(clamped % 60);
+  const ms = Math.floor((clamped % 1) * 1000);
+  return `${m}:${String(s).padStart(2, "0")}.${String(ms).padStart(3, "0")}`;
 }
 
 function CaptionsPanel() {
@@ -56,60 +57,165 @@ function PlaceholderPanel({ label }) {
   );
 }
 
+// Isolated from Editor's frame-state re-renders via memo + forwardRef.
+// compositionProps comes from a reducer and is a stable reference during playback,
+// so this component only re-renders when the user actually changes the composition.
+const PlayerContainer = memo(
+  forwardRef(function PlayerContainer({ compositionProps, durationInFrames }, ref) {
+    const clampedBrollClips = clampBrollClips({
+      avatarDuration: compositionProps.avatarDuration,
+      brollClips:     compositionProps.brollClips,
+      ctaDuration:    compositionProps.ctaDuration,
+      showIntro:      false,
+      showOutro:      false,
+    });
+
+    const previewProps = {
+      ...compositionProps,
+      brollClips:     clampedBrollClips,
+      showIntro:      false,
+      showOutro:      false,
+      introTitle:     "",
+      introSubtitle:  "",
+      introTagline:   "",
+      outroBrandText: "thumbpin.ai",
+      ctaText:        compositionProps.ctaText || "",
+    };
+
+    return (
+      <Player
+        ref={ref}
+        component={SeedanceReelComposition}
+        inputProps={previewProps}
+        durationInFrames={durationInFrames}
+        compositionWidth={1080}
+        compositionHeight={1920}
+        fps={FPS}
+        style={{ width: "100%", height: "100%", display: "block" }}
+        loop
+        clickToPlay
+      />
+    );
+  })
+);
+
 export function Editor({ compositionProps, onExit }) {
   const [rendering, setRendering] = useState(false);
+  const [renderProgress, setRenderProgress] = useState(0);
+  const [renderStatus, setRenderStatus] = useState("");
   const [renderError, setRenderError] = useState(null);
-  const [activePanel, setActivePanel] = useState(null); // "captions" | "music" | "overlays" | null
+  const [activePanel, setActivePanel] = useState(null);
 
   const playerRef = useRef(null);
   const [playing, setPlaying] = useState(false);
   const [frame, setFrame] = useState(0);
-
-  const showIntro = false;
-  const showOutro = false;
-  const introTitle = "";
-  const introSubtitle = "";
-  const introTagline = "";
-  const outroCtaText = compositionProps.ctaText || "";
-  const outroBrandText = "thumbpin.ai";
+  const [trim, setTrim] = useState({ in: 0, out: 0 });
 
   const sourceConfig = EDITABLE_SOURCES[compositionProps.source] || {};
 
+  // Computed for the timeline ruler and time display only — not passed to PlayerContainer.
+  const durationInFrames = calcDurationInFrames({
+    avatarDuration: compositionProps.avatarDuration,
+    brollClips: clampBrollClips({
+      avatarDuration: compositionProps.avatarDuration,
+      brollClips:     compositionProps.brollClips,
+      ctaDuration:    compositionProps.ctaDuration,
+      showIntro:      false,
+      showOutro:      false,
+    }),
+    ctaDuration: compositionProps.ctaDuration,
+    showIntro:   false,
+    showOutro:   false,
+  });
+
+  useEffect(() => {
+    const player = playerRef.current;
+    if (!player) return;
+    const onPlay        = () => setPlaying(true);
+    const onPause       = () => setPlaying(false);
+    const onFrameUpdate = (e) => setFrame(e.detail.frame);
+    player.addEventListener("play",        onPlay);
+    player.addEventListener("pause",       onPause);
+    player.addEventListener("frameupdate", onFrameUpdate);
+    return () => {
+      player.removeEventListener("play",        onPlay);
+      player.removeEventListener("pause",       onPause);
+      player.removeEventListener("frameupdate", onFrameUpdate);
+    };
+  }, []);
+
+  const togglePlay = () => {
+    const player = playerRef.current;
+    if (!player) return;
+    if (playing) player.pause();
+    else player.play();
+  };
+
   const handleDownload = async () => {
     setRendering(true);
+    setRenderProgress(0);
+    setRenderStatus("Starting…");
     setRenderError(null);
     try {
+      const trimInFrame  = trim.in;
+      const trimOutFrame = trim.out > 0 ? trim.out : durationInFrames;
+
       const renderProps = {
         ...compositionProps,
         brollClips: clampBrollClips({
           avatarDuration: compositionProps.avatarDuration,
           brollClips:     compositionProps.brollClips,
           ctaDuration:    compositionProps.ctaDuration,
-          showIntro,
-          showOutro,
+          showIntro:      false,
+          showOutro:      false,
         }),
-        showIntro,
-        showOutro,
-        introTitle,
-        introSubtitle,
-        introTagline,
-        outroBrandText,
-        ctaText: outroCtaText,
+        showIntro:      false,
+        showOutro:      false,
+        introTitle:     "",
+        introSubtitle:  "",
+        introTagline:   "",
+        outroBrandText: "thumbpin.ai",
+        ctaText:        compositionProps.ctaText || "",
+        trimInFrame,
+        trimOutFrame,
       };
+
       const res = await fetch(sourceConfig.renderEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(renderProps),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.url) throw new Error(data.error || `Render failed: ${res.status}`);
+
+      if (!res.ok) throw new Error(`Render failed: ${res.status}`);
+
+      const reader  = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer   = "";
+      let finalUrl = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop();
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          let event;
+          try { event = JSON.parse(line.slice(6)); } catch (_) { continue; }
+          if (event.type === "progress") setRenderProgress(event.progress);
+          if (event.type === "status")   setRenderStatus(event.message);
+          if (event.type === "done")     finalUrl = event.url;
+          if (event.type === "error")    throw new Error(event.error);
+        }
+      }
+
+      if (!finalUrl) throw new Error("No URL returned from render");
 
       const filename = sourceConfig.downloadFilename || "video.mp4";
-      const sep = data.url.includes("?") ? "&" : "?";
-      const downloadUrl = `${data.url}${sep}download=1&filename=${filename}`;
-
+      const sep = finalUrl.includes("?") ? "&" : "?";
       const a = document.createElement("a");
-      a.href = downloadUrl;
+      a.href = `${finalUrl}${sep}download=1&filename=${filename}`;
       a.download = filename;
       document.body.appendChild(a);
       a.click();
@@ -122,58 +228,9 @@ export function Editor({ compositionProps, onExit }) {
       toast.error("Render failed", { description: err.message });
     } finally {
       setRendering(false);
+      setRenderProgress(0);
+      setRenderStatus("");
     }
-  };
-
-  const clampedBrollClips = useMemo(() => clampBrollClips({
-    avatarDuration: compositionProps.avatarDuration,
-    brollClips:     compositionProps.brollClips,
-    ctaDuration:    compositionProps.ctaDuration,
-    showIntro,
-    showOutro,
-  }), [compositionProps.avatarDuration, compositionProps.brollClips, compositionProps.ctaDuration]);
-
-  const previewProps = useMemo(() => ({
-    ...compositionProps,
-    brollClips: clampedBrollClips,
-    showIntro,
-    showOutro,
-    introTitle,
-    introSubtitle,
-    introTagline,
-    outroBrandText,
-    ctaText: outroCtaText,
-  }), [compositionProps, clampedBrollClips, outroCtaText]);
-
-  const durationInFrames = useMemo(() => calcDurationInFrames({
-    avatarDuration: compositionProps.avatarDuration,
-    brollClips:     clampedBrollClips,
-    ctaDuration:    compositionProps.ctaDuration,
-    showIntro,
-    showOutro,
-  }), [compositionProps.avatarDuration, compositionProps.ctaDuration, clampedBrollClips]);
-
-  useEffect(() => {
-    const player = playerRef.current;
-    if (!player) return;
-    const onPlay = () => setPlaying(true);
-    const onPause = () => setPlaying(false);
-    const onFrameUpdate = (e) => setFrame(e.detail.frame);
-    player.addEventListener("play", onPlay);
-    player.addEventListener("pause", onPause);
-    player.addEventListener("frameupdate", onFrameUpdate);
-    return () => {
-      player.removeEventListener("play", onPlay);
-      player.removeEventListener("pause", onPause);
-      player.removeEventListener("frameupdate", onFrameUpdate);
-    };
-  }, []);
-
-  const togglePlay = () => {
-    const player = playerRef.current;
-    if (!player) return;
-    if (playing) player.pause();
-    else player.play();
   };
 
   return (
@@ -191,11 +248,11 @@ export function Editor({ compositionProps, onExit }) {
           </div>
         </div>
         <div className="flex flex-col items-end gap-1">
-          <Button onClick={handleDownload} disabled={rendering} className="gap-2 bg-linear-to-b from-black to-neutral-600 text-[#c7f038]">
+          <Button onClick={handleDownload} disabled={rendering} className="gap-2 bg-linear-to-b from-black to-neutral-600 text-[#c7f038] min-w-32">
             {rendering ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Rendering…
+                <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                <span className="truncate">{renderProgress > 0 ? `${renderProgress}%` : renderStatus || "Rendering…"}</span>
               </>
             ) : (
               <>
@@ -204,6 +261,14 @@ export function Editor({ compositionProps, onExit }) {
               </>
             )}
           </Button>
+          {rendering && renderProgress > 0 && (
+            <div className="w-32 h-1 rounded-full bg-neutral-200 overflow-hidden">
+              <div
+                className="h-full bg-[#c7f038] rounded-full transition-all duration-300"
+                style={{ width: `${renderProgress}%` }}
+              />
+            </div>
+          )}
           {renderError && (
             <div className="flex items-start gap-1 text-xs text-destructive">
               <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
@@ -215,20 +280,13 @@ export function Editor({ compositionProps, onExit }) {
 
       {/* Canvas + right panel */}
       <div className="flex-1 min-h-0 flex overflow-hidden">
-        {/* Main canvas — video centered */}
+        {/* Main canvas */}
         <div className="flex-1 flex flex-col items-center justify-center gap-3 py-4 px-6 bg-[#fafbfc]">
           <div className="rounded-2xl overflow-hidden border border-border/50 bg-black shadow-xl" style={{ aspectRatio: "9/16", height: "calc(100% - 2.5rem)", maxHeight: "100%" }}>
-            <Player
+            <PlayerContainer
               ref={playerRef}
-              component={SeedanceReelComposition}
-              inputProps={previewProps}
+              compositionProps={compositionProps}
               durationInFrames={durationInFrames}
-              compositionWidth={1080}
-              compositionHeight={1920}
-              fps={FPS}
-              style={{ width: "100%", height: "100%", display: "block" }}
-              loop
-              clickToPlay
             />
           </div>
 
@@ -245,7 +303,7 @@ export function Editor({ compositionProps, onExit }) {
           </div>
         </div>
 
-        {/* Right panel — docked sidebar */}
+        {/* Right panel */}
         <div className="w-72 shrink-0 border-l border-border/50 bg-white flex flex-col overflow-hidden">
           {activePanel ? (
             <>
@@ -271,9 +329,9 @@ export function Editor({ compositionProps, onExit }) {
               </div>
               <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
                 {[
-                  { id: "captions", label: "Captions",              Icon: Captions, desc: "Add or edit captions" },
-                  { id: "music",    label: "Music",                  Icon: Music,    desc: "Add background music" },
-                  { id: "overlays", label: "Text / Image Overlays",  Icon: Type,     desc: "Add text or images" },
+                  { id: "captions", label: "Captions",             Icon: Captions, desc: "Add or edit captions" },
+                  { id: "music",    label: "Music",                 Icon: Music,    desc: "Add background music" },
+                  { id: "overlays", label: "Text / Image Overlays", Icon: Type,     desc: "Add text or images" },
                 ].map(({ id, label, Icon, desc }) => (
                   <button
                     key={id}
@@ -305,6 +363,7 @@ export function Editor({ compositionProps, onExit }) {
             setFrame(f);
             playerRef.current?.seekTo(f);
           }}
+          onTrimChange={({ trimIn, trimOut }) => setTrim({ in: trimIn, out: trimOut })}
           onToolbarAction={(action) => {
             if (!action?.startsWith("add:")) return;
             const panel = action.slice(4);

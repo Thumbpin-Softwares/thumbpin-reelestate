@@ -258,21 +258,27 @@ export function Timeline({
             <>
               {/* In-point handle */}
               <div
-                className="absolute top-0 bottom-0 w-0.75 bg-[#c7f038] z-20 cursor-col-resize pointer-events-none"
+                className="absolute top-0 bottom-0 w-0.75 bg-[#c7f038] z-20 pointer-events-none"
                 style={{ left: `${trimInPct}%` }}
               >
                 <div className="absolute -top-px left-0 w-4 h-4 bg-[#c7f038] rounded-br-md flex items-center justify-center">
                   <div className="w-px h-2.5 bg-neutral-800 rounded-full" />
                 </div>
+                <span className="absolute top-5 left-1 bg-neutral-900 text-white text-[9px] tabular-nums px-1 py-px rounded whitespace-nowrap">
+                  {formatTime(trimIn / fps)}
+                </span>
               </div>
               {/* Out-point handle */}
               <div
-                className="absolute top-0 bottom-0 w-0.75 bg-[#c7f038] z-20 cursor-col-resize pointer-events-none"
+                className="absolute top-0 bottom-0 w-0.75 bg-[#c7f038] z-20 pointer-events-none"
                 style={{ left: `${trimOutPct}%` }}
               >
                 <div className="absolute -top-px -left-3.25 w-4 h-4 bg-[#c7f038] rounded-bl-md flex items-center justify-center">
                   <div className="w-px h-2.5 bg-neutral-800 rounded-full" />
                 </div>
+                <span className="absolute top-5 right-1 -translate-x-full bg-neutral-900 text-white text-[9px] tabular-nums px-1 py-px rounded whitespace-nowrap">
+                  {formatTime(effectiveTrimOut / fps)}
+                </span>
               </div>
             </>
           )}
@@ -291,8 +297,9 @@ export function Timeline({
 }
 
 function formatTime(seconds) {
-  const total = Math.max(0, Math.floor(seconds));
-  const m = Math.floor(total / 60);
-  const s = total % 60;
-  return `${m}:${String(s).padStart(2, "0")}`;
+  const clamped = Math.max(0, seconds);
+  const m = Math.floor(clamped / 60);
+  const s = Math.floor(clamped % 60);
+  const ms = Math.floor((clamped % 1) * 1000);
+  return `${m}:${String(s).padStart(2, "0")}.${String(ms).padStart(3, "0")}`;
 }
