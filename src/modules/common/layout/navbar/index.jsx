@@ -30,7 +30,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { CreditsBadge } from "@/components/dashboard/credits-badge";
+import { CreditsBadge } from "@/modules/dashboard/components/credits-badge";
 import UserMenu from "@/modules/dashboard/components/user-menu";
 import HelpMenu from "@/modules/dashboard/components/help-menu";
 
