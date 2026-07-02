@@ -1,34 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
-  Download,
-  ExternalLink,
   Eye,
   Loader2,
   Pencil,
   Video,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { EDITABLE_SOURCES, buildCompositionFromAsset } from "@/lib/editable-sources";
 
-export function VideoPicker({ onSelect }) {
-  const [videos, setVideos] = useState([]);
-  const [loading, setLoading] = useState(true);
+function useVideos() {
+  const [videos, setVideos] = useState(null); // null = loading
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
-  const [previewVideo, setPreviewVideo] = useState(null);
-  const [selectingId, setSelectingId] = useState(null);
+  const [fetching, setFetching] = useState(false);
 
-  async function fetchVideos(page = 1) {
-    setLoading(true);
+  async function load(page = 1) {
+    setFetching(true);
     try {
       const res = await fetch(`/api/user/videos?page=${page}&limit=12`);
       if (res.ok) {
@@ -38,14 +27,26 @@ export function VideoPicker({ onSelect }) {
       }
     } catch (err) {
       console.error("Failed to fetch videos:", err);
+      setVideos([]);
     } finally {
-      setLoading(false);
+      setFetching(false);
     }
   }
 
-  useEffect(() => {
-    fetchVideos();
-  }, []);
+  // Trigger initial load once on first render via a lazy ref trick
+  const [started, setStarted] = useState(false);
+  if (!started) {
+    setStarted(true);
+    load(1);
+  }
+
+  return { videos, pagination, fetching, load };
+}
+
+export function VideoPicker({ onSelect }) {
+  const { videos, pagination, fetching, load } = useVideos();
+  const [previewVideo, setPreviewVideo] = useState(null);
+  const [selectingId, setSelectingId] = useState(null);
 
   async function handleEditClick(video) {
     if (selectingId) return;
@@ -59,175 +60,168 @@ export function VideoPicker({ onSelect }) {
     }
   }
 
+  function handleDownload(url, name) {
+    const proxyUrl = `/api/download?url=${encodeURIComponent(url)}&name=${encodeURIComponent(name || "video.mp4")}`;
+    window.location.href = proxyUrl;
+  }
+
+  const loading = videos === null;
+
   return (
-    <div className="space-y-6 animate-fade-in pt-12 bg-[#fafbfc]">
-      <div>
+    <div className="py-10 space-y-6 sm:px-8 px-0">
+      {/* Header */}
+      <div className="border-b border-black pb-4">
         <h1 className="text-2xl font-semibold font-heading tracking-tight">Edit a video</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Pick a video below to open it in the editor
-        </p>
+        <p className="text-sm text-muted-foreground mt-1">Pick a video below to open it in the editor</p>
       </div>
 
+      {/* Loading skeleton */}
       {loading && (
-        <div className="flex items-center justify-center py-24">
+        <div className="flex items-center justify-center py-32">
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
         </div>
       )}
 
+      {/* Empty state */}
       {!loading && videos.length === 0 && (
-        <Card className="border border-dashed border-border/60">
-          <CardContent className="py-16 text-center">
-            <Video className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
+        <div className="rounded-2xl border border-dashed border-border/60 py-20 flex flex-col items-center gap-3 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center">
+            <Video className="w-6 h-6 text-muted-foreground/50" />
+          </div>
+          <div>
             <p className="text-sm font-medium text-muted-foreground">No videos yet</p>
-            <p className="text-xs text-muted-foreground/70 mt-1">
-              Generate your first video to see it here
-            </p>
-          </CardContent>
-        </Card>
+            <p className="text-xs text-muted-foreground/60 mt-0.5">Generate your first video to see it here</p>
+          </div>
+        </div>
       )}
 
+      {/* Video grid */}
       {!loading && videos.length > 0 && (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {videos.map((video) => {
             const canEdit = !!EDITABLE_SOURCES[video.metadata?.source];
             return (
-              <Card
+              <div
                 key={video.id}
-                className="group overflow-hidden border-border/50 bg-card hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
+                className="group rounded-lg overflow-hidden border border-neutral-200 bg-white hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
               >
-                <CardContent className="p-0">
-                  <div className="relative aspect-video overflow-hidden bg-muted">
-                    {video.url ? (
-                      <video
-                        src={video.url}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                        preload="metadata"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Video className="w-10 h-10 text-muted-foreground/40" />
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
-                    {video.url && (
+                {/* Thumbnail */}
+                <div className="relative aspect-video overflow-hidden">
+                  {video.url ? (
+                    <video
+                      src={video.url}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      preload="metadata"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Video className="w-8 h-8 text-muted-foreground/30" />
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-black/20 sm:bg-black/0 sm:group-hover:bg-black/20 transition-colors" />
+                  {canEdit ? (
+                    <>
                       <button
-                        onClick={() => setPreviewVideo(video)}
-                        className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => handleEditClick(video)}
+                        disabled={!!selectingId}
+                        className="absolute inset-0 flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                       >
-                        <div className="h-12 w-12 rounded-full bg-white/90 backdrop-blur flex items-center justify-center">
-                          <Eye className="w-5 h-5 text-black" />
+                        <div className="h-9 px-4 rounded-md bg-white/90 backdrop-blur flex items-center gap-2 shadow-md">
+                          {selectingId === video.id ? (
+                            <Loader2 className="w-4 h-4 text-black animate-spin" />
+                          ) : (
+                            <Pencil className="w-4 h-4 text-black" />
+                          )}
+                          <span className="text-black text-sm font-medium">Edit</span>
                         </div>
                       </button>
-                    )}
-                  </div>
-
-                  <div className="p-4">
-                    <h3 className="font-medium text-sm line-clamp-1">{video.name}</h3>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {new Date(video.createdAt).toLocaleDateString("en-IN", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      })}
-                    </p>
-
-                    <div className="mt-4 flex items-center justify-between gap-2">
-                      <Badge variant="secondary" className="text-[11px]">
-                        {canEdit ? "Editable" : video.type}
-                      </Badge>
-
-                      {canEdit ? (
-                        <Button
-                          size="sm"
-                          className="gap-2 bg-neutral-900 text-[#c7f038]"
-                          disabled={selectingId === video.id}
-                          onClick={() => handleEditClick(video)}
+                      {video.url && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setPreviewVideo(video); }}
+                          className="absolute top-2 right-2 h-8 w-8 rounded-full bg-white/90 backdrop-blur flex items-center justify-center shadow-md opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                         >
-                          {selectingId === video.id ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <Pencil className="w-3.5 h-3.5" />
-                          )}
-                          Edit
-                        </Button>
-                      ) : (
-                        video.url && (
-                          <a href={video.url} download>
-                            <Button variant="outline" size="sm" className="gap-2">
-                              <Download className="w-3.5 h-3.5" />
-                              Download
-                            </Button>
-                          </a>
-                        )
+                          <Eye className="w-3.5 h-3.5 text-black" />
+                        </button>
                       )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                    </>
+                  ) : video.url && (
+                    <button
+                      onClick={() => setPreviewVideo(video)}
+                      className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <div className="h-11 w-11 rounded-full bg-white/90 backdrop-blur flex items-center justify-center shadow-md">
+                        <Eye className="w-4 h-4 text-black" />
+                      </div>
+                    </button>
+                  )}
+                </div>
+
+                {/* Info */}
+                <div className="p-4">
+                  <p className="font-medium text-sm line-clamp-1">{video.name}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {new Date(video.createdAt).toLocaleDateString("en-IN", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </p>
+                </div>
+              </div>
             );
           })}
         </div>
       )}
 
-      <Dialog open={!!previewVideo} onOpenChange={() => setPreviewVideo(null)}>
-        <DialogContent className="max-w-3xl p-0 overflow-hidden rounded-2xl">
-          <DialogHeader className="p-4 pb-0">
-            <DialogTitle className="text-base font-semibold truncate pr-6">
-              {previewVideo?.name || "Preview"}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="p-4 pt-3">
-            {previewVideo?.url && (
-              <div className="w-full rounded-xl overflow-hidden bg-black">
-                <video
-                  src={previewVideo.url}
-                  controls
-                  autoPlay
-                  className="w-full max-h-[70vh] object-contain"
-                />
-              </div>
-            )}
-            {previewVideo?.url && (
-              <div className="flex gap-2 mt-3 justify-end">
-                <a href={previewVideo.url} target="_blank" rel="noopener noreferrer">
-                  <Button variant="outline" size="sm" className="text-xs cursor-pointer gap-1.5">
-                    <ExternalLink className="w-3.5 h-3.5" /> Open
-                  </Button>
-                </a>
-                <a href={previewVideo.url} download={previewVideo.name}>
-                  <Button size="sm" className="text-xs cursor-pointer gap-1.5 gradient-bg text-white">
-                    <Download className="w-3.5 h-3.5" /> Download
-                  </Button>
-                </a>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
+      {/* Pagination */}
       {!loading && pagination.totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2">
+        <div className="flex items-center justify-center gap-2 pt-2 sm:pb-0 pb-8">
           <Button
             variant="outline"
             size="sm"
-            className="cursor-pointer h-8 text-xs"
-            disabled={pagination.page <= 1}
-            onClick={() => fetchVideos(pagination.page - 1)}
+            className="bg-neutral-900 text-[#c7f038] hover:opacity-90 hover:bg-neutral-900 shadow-lg gap-2 px-6"
+            disabled={fetching || pagination.page <= 1}
+            onClick={() => load(pagination.page - 1)}
           >
-            Previous
+            Prev
           </Button>
-          <Badge variant="secondary" className="text-xs">
-            Page {pagination.page} of {pagination.totalPages}
-          </Badge>
+          <span className="text-xs text-muted-foreground tabular-nums px-1">
+            {pagination.page} / {pagination.totalPages}
+          </span>
           <Button
             variant="outline"
             size="sm"
-            className="cursor-pointer h-8 text-xs"
-            disabled={pagination.page >= pagination.totalPages}
-            onClick={() => fetchVideos(pagination.page + 1)}
+            className="bg-neutral-900 text-[#c7f038] hover:opacity-90 hover:bg-neutral-900 shadow-lg gap-2 px-6"
+            disabled={fetching || pagination.page >= pagination.totalPages}
+            onClick={() => load(pagination.page + 1)}
           >
             Next
           </Button>
+        </div>
+      )}
+
+      {/* Preview modal */}
+      {!!previewVideo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setPreviewVideo(null)}>
+          <div className="bg-white rounded-xl overflow-hidden w-xs mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 flex items-center justify-between border-b border-neutral-100">
+              <p className="text-sm font-semibold truncate pr-4">{previewVideo.name || "Preview"}</p>
+              <button onClick={() => setPreviewVideo(null)} className="text-neutral-400 hover:text-black text-lg leading-none">✕</button>
+            </div>
+            <div className="p-4">
+              {previewVideo.url && (
+                <div className="relative">
+                  <video src={previewVideo.url} controls autoPlay className="w-full rounded-md bg-black max-h-[75vh] object-contain" />
+                  <button
+                    onClick={() => handleDownload(previewVideo.url, previewVideo.name)}
+                    className="absolute top-2 right-2 h-8 w-8 rounded-full bg-white/90 backdrop-blur flex items-center justify-center shadow-md hover:bg-white transition-colors"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

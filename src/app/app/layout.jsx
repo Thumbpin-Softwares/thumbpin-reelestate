@@ -12,9 +12,9 @@ export default function DashboardLayout({ children }) {
       <div className="flex flex-1 min-h-0 py-4">
         <Aside />
 
-        <main className="relative flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden px-6">
+        <main className="relative flex-1 min-w-0 min-h-0 flex flex-col px-6">
           <PipelineBreadcrumb />
-          <div className="animate-fade-in flex-1 min-h-0 overflow-hidden">
+          <div data-lenis-prevent className="animate-fade-in flex-1 min-h-0 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {children}
           </div>
         </main>
