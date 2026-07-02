@@ -12,22 +12,11 @@ import {
   User as UserIcon,
   LogOut,
   Menu,
-  CreditCard,
-  HelpCircle,
   BookOpen,
   MessageCircle,
-  MessageSquarePlus,
   UserPlus,
   RectangleGoggles,
 } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -40,9 +29,10 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { CreditsBadge } from "@/components/dashboard/credits-badge";
+import UserMenu from "@/modules/dashboard/components/user-menu";
+import HelpMenu from "@/modules/dashboard/components/help-menu";
 
 const navItems = [
   { label: "Get Started", href: "/app", icon: Plus },
@@ -183,97 +173,5 @@ function InviteButton() {
         </DialogContent>
       </Dialog>
     </>
-  );
-}
-
-function HelpMenu() {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          className="rounded-full p-2 hover:bg-neutral-100 flex items-center cursor-pointer ring-0"
-        >
-          <HelpCircle size={18}/>
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56 mt-2">
-        <DropdownMenuItem asChild className="cursor-pointer">
-          <Link href="/app/help">
-            <BookOpen className="mr-2 h-4 w-4" />
-            <span>Help Center</span>
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild className="cursor-pointer">
-          <Link href="mailto:support@thumbpin.ai">
-            <MessageCircle className="mr-2 h-4 w-4" />
-            <span>Chat with us</span>
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild className="cursor-pointer">
-          <Link href="mailto:feedback@thumbpin.ai">
-            <MessageSquarePlus className="mr-2 h-4 w-4" />
-            <span>Feedback</span>
-          </Link>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-function UserMenu({ user, initials }) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          className="p-0 h-10 w-10 rounded-full border border-black overflow-hidden cursor-pointer"
-        >
-          <Avatar className="h-8 w-8">
-            {user?.image && <AvatarImage src={user.image} alt={user.name} />}
-            <AvatarFallback className="text-md bg-black text-[#c7f038]">
-              {initials}
-            </AvatarFallback>
-          </Avatar>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56 mt-2">
-        <DropdownMenuLabel className="font-normal">
-          <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{user?.name}</p>
-            <p className="text-xs leading-none text-muted-foreground">
-              {user?.email}
-            </p>
-          </div>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild className="cursor-pointer">
-          <Link href="/app/profile">
-            <UserIcon className="mr-2 h-4 w-4" />
-            <span>Profile Settings</span>
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild className="cursor-pointer">
-          <Link href="/app/credits">
-            <CreditCard className="mr-2 h-4 w-4" />
-            <span>Billing & Credits</span>
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild className="cursor-pointer">
-          <Link href="/app/help">
-            <HelpCircle className="mr-2 h-4 w-4" />
-            <span>Support</span>
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          className="text-destructive focus:text-destructive cursor-pointer"
-          onClick={() => signOut({ callbackUrl: "/auth/login" })}
-        >
-          <LogOut className="mr-2 h-4 w-4" />
-          <span>Log Out</span>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }

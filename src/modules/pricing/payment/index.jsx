@@ -5,7 +5,7 @@ const Plans = [
   {
     title: "Creator",
     tag: "normal",
-    price: "Rs. 9,999",
+    price: "Rs. 16,999",
     type: "per year",
     tax: "(+GST Applicable)",
     paymentLink: "",
@@ -21,7 +21,7 @@ const Plans = [
   {
     title: "Pro",
     tag: "Recommended",
-    price: "Rs. 19,999",
+    price: "Rs. 24,999",
     type: "per year",
     tax: "(+GST Applicable)",
     paymentLink: "",

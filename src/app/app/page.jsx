@@ -9,8 +9,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Video, Pencil } from "lucide-react";
+import { Video, Pencil, ArrowRight } from "lucide-react";
 import { Search } from "lucide-react";
+import { useUser } from "@/hooks/use-user";
 
 const REAL_ESTATE_TEMPLATES = [
   {
@@ -43,66 +44,83 @@ export default function DashboardPage() {
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const router = useRouter();
   const [query, setQuery] = useState("");
+  const { user, profile } = useUser();
   const filteredTemplates = REAL_ESTATE_TEMPLATES.filter((t) =>
     t.title.toLowerCase().includes(query.toLowerCase()),
   );
 
+  const displayName =
+    profile?.name || user?.name || profile?.email?.split("@")[0] || "there";
+  const firstName = displayName.split(" ")[0];
+
   const actions = [
     {
-      title: "AI Reel Generator",
+      title: "Reel Generator",
       description:
         "Build stunning real estate reels that grab users' attention.",
       href: null,
       icon: Video,
-      color: "bg-amber-50 text-amber-600",
+      color: "bg-black text-[#c7f038]",
     },
     {
       title: "Edit Your Reels",
       description: "Fine-tune and download your generated reels",
       href: "/app/edit",
       icon: Pencil,
-      color: "bg-emerald-50 text-emerald-600",
+      color: "bg-black text-[#c7f038]",
     },
   ];
 
   return (
-    <div className="h-full flex items-center justify-center bg-[#fafbfc]">
-      {/* Minimalism Actions */}
-      <section className="w-full max-w-2xl grid sm:grid-cols-2 sm:pt-0 pt-4 gap-4 px-4">
-        {actions.map((action) => {
-          const Icon = action.icon;
+    <div className="h-full flex items-center justify-center bg-linear-to-b from-[#fafbfc] to-neutral-50">
+      <section className="w-full max-w-2xl px-4 sm:pt-0 pt-4">
+        {/* Greeting */}
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl font-switzer sm:text-4xl font-light text-center tracking-tight text-neutral-900">
+            Hi {firstName}, Let&apos;s do something remarkable today.
+          </h1>
+          <p className="mt-1 text-sm sm:text-base text-neutral-500">
+            
+          </p>
+        </div>
 
-          const content = (
-            <div className="relative flex flex-row sm:flex-col bg-white items-center justify-between sm:justify-center p-4 sm:p-6 sm:h-48 gap-4 sm:space-y-4 rounded-3xl border border-neutral-200 transition-all duration-300 hover:border-border/40 hover:bg-white hover:shadow-xl">
-              <div className="order-1 sm:order-2 text-left sm:text-center flex flex-col gap-1 sm:gap-2">
-                <h3 className="font-semibold">{action.title}</h3>
-                <p className="text-sm text-neutral-500">{action.description}</p>
+        {/* Actions */}
+        <div className="grid sm:grid-cols-2 gap-4">
+          {actions.map((action) => {
+            const Icon = action.icon;
+
+            const content = (
+              <div className="group relative flex flex-row sm:flex-col border border-neutral-100 bg-white shadow-lg items-center justify-between sm:justify-center p-4 sm:p-6 sm:h-48 gap-2 sm:space-y-4 rounded-xl transition-all duration-300 hover:border-neutral-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)] hover:-translate-y-0.5">
+                <div className="order-1 sm:order-2 text-left sm:text-center flex flex-col gap-1 sm:gap-1">
+                  <h3 className="text-lg text-black">{action.title}</h3>
+                  <h1 className="text-neutral-700 text-sm">{action.description}</h1>
+                </div>
+
+                <div className={`order-2 sm:order-1 shrink-0 w-12 h-12 rounded-lg flex items-center justify-center ${action.color} group-hover:scale-110 duration-300 transition-transform`}>
+                  <Icon className="w-6 h-6" />
+                </div>
               </div>
-
-              <div className={`order-2 sm:order-1 shrink-0 w-12 h-12 rounded-3xl flex items-center justify-center ${action.color} group-hover:scale-110 transition-transform`}>
-                <Icon className="w-6 h-6" />
-              </div>
-            </div>
-          );
-
-          if (action.title === "AI Reel Generator") {
-            return (
-              <button
-                key={action.title}
-                className="group text-left w-full"
-                onClick={() => setTemplateModalOpen(true)}
-              >
-                {content}
-              </button>
             );
-          }
 
-          return (
-            <Link key={action.href} href={action.href} className="group">
-              {content}
-            </Link>
-          );
-        })}
+            if (action.title === "Reel Generator") {
+              return (
+                <button
+                  key={action.title}
+                  className="group text-left w-full"
+                  onClick={() => setTemplateModalOpen(true)}
+                >
+                  {content}
+                </button>
+              );
+            }
+
+            return (
+              <Link key={action.href} href={action.href} className="group">
+                {content}
+              </Link>
+            );
+          })}
+        </div>
       </section>
 
       {/* Real Estate Template Modal */}
