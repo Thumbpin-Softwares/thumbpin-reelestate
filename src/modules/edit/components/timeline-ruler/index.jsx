@@ -127,6 +127,17 @@ export function Timeline({
   overlays  = [],
 }) {
   const [activeAction, setActiveAction] = useState("trim");
+  const prevCaptionsCount = useRef(captions.length);
+
+  // Surface the ruler's captions track automatically the moment a caption clip
+  // is added, so the user sees it land without having to click the tab.
+  useEffect(() => {
+    if (captions.length > 0 && prevCaptionsCount.current === 0) {
+      setActiveAction("captions");
+      onToolbarAction?.("captions");
+    }
+    prevCaptionsCount.current = captions.length;
+  }, [captions.length, onToolbarAction]);
 
   const [trimIn,  setTrimIn]  = useState(0);
   const [trimOut, setTrimOut] = useState(durationInFrames);

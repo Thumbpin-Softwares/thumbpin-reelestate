@@ -3,7 +3,7 @@
 import { useEffect, useReducer } from "react";
 import { Loader2 } from "lucide-react";
 import { COMPOSITION_STORAGE_KEY } from "@/lib/editable-sources";
-import { Editor } from "@/modules/edit/components/editor";
+import { Editor } from "@/modules/edit/layout/editor";
 import { VideoPicker } from "@/modules/edit/components/video-picker";
 
 function reducer(state, action) {

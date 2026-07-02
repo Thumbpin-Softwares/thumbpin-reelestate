@@ -19,9 +19,31 @@ import { Button } from "@/components/ui/button";
 import { SeedanceReelComposition } from "@/lib/remotion/SeedanceReelComposition";
 import { calcDurationInFrames, clampBrollClips } from "@/lib/remotion/duration";
 import { EDITABLE_SOURCES } from "@/lib/editable-sources";
+import { CAPTION_PRESETS } from "@/lib/remotion/caption-presets";
+import { CaptionsPanel } from "@/modules/edit/components/caption-panel";
 import { Timeline } from "@/modules/edit/components/timeline-ruler";
 
 const FPS = 30;
+
+function buildBaseRenderProps(compositionProps) {
+  return {
+    ...compositionProps,
+    brollClips: clampBrollClips({
+      avatarDuration: compositionProps.avatarDuration,
+      brollClips:     compositionProps.brollClips,
+      ctaDuration:    compositionProps.ctaDuration,
+      showIntro:      false,
+      showOutro:      false,
+    }),
+    showIntro:      false,
+    showOutro:      false,
+    introTitle:     "",
+    introSubtitle:  "",
+    introTagline:   "",
+    outroBrandText: "thumbpin.ai",
+    ctaText:        compositionProps.ctaText || "",
+  };
+}
 
 function formatTime(seconds) {
   const clamped = Math.max(0, seconds);
@@ -29,23 +51,6 @@ function formatTime(seconds) {
   const s = Math.floor(clamped % 60);
   const ms = Math.floor((clamped % 1) * 1000);
   return `${m}:${String(s).padStart(2, "0")}.${String(ms).padStart(3, "0")}`;
-}
-
-function CaptionsPanel() {
-  return (
-    <div className="flex flex-col gap-3">
-      <p className="text-xs text-muted-foreground">
-        Choose or generate captions for your reel. Each caption block will appear on the timeline as a clip.
-      </p>
-      <div className="rounded-xl border border-dashed border-border/60 py-10 flex flex-col items-center gap-2 text-center">
-        <span className="text-sm font-medium text-muted-foreground">No captions yet</span>
-        <span className="text-xs text-muted-foreground/60">Click below to add your first caption</span>
-      </div>
-      <button className="w-full rounded-xl border border-border/50 py-2 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors">
-        + Add caption
-      </button>
-    </div>
-  );
 }
 
 function PlaceholderPanel({ label }) {
@@ -105,11 +110,20 @@ export function Editor({ compositionProps, onExit }) {
   const [renderStatus, setRenderStatus] = useState("");
   const [renderError, setRenderError] = useState(null);
   const [activePanel, setActivePanel] = useState(null);
+  const [captionState, setCaptionState] = useState({
+    preset: null, status: "idle", progress: 0, message: "", videoUrl: null, error: null,
+  });
+  const [captionDraft, setCaptionDraft] = useState(null);
 
   const playerRef = useRef(null);
   const [playing, setPlaying] = useState(false);
   const [frame, setFrame] = useState(0);
   const [trim, setTrim] = useState({ in: 0, out: 0 });
+
+  const captionVideoRef = useRef(null);
+  const [captionPlaying, setCaptionPlaying] = useState(false);
+  const [captionTime, setCaptionTime] = useState(0);
+  const [captionDuration, setCaptionDuration] = useState(0);
 
   const sourceConfig = EDITABLE_SOURCES[compositionProps.source] || {};
 
@@ -158,7 +172,45 @@ export function Editor({ compositionProps, onExit }) {
     }
   };
 
+  useEffect(() => {
+    const el = captionVideoRef.current;
+    if (!el) return;
+    const onPlay             = () => setCaptionPlaying(true);
+    const onPause            = () => setCaptionPlaying(false);
+    const onTimeUpdate       = () => setCaptionTime(el.currentTime);
+    const onLoadedMetadata   = () => setCaptionDuration(el.duration || 0);
+    el.addEventListener("play",            onPlay);
+    el.addEventListener("pause",           onPause);
+    el.addEventListener("timeupdate",      onTimeUpdate);
+    el.addEventListener("loadedmetadata",  onLoadedMetadata);
+    return () => {
+      el.removeEventListener("play",            onPlay);
+      el.removeEventListener("pause",           onPause);
+      el.removeEventListener("timeupdate",      onTimeUpdate);
+      el.removeEventListener("loadedmetadata",  onLoadedMetadata);
+    };
+  }, [captionState.videoUrl]);
+
+  const toggleCaptionPlay = () => {
+    const el = captionVideoRef.current;
+    if (!el) return;
+    if (el.paused) el.play(); else el.pause();
+  };
+
   const handleDownload = async () => {
+    if (captionState.videoUrl) {
+      const filename = sourceConfig.downloadFilename || "video.mp4";
+      const sep = captionState.videoUrl.includes("?") ? "&" : "?";
+      const a = document.createElement("a");
+      a.href = `${captionState.videoUrl}${sep}download=1&filename=${filename}`;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      toast.success("Reel with captions downloading…");
+      return;
+    }
+
     setRendering(true);
     setRenderProgress(0);
     setRenderStatus("Starting…");
@@ -168,21 +220,7 @@ export function Editor({ compositionProps, onExit }) {
       const trimOutFrame = trim.out > 0 ? trim.out : durationInFrames;
 
       const renderProps = {
-        ...compositionProps,
-        brollClips: clampBrollClips({
-          avatarDuration: compositionProps.avatarDuration,
-          brollClips:     compositionProps.brollClips,
-          ctaDuration:    compositionProps.ctaDuration,
-          showIntro:      false,
-          showOutro:      false,
-        }),
-        showIntro:      false,
-        showOutro:      false,
-        introTitle:     "",
-        introSubtitle:  "",
-        introTagline:   "",
-        outroBrandText: "thumbpin.ai",
-        ctaText:        compositionProps.ctaText || "",
+        ...buildBaseRenderProps(compositionProps),
         trimInFrame,
         trimOutFrame,
       };
@@ -240,6 +278,66 @@ export function Editor({ compositionProps, onExit }) {
     }
   };
 
+  const handleGenerateCaptions = async (preset, language, translationLanguage, position) => {
+    setCaptionState({ preset, status: "rendering", progress: 0, message: "Assembling video…", videoUrl: null, error: null });
+    try {
+      const res = await fetch(sourceConfig.renderEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildBaseRenderProps(compositionProps)),
+      });
+
+      if (!res.ok) throw new Error(`Render failed: ${res.status}`);
+
+      const reader  = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer   = "";
+      let finalUrl = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop();
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          let event;
+          try { event = JSON.parse(line.slice(6)); } catch (_) { continue; }
+          if (event.type === "progress") setCaptionState((s) => ({ ...s, progress: event.progress }));
+          if (event.type === "status")   setCaptionState((s) => ({ ...s, message: event.message }));
+          if (event.type === "done")     finalUrl = event.url;
+          if (event.type === "error")    throw new Error(event.error);
+        }
+      }
+
+      if (!finalUrl) throw new Error("No URL returned from render");
+
+      setCaptionState((s) => ({ ...s, status: "captioning", progress: 0, message: "Applying captions…" }));
+
+      const capRes = await fetch("/api/captions/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          videoUrl: finalUrl,
+          preset,
+          language: language || undefined,
+          translationLanguage: translationLanguage || undefined,
+          position: position || undefined,
+        }),
+      });
+
+      const capData = await capRes.json();
+      if (!capRes.ok) throw new Error(capData.error || `Captioning failed: ${capRes.status}`);
+
+      setCaptionState({ preset, status: "done", progress: 100, message: "", videoUrl: capData.url, error: null });
+      setCaptionDraft(null);
+    } catch (err) {
+      console.error("[Editor] Caption generation failed:", err);
+      setCaptionState((s) => ({ ...s, status: "error", error: err.message || "Caption generation failed" }));
+    }
+  };
+
   return (
     <div className="absolute inset-x-0 bottom-0 top-12 z-10 bg-[#fafbfc] flex flex-col overflow-hidden">
       {/* Header */}
@@ -289,24 +387,66 @@ export function Editor({ compositionProps, onExit }) {
       <div className="flex-1 min-h-0 flex overflow-hidden">
         {/* Main canvas */}
         <div className="flex-1 flex flex-col items-center justify-center gap-3 py-4 px-6 bg-[#fafbfc]">
-          <div className="rounded-2xl overflow-hidden border border-border/50 bg-black shadow-xl" style={{ aspectRatio: "9/16", height: "calc(100% - 2.5rem)", maxHeight: "100%" }}>
-            <PlayerContainer
-              ref={playerRef}
-              compositionProps={compositionProps}
-              durationInFrames={durationInFrames}
-            />
+          <div className="relative rounded-2xl overflow-hidden border border-border/50 bg-black shadow-xl" style={{ aspectRatio: "9/16", height: "calc(100% - 2.5rem)", maxHeight: "100%" }}>
+            {captionState.videoUrl ? (
+              <video
+                ref={captionVideoRef}
+                src={captionState.videoUrl}
+                onClick={toggleCaptionPlay}
+                playsInline
+                className="w-full h-full object-contain bg-black cursor-pointer"
+              />
+            ) : (
+              <PlayerContainer
+                ref={playerRef}
+                compositionProps={compositionProps}
+                durationInFrames={durationInFrames}
+              />
+            )}
+
+            {!captionState.videoUrl && captionDraft && (
+              <div
+                className={`absolute inset-x-0 flex px-6 pointer-events-none ${
+                  captionDraft.position === "top"
+                    ? "top-8 justify-center"
+                    : captionDraft.position === "center"
+                    ? "inset-y-0 items-center justify-center"
+                    : "bottom-8 justify-center"
+                }`}
+              >
+                <span className="rounded-sm background-blur-sm bg-black/50 px-4 py-2 text-sm text-white text-center">
+                  Your text here
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={togglePlay}
-              className="h-7 w-7 rounded-full bg-neutral-900 text-white flex items-center justify-center hover:bg-neutral-800 transition-colors shrink-0"
-            >
-              {playing ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3 ml-0.5" />}
-            </button>
-            <span className="text-xs text-muted-foreground tabular-nums">
-              {formatTime(Math.max(0, frame - trim.in) / FPS)} / {formatTime(((trim.out > 0 ? trim.out : durationInFrames) - trim.in) / FPS)}
-            </span>
+            {captionState.videoUrl ? (
+              <>
+                <button
+                  onClick={toggleCaptionPlay}
+                  className="h-7 w-7 rounded-full bg-neutral-900 text-white flex items-center justify-center hover:bg-neutral-800 transition-colors shrink-0"
+                >
+                  {captionPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3 ml-0.5" />}
+                </button>
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {formatTime(captionTime)} / {formatTime(captionDuration)}
+                </span>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={togglePlay}
+                  className="h-7 w-7 rounded-full bg-neutral-900 text-white flex items-center justify-center hover:bg-neutral-800 transition-colors shrink-0"
+                >
+                  {playing ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3 ml-0.5" />}
+                </button>
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {formatTime(Math.max(0, frame - trim.in) / FPS)} / {formatTime(((trim.out > 0 ? trim.out : durationInFrames) - trim.in) / FPS)}
+                </span>
+              </>
+            )}
           </div>
         </div>
 
@@ -316,7 +456,10 @@ export function Editor({ compositionProps, onExit }) {
             <>
               <div className="flex items-center gap-2 px-3 py-3 border-b border-border/40 shrink-0">
                 <button
-                  onClick={() => setActivePanel(null)}
+                  onClick={() => {
+                    setActivePanel(null);
+                    setCaptionDraft(null);
+                  }}
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <ChevronLeft className="w-4 h-4" />
@@ -324,7 +467,14 @@ export function Editor({ compositionProps, onExit }) {
                 <span className="text-sm font-semibold capitalize">{activePanel}</span>
               </div>
               <div className="flex-1 overflow-y-auto p-4">
-                {activePanel === "captions" && <CaptionsPanel />}
+                {activePanel === "captions" && (
+                  <CaptionsPanel
+                    captionState={captionState}
+                    onGenerate={handleGenerateCaptions}
+                    onDraftChange={setCaptionDraft}
+                    onReset={() => setCaptionState({ preset: null, status: "idle", progress: 0, message: "", videoUrl: null, error: null })}
+                  />
+                )}
                 {activePanel === "music"    && <PlaceholderPanel label="Music" />}
                 {activePanel === "overlays" && <PlaceholderPanel label="Text / Image Overlays" />}
               </div>
@@ -367,6 +517,15 @@ export function Editor({ compositionProps, onExit }) {
           frame={frame}
           fps={FPS}
           audioUrl={compositionProps.avatarVideoUrl || null}
+          captions={
+            captionState.status === "done"
+              ? [{
+                  startFrame: 0,
+                  endFrame:   durationInFrames,
+                  label:      CAPTION_PRESETS.find((p) => p.id === captionState.preset)?.label || "Captions",
+                }]
+              : []
+          }
           onSeek={(f) => {
             setFrame(f);
             playerRef.current?.seekTo(f);
