@@ -31,13 +31,7 @@ const REAL_ESTATE_TEMPLATES = [
     href: "/app/action-reel",
     video: "https://content.thumbpin.in/users/69e20794114a93d739a79321/videos/areel-final-1782433444937-1782433444937-38a76a27.mp4",
     tag: "New",
-  },
-  {
-    title: "Nosy Padosi Comedy Reel",
-    href: "/app/comedy-reel",
-    video: null,
-    tag: "New",
-  },
+  }
 ];
 
 export default function DashboardPage() {
