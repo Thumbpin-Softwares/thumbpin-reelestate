@@ -3,15 +3,24 @@ import { NextResponse } from "next/server";
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const url = searchParams.get("url");
-  const name = searchParams.get("name") || "video.mp4";
+  const rawName = searchParams.get("name") || "video";
+  const name = rawName.replace(/[^\w.\-]/g, "_") + (rawName.includes(".") ? "" : ".mp4");
 
   if (!url) {
     return NextResponse.json({ error: "Missing url" }, { status: 400 });
   }
 
-  const res = await fetch(url);
+  let res;
+  try {
+    res = await fetch(url);
+  } catch (err) {
+    console.error("[download] fetch failed:", err);
+    return NextResponse.json({ error: "Failed to reach asset URL" }, { status: 502 });
+  }
+
   if (!res.ok) {
-    return NextResponse.json({ error: "Failed to fetch asset" }, { status: 502 });
+    console.error("[download] upstream error:", res.status, await res.text());
+    return NextResponse.json({ error: `Upstream ${res.status}` }, { status: 502 });
   }
 
   const contentType = res.headers.get("content-type") || "video/mp4";

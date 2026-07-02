@@ -202,13 +202,13 @@ export function VideoPicker({ onSelect }) {
 
       {/* Preview modal */}
       {!!previewVideo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setPreviewVideo(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs" onClick={() => setPreviewVideo(null)}>
           <div className="bg-white rounded-xl overflow-hidden w-xs mx-4" onClick={(e) => e.stopPropagation()}>
-            <div className="p-4 flex items-center justify-between border-b border-neutral-100">
+            <div className="px-4 pb-2 pt-4 flex items-center justify-between border-b border-neutral-100">
               <p className="text-sm font-semibold truncate pr-4">{previewVideo.name || "Preview"}</p>
               <button onClick={() => setPreviewVideo(null)} className="text-neutral-400 hover:text-black text-lg leading-none">✕</button>
             </div>
-            <div className="p-4">
+            <div className="px-4 pb-4">
               {previewVideo.url && (
                 <div className="relative">
                   <video src={previewVideo.url} controls autoPlay className="w-full rounded-md bg-black max-h-[75vh] object-contain" />
