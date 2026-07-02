@@ -13,18 +13,13 @@ import {
   Mic,
   Play,
   Square,
+  Upload,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { LANGUAGES } from "@/utils/constants";
 import { ELEVENLABS_VOICES, ELEVENLABS_VOICE_SETTINGS } from "@/lib/elevenlabs-config";
-
-const VOICE_SLIDERS = [
-  { key: "stability", label: "Stability", min: 0, max: 1, step: 0.01 },
-  { key: "similarity_boost", label: "Similarity", min: 0, max: 1, step: 0.01 },
-  { key: "style", label: "Style", min: 0, max: 1, step: 0.01 },
-  { key: "speed", label: "Speed", min: 0.7, max: 1.6, step: 0.01 },
-];
 
 const MIN_SCRIPT_WORDS = 20;
 const MAX_SCRIPT_WORDS = 300;
@@ -85,6 +80,57 @@ export function StepScript({ onBack, onGenerate }) {
     stopPreviewVoice();
     setElevenLabsVoice(voiceId);
     setVoiceSettings({ ...(ELEVENLABS_VOICE_SETTINGS[voiceId] || ELEVENLABS_VOICE_SETTINGS[ELEVENLABS_VOICES[0].id]) });
+  };
+
+  // Custom voice (record or upload) — captured locally for now, cloning wired up later.
+  const [customVoiceTab, setCustomVoiceTab] = useState("record");
+  const [isRecording, setIsRecording] = useState(false);
+  const [customVoiceUrl, setCustomVoiceUrl] = useState(null);
+  const [customVoiceName, setCustomVoiceName] = useState(null);
+  const mediaRecorderRef = useRef(null);
+  const recordedChunksRef = useRef([]);
+  const fileInputRef = useRef(null);
+
+  const clearCustomVoice = () => {
+    if (customVoiceUrl) URL.revokeObjectURL(customVoiceUrl);
+    setCustomVoiceUrl(null);
+    setCustomVoiceName(null);
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      recordedChunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) recordedChunksRef.current.push(e.data);
+      };
+      recorder.onstop = () => {
+        const blob = new Blob(recordedChunksRef.current, { type: "audio/webm" });
+        clearCustomVoice();
+        setCustomVoiceUrl(URL.createObjectURL(blob));
+        setCustomVoiceName("Recorded voice");
+        stream.getTracks().forEach((t) => t.stop());
+      };
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setIsRecording(true);
+    } catch (err) {
+      toast.error("Could not access microphone", { description: err.message });
+    }
+  };
+
+  const stopRecording = () => {
+    mediaRecorderRef.current?.stop();
+    setIsRecording(false);
+  };
+
+  const handleUploadVoice = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    clearCustomVoice();
+    setCustomVoiceUrl(URL.createObjectURL(file));
+    setCustomVoiceName(file.name);
   };
 
   const [manualScript, setManualScript] = useState(draft?.manualScript || "");
@@ -201,48 +247,41 @@ export function StepScript({ onBack, onGenerate }) {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="text-center space-y-1">
-        <h2 className="text-2xl font-bold font-heading tracking-tight">Script</h2>
-        <p className="text-sm text-muted-foreground">
-          Let{"\'"}s give voice to your reel.
-        </p>
-      </div>
-
-      {/* Mode toggle */}
-      <div className="flex justify-center">
-        <div className="relative inline-flex rounded-full bg-neutral-100 p-1">
-          {mode === "manual" && (
-            <motion.div
-              layoutId="sreel-active-pill"
-              className="absolute inset-y-1 left-1 w-[calc(50%-4px)] rounded-full bg-white shadow-sm"
-            />
-          )}
-          {mode === "ai" && (
-            <motion.div
-              layoutId="sreel-active-pill"
-              className="absolute inset-y-1 right-1 w-[calc(50%-4px)] rounded-full bg-[#c7f038] shadow-sm"
-            />
-          )}
-          <button
-            onClick={() => setMode("manual")}
-            className="relative z-10 flex items-center gap-2 px-5 py-2 text-sm font-medium"
-          >
-            <FileText className="h-4 w-4" />
-            Paste Script
-          </button>
-          <button
-            onClick={() => setMode("ai")}
-            className="relative z-10 flex items-center gap-2 px-5 py-2 text-sm font-medium"
-          >
-            <Wand2 className="h-4 w-4" />
-            AI Write Script
-          </button>
-        </div>
-      </div>
-
       {/* ── Script (left) + Language/Voice/Tone (right) ─────────────────────── */}
       <div className="grid md:grid-cols-3 gap-6">
         <div className="md:col-span-2 space-y-4">
+          {/* Mode toggle */}
+          <div className="flex justify-center">
+            <div className="relative inline-flex rounded-full bg-neutral-100 p-1">
+              {mode === "manual" && (
+                <motion.div
+                  layoutId="sreel-active-pill"
+                  className="absolute inset-y-1 left-1 w-[calc(50%-4px)] rounded-full bg-white shadow-sm"
+                />
+              )}
+              {mode === "ai" && (
+                <motion.div
+                  layoutId="sreel-active-pill"
+                  className="absolute inset-y-1 right-1 w-[calc(50%-4px)] rounded-full bg-[#c7f038] shadow-sm"
+                />
+              )}
+              <button
+                onClick={() => setMode("manual")}
+                className="relative z-10 flex items-center gap-2 px-5 py-2 text-sm font-medium"
+              >
+                <FileText className="h-4 w-4" />
+                Paste Script
+              </button>
+              <button
+                onClick={() => setMode("ai")}
+                className="relative z-10 flex items-center gap-2 px-5 py-2 text-sm font-medium"
+              >
+                <Wand2 className="h-4 w-4" />
+                AI Write Script
+              </button>
+            </div>
+          </div>
+
           {/* ── Manual Mode ───────────────────────────────────────────────── */}
           {mode === "manual" && (
             <div className="space-y-2">
@@ -369,7 +408,7 @@ export function StepScript({ onBack, onGenerate }) {
         </div>
 
         {/* ── Language / Voice / Tone ─────────────────────────────────────── */}
-        <div className="space-y-4 rounded-2xl border border-border/50 bg-card/40 p-4 h-fit">
+        <div className="space-y-4 p-4 h-fit">
           {/* Language */}
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-neutral-500 flex items-center gap-1.5">
@@ -393,13 +432,13 @@ export function StepScript({ onBack, onGenerate }) {
           </div>
 
           {/* Voice */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-neutral-500 flex items-center gap-1.5">
-              <Mic className="w-3.5 h-3.5" />
-              Voice
-            </label>
-            <div className="flex gap-1.5">
-              <div className="relative flex-1">
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-neutral-500 flex items-center gap-1.5">
+                <Mic className="w-3.5 h-3.5" />
+                Choose Prebuilt Voice
+              </label>
+              <div className="relative">
                 <select
                   value={elevenLabsVoice}
                   onChange={(e) => handleVoiceChange(e.target.value)}
@@ -413,46 +452,106 @@ export function StepScript({ onBack, onGenerate }) {
                   <ChevronDown />
                 </div>
               </div>
+              <button
+                type="button"
+                onClick={previewingVoice ? stopPreviewVoice : handlePreviewVoice}
+                className="w-full flex items-center justify-center gap-2 text-xs font-medium rounded-lg border border-neutral-200 bg-neutral-50 hover:bg-neutral-100 py-2 text-neutral-700 transition-colors"
+              >
+                {previewingVoice
+                  ? <><Square className="w-3.5 h-3.5" /> Stop</>
+                  : <><Play className="w-3.5 h-3.5" /> {activeScript.trim() ? "Preview with My Script" : "Preview Voice"}</>
+                }
+              </button>
             </div>
-          </div>
 
-          {/* Voice tuning sliders — adjust, then hit Preview to hear the result */}
-          <div className="space-y-3 rounded-xl border border-neutral-200 bg-white p-3">
-            {VOICE_SLIDERS.map(({ key, label, min, max, step }) => (
-              <div key={key} className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <label className="text-[11px] font-medium text-neutral-500">{label}</label>
-                  <span className="text-[11px] font-mono text-neutral-400">{voiceSettings[key]?.toFixed(2)}</span>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-neutral-500">Add Your Own</label>
+
+              <div className="rounded-xl border border-neutral-200 bg-white p-3 space-y-3">
+                <div className="relative inline-flex rounded-full bg-neutral-100 p-1 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setCustomVoiceTab("record")}
+                    className={`relative z-10 px-3 py-1.5 rounded-full font-medium transition-colors ${
+                      customVoiceTab === "record" ? "bg-white shadow-sm" : "text-neutral-500"
+                    }`}
+                  >
+                    Record
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCustomVoiceTab("upload")}
+                    className={`relative z-10 px-3 py-1.5 rounded-full font-medium transition-colors ${
+                      customVoiceTab === "upload" ? "bg-white shadow-sm" : "text-neutral-500"
+                    }`}
+                  >
+                    Upload
+                  </button>
                 </div>
-                <input
-                  type="range"
-                  min={min}
-                  max={max}
-                  step={step}
-                  value={voiceSettings[key] ?? min}
-                  onChange={(e) =>
-                    setVoiceSettings((prev) => ({ ...prev, [key]: parseFloat(e.target.value) }))
-                  }
-                  className="w-full h-1.5 rounded-full accent-[#c7f038] cursor-pointer"
-                />
+
+                {customVoiceTab === "record" ? (
+                  <button
+                    type="button"
+                    onClick={isRecording ? stopRecording : startRecording}
+                    className={`w-full flex items-center justify-center gap-2 text-xs font-medium rounded-lg border py-2 transition-colors ${
+                      isRecording
+                        ? "border-red-200 bg-red-50 text-red-600 animate-pulse"
+                        : "border-neutral-200 bg-neutral-50 hover:bg-neutral-100 text-neutral-700"
+                    }`}
+                  >
+                    {isRecording
+                      ? <><Square className="w-3.5 h-3.5" /> Stop Recording</>
+                      : <><Mic className="w-3.5 h-3.5" /> Record Your Voice</>
+                    }
+                  </button>
+                ) : (
+                  <>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="audio/*"
+                      onChange={handleUploadVoice}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full flex items-center justify-center gap-2 text-xs font-medium rounded-lg border border-neutral-200 bg-neutral-50 hover:bg-neutral-100 py-2 text-neutral-700 transition-colors"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      Upload a Recording
+                    </button>
+                  </>
+                )}
+
+                {customVoiceUrl && (
+                  <div className="space-y-1.5">
+                    <p className="text-[11px] text-neutral-500 truncate">{customVoiceName}</p>
+                    <div className="flex items-center gap-2 rounded-lg border border-neutral-200 bg-neutral-50 px-2.5 py-2">
+                      <audio src={customVoiceUrl} controls className="h-8 flex-1" />
+                      <button
+                        type="button"
+                        onClick={clearCustomVoice}
+                        className="text-neutral-400 hover:text-red-500 shrink-0"
+                        title="Remove"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-            ))}
-            <button
-              type="button"
-              onClick={previewingVoice ? stopPreviewVoice : handlePreviewVoice}
-              className="w-full flex items-center justify-center gap-2 text-xs font-medium rounded-lg border border-neutral-200 bg-neutral-50 hover:bg-neutral-100 py-2 text-neutral-700 transition-colors"
-            >
-              {previewingVoice
-                ? <><Square className="w-3.5 h-3.5" /> Stop</>
-                : <><Play className="w-3.5 h-3.5" /> {activeScript.trim() ? "Preview with My Script" : "Preview Voice"}</>
-              }
-            </button>
+            </div>
           </div>
         </div>
       </div>
 
       <div className="flex items-center justify-between pt-2">
-        <Button variant="ghost" onClick={onBack} className="gap-2 text-muted-foreground">
+        <Button
+          type="button"
+          onClick={onBack}
+          className="bg-neutral-900 text-[#c7f038] hover:opacity-90 disabled:opacity-50 hover:bg-neutral-900 shadow-lg gap-2 px-6"
+        >
           <ChevronLeft className="w-4 h-4" />
           Back
         </Button>
