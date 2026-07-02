@@ -1,5 +1,4 @@
 "use client";
-
 import Link from "next/link";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
@@ -43,7 +42,7 @@ export default function Aside() {
 
   return (
     <aside
-      className={`hidden md:flex flex-col shrink-0 sticky top-0 z-50 h-screen shadow-xl border border-neutral-100 bg-white rounded-2xl px-3 py-6 gap-1 transition-all duration-200 ${
+      className={`hidden md:flex flex-col shrink-0 sticky top-0 z-50 h-screen px-3 py-6 gap-1 transition-all duration-200 border-r ${
         collapsed ? "w-16" : "w-56"
       }`}
     >
@@ -88,7 +87,7 @@ export default function Aside() {
                 collapsed ? "justify-center px-0" : "px-3"
               } ${
                 isActive
-                  ? "bg-neutral-200 text-black font-medium"
+                  ? "bg-[#c7f038] text-black font-medium"
                   : "text-neutral-700 hover:bg-neutral-100"
               }`}
             >
