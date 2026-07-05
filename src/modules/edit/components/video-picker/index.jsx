@@ -71,7 +71,7 @@ export function VideoPicker({ onSelect }) {
     <div className="py-10 space-y-6 sm:px-8 px-0">
       {/* Header */}
       <div className="border-b border-black pb-4">
-        <h1 className="text-2xl font-semibold font-heading tracking-tight">Edit a video</h1>
+        <h1 className="text-4xl font-heading tracking-tight">Edit a Video</h1>
         <p className="text-sm text-muted-foreground mt-1">Pick a video below to open it in the editor</p>
       </div>
 
