@@ -8,6 +8,7 @@ import { ChevronRight, Home } from "lucide-react";
 // are utility pages and don't get a breadcrumb.
 const PIPELINE_LABELS = {
   "seedance-reel": "Luxury Car Exit",
+  "news-anchor": "News Anchor",
   "home-tour": "Home Tour",
   "ugc-creator": "UGC Creator",
   "product-to-video": "Product Video",
