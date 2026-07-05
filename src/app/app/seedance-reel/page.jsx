@@ -201,6 +201,7 @@ function SeedanceReelContent() {
               avatarHook={avatarHook}
               onNext={() => goToStep(1)}
               isValid={step0Valid}
+              onClear={handleReset}
             />
           </div>
 
