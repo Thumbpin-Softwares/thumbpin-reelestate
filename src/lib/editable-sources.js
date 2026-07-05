@@ -7,6 +7,11 @@ export const EDITABLE_SOURCES = {
     generatorPath: "/app/seedance-reel",
     downloadFilename: "seedance-reel.mp4",
   },
+  "news-anchor": {
+    renderEndpoint: "/api/news-anchor/render-remotion",
+    generatorPath: "/app/news-anchor",
+    downloadFilename: "news-anchor.mp4",
+  },
   "home-tour": {
     renderEndpoint: "/api/home-tour/render-remotion",
     generatorPath: "/app/home-tour",
