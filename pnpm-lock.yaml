@@ -41,6 +41,9 @@ importers:
       '@remotion/renderer':
         specifier: ^4.0.478
         version: 4.0.479(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      '@remotion/transitions':
+        specifier: ^4.0.478
+        version: 4.0.484(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       autoprefixer:
         specifier: ^10.5.0
         version: 10.5.0(postcss@8.5.15)
@@ -1892,6 +1895,9 @@ packages:
       react: '>=16.8.0'
       react-dom: '>=16.8.0'
 
+  '@remotion/paths@4.0.484':
+    resolution: {integrity: sha512-JFJfr40lBGCcDlGHsnLbjbVjyok/Ctag4xDSeScMZr3F7frL4BL7PBzuBk8AMgEgNmVc3I3DRqGxOx8z1WVPhA==}
+
   '@remotion/player@4.0.479':
     resolution: {integrity: sha512-oluW+lTOhNhDWpR24N8JN7ZnghTExGqPBg/HAG8UetEpizCYCTE+MSyf4sggf68jjJOte/f/pF4zMduQRtd0Gw==}
     peerDependencies:
@@ -1900,6 +1906,12 @@ packages:
 
   '@remotion/renderer@4.0.479':
     resolution: {integrity: sha512-t7rNPESRpqwhKPBx5F3XXQdQwzh7lvs4oR3ApDRscyCOAMYB4xg7zv1UfK+2zvVETbdZ9AJDvQ/nOvkO2x7WnA==}
+    peerDependencies:
+      react: '>=16.8.0'
+      react-dom: '>=16.8.0'
+
+  '@remotion/shapes@4.0.484':
+    resolution: {integrity: sha512-gPEko27JbOgdSo0SqfGo24BYtpQ0sZ7KOcUwaCzxiDdUidQc5+lT6qjViKpxhJPoPuSKGA2iLuyqcgqQ1u4h6g==}
     peerDependencies:
       react: '>=16.8.0'
       react-dom: '>=16.8.0'
@@ -1918,6 +1930,12 @@ packages:
 
   '@remotion/timeline-utils@4.0.479':
     resolution: {integrity: sha512-JyvO1NocSGctgemlNh7ZJKbdodTiuUZmL/bFQ9U6pzw6o4+1q20sd2+Kqua+lJKbIcDigXjqUIBttYiM6ZO/1g==}
+
+  '@remotion/transitions@4.0.484':
+    resolution: {integrity: sha512-E4MqFBxbArq7WXPeUGmWJXj5dUFqHoqbBBnF4tQI5NwIFWnqMMgvTxI3NguNzcaCCLHQbM5FhwKzqhMXFIimIQ==}
+    peerDependencies:
+      react: '>=16.8.0'
+      react-dom: '>=16.8.0'
 
   '@remotion/web-renderer@4.0.479':
     resolution: {integrity: sha512-JLICwVsWoyJnc/2Dme5V7eY1v1RqhjeVLWxv9orIdvOIJD2byq473VmZh7ldwzZNmzx6zJWxWrarhraX7nIW2g==}
@@ -4687,6 +4705,12 @@ packages:
       react: '>=16.8.0'
       react-dom: '>=16.8.0'
 
+  remotion@4.0.484:
+    resolution: {integrity: sha512-UJTgWindeUPqn5TTb55qOtRFhh96uTfVqJN20qb0ggi5Qq/T1OEY2nu1yi4CEbsM/+tpFDHV1aecrtrDykcdlA==}
+    peerDependencies:
+      react: '>=16.8.0'
+      react-dom: '>=16.8.0'
+
   require-directory@2.1.1:
     resolution: {integrity: sha512-fGxEI7+wsG9xrvdjsrlmL22OMTTiHRwAMroiEeMgq8gzoLC/PQr7RsRDSTLUg/bZAZtF+TVIkHc6/4RIKrui+Q==}
     engines: {node: '>=0.10.0'}
@@ -7283,6 +7307,8 @@ snapshots:
       remotion: 4.0.479(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       zod: 4.3.6
 
+  '@remotion/paths@4.0.484': {}
+
   '@remotion/player@4.0.479(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':
     dependencies:
       react: 19.2.3
@@ -7310,6 +7336,13 @@ snapshots:
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
+
+  '@remotion/shapes@4.0.484(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':
+    dependencies:
+      '@remotion/paths': 4.0.484
+      react: 19.2.3
+      react-dom: 19.2.3(react@19.2.3)
+      remotion: 4.0.484(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
 
   '@remotion/streaming@4.0.479': {}
 
@@ -7346,6 +7379,14 @@ snapshots:
   '@remotion/timeline-utils@4.0.479':
     dependencies:
       mediabunny: 1.47.0
+
+  '@remotion/transitions@4.0.484(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':
+    dependencies:
+      '@remotion/paths': 4.0.484
+      '@remotion/shapes': 4.0.484(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      react: 19.2.3
+      react-dom: 19.2.3(react@19.2.3)
+      remotion: 4.0.484(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
 
   '@remotion/web-renderer@4.0.479(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':
     dependencies:
@@ -10354,6 +10395,11 @@ snapshots:
       set-function-name: 2.0.2
 
   remotion@4.0.479(react-dom@19.2.3(react@19.2.3))(react@19.2.3):
+    dependencies:
+      react: 19.2.3
+      react-dom: 19.2.3(react@19.2.3)
+
+  remotion@4.0.484(react-dom@19.2.3(react@19.2.3))(react@19.2.3):
     dependencies:
       react: 19.2.3
       react-dom: 19.2.3(react@19.2.3)
