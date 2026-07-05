@@ -21,13 +21,24 @@ import { calcDurationInFrames, clampBrollClips } from "@/lib/remotion/duration";
 import { EDITABLE_SOURCES } from "@/lib/editable-sources";
 import { CAPTION_PRESETS } from "@/lib/remotion/caption-presets";
 import { CaptionsPanel } from "@/modules/edit/components/caption-panel";
+import { OverlaysPanel } from "@/modules/edit/components/overlays-panel";
+import { OverlaysCanvasLayer } from "@/modules/edit/components/overlays-canvas-layer";
 import { Timeline } from "@/modules/edit/components/timeline-ruler";
 
 const FPS = 30;
 
-function buildBaseRenderProps(compositionProps) {
+function createOverlay(type) {
+  const id = `${type}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  if (type === "text") {
+    return { id, type, x: 50, y: 50, width: 60, text: "Your text here", fontSize: 56, color: "#ffffff" };
+  }
+  return { id, type: "image", x: 50, y: 50, width: 40, url: "", aspect: null };
+}
+
+function buildBaseRenderProps(compositionProps, overlays = []) {
   return {
     ...compositionProps,
+    overlays,
     brollClips: clampBrollClips({
       avatarDuration: compositionProps.avatarDuration,
       brollClips:     compositionProps.brollClips,
@@ -66,7 +77,7 @@ function PlaceholderPanel({ label }) {
 // compositionProps comes from a reducer and is a stable reference during playback,
 // so this component only re-renders when the user actually changes the composition.
 const PlayerContainer = memo(
-  forwardRef(function PlayerContainer({ compositionProps, durationInFrames }, ref) {
+  forwardRef(function PlayerContainer({ compositionProps, durationInFrames, overlays }, ref) {
     const clampedBrollClips = clampBrollClips({
       avatarDuration: compositionProps.avatarDuration,
       brollClips:     compositionProps.brollClips,
@@ -85,6 +96,7 @@ const PlayerContainer = memo(
       introTagline:   "",
       outroBrandText: "thumbpin.ai",
       ctaText:        compositionProps.ctaText || "",
+      overlays:       overlays || [],
     };
 
     return (
@@ -114,6 +126,11 @@ export function Editor({ compositionProps, onExit }) {
     preset: null, status: "idle", progress: 0, message: "", videoUrl: null, error: null,
   });
   const [captionDraft, setCaptionDraft] = useState(null);
+
+  const [overlays, setOverlays] = useState([]);
+  const [selectedOverlayId, setSelectedOverlayId] = useState(null);
+  const [overlayUploading, setOverlayUploading] = useState(false);
+  const canvasBoxRef = useRef(null);
 
   const playerRef = useRef(null);
   const [playing, setPlaying] = useState(false);
@@ -220,7 +237,7 @@ export function Editor({ compositionProps, onExit }) {
       const trimOutFrame = trim.out > 0 ? trim.out : durationInFrames;
 
       const renderProps = {
-        ...buildBaseRenderProps(compositionProps),
+        ...buildBaseRenderProps(compositionProps, overlays),
         trimInFrame,
         trimOutFrame,
       };
@@ -284,7 +301,7 @@ export function Editor({ compositionProps, onExit }) {
       const res = await fetch(sourceConfig.renderEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildBaseRenderProps(compositionProps)),
+        body: JSON.stringify(buildBaseRenderProps(compositionProps, overlays)),
       });
 
       if (!res.ok) throw new Error(`Render failed: ${res.status}`);
@@ -338,6 +355,49 @@ export function Editor({ compositionProps, onExit }) {
     }
   };
 
+  const handleAddTextOverlay = () => {
+    const overlay = createOverlay("text");
+    setOverlays((prev) => [...prev, overlay]);
+    setSelectedOverlayId(overlay.id);
+  };
+
+  const handleAddImageOverlay = async (file) => {
+    setOverlayUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("name", "Overlay image");
+      formData.append("type", "overlay");
+      formData.append("category", "overlays");
+
+      const res = await fetch("/api/assets/upload", { method: "POST", body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Upload failed");
+
+      const overlay = { ...createOverlay("image"), url: data.asset.url };
+      setOverlays((prev) => [...prev, overlay]);
+      setSelectedOverlayId(overlay.id);
+    } catch (err) {
+      console.error("[Editor] Overlay image upload failed:", err);
+      toast.error("Image upload failed", { description: err.message });
+    } finally {
+      setOverlayUploading(false);
+    }
+  };
+
+  const handleUpdateOverlay = (id, patch) => {
+    setOverlays((prev) => prev.map((o) => (o.id === id ? { ...o, ...patch } : o)));
+  };
+
+  const handleMoveOverlay = (id, { x, y }) => {
+    setOverlays((prev) => prev.map((o) => (o.id === id ? { ...o, x, y } : o)));
+  };
+
+  const handleRemoveOverlay = (id) => {
+    setOverlays((prev) => prev.filter((o) => o.id !== id));
+    setSelectedOverlayId((prev) => (prev === id ? null : prev));
+  };
+
   return (
     <div className="absolute inset-x-0 bottom-0 top-12 z-10 bg-[#fafbfc] flex flex-col overflow-hidden">
       {/* Header */}
@@ -387,7 +447,11 @@ export function Editor({ compositionProps, onExit }) {
       <div className="flex-1 min-h-0 flex overflow-hidden">
         {/* Main canvas */}
         <div className="flex-1 flex flex-col items-center justify-center gap-3 py-4 px-6 bg-[#fafbfc]">
-          <div className="relative rounded-2xl overflow-hidden border border-border/50 bg-black shadow-xl" style={{ aspectRatio: "9/16", height: "calc(100% - 2.5rem)", maxHeight: "100%" }}>
+          <div
+            ref={canvasBoxRef}
+            className="relative rounded-2xl overflow-hidden border border-border/50 bg-black shadow-xl"
+            style={{ aspectRatio: "9/16", height: "calc(100% - 2.5rem)", maxHeight: "100%" }}
+          >
             {captionState.videoUrl ? (
               <video
                 ref={captionVideoRef}
@@ -401,6 +465,18 @@ export function Editor({ compositionProps, onExit }) {
                 ref={playerRef}
                 compositionProps={compositionProps}
                 durationInFrames={durationInFrames}
+                overlays={overlays}
+              />
+            )}
+
+            {!captionState.videoUrl && activePanel === "overlays" && (
+              <OverlaysCanvasLayer
+                containerRef={canvasBoxRef}
+                overlays={overlays}
+                selectedId={selectedOverlayId}
+                onSelect={setSelectedOverlayId}
+                onMove={handleMoveOverlay}
+                onLoadAspect={(id, aspect) => handleUpdateOverlay(id, { aspect })}
               />
             )}
 
@@ -459,6 +535,7 @@ export function Editor({ compositionProps, onExit }) {
                   onClick={() => {
                     setActivePanel(null);
                     setCaptionDraft(null);
+                    setSelectedOverlayId(null);
                   }}
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
@@ -476,7 +553,18 @@ export function Editor({ compositionProps, onExit }) {
                   />
                 )}
                 {activePanel === "music"    && <PlaceholderPanel label="Music" />}
-                {activePanel === "overlays" && <PlaceholderPanel label="Text / Image Overlays" />}
+                {activePanel === "overlays" && (
+                  <OverlaysPanel
+                    overlays={overlays}
+                    selectedId={selectedOverlayId}
+                    onSelect={setSelectedOverlayId}
+                    onAddText={handleAddTextOverlay}
+                    onAddImage={handleAddImageOverlay}
+                    onUpdate={handleUpdateOverlay}
+                    onRemove={handleRemoveOverlay}
+                    uploading={overlayUploading}
+                  />
+                )}
               </div>
             </>
           ) : (

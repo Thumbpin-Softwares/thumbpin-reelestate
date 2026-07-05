@@ -1,8 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Check, ChevronLeft, Loader2, Sparkles } from "lucide-react";
+import { Check, ChevronLeft, Eye, Loader2, Sparkles, X } from "lucide-react";
 import { CAPTION_PRESETS } from "@/lib/remotion/caption-presets";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+
+// Preset preview images live at /captions/presets/<id>.jpg — drop the real
+// exports in there; until then this falls back to a plain label tile.
+function presetImageUrl(preset) {
+  return `/captions/presets/${preset.id}.jpg`;
+}
 
 const LANGUAGES = [
   { code: "", label: "Auto-detect" },
@@ -64,6 +71,7 @@ export function CaptionsPanel({ captionState, onGenerate, onReset, onDraftChange
   const [language, setLanguage] = useState("");
   const [translateTo, setTranslateTo] = useState("");
   const [position, setPosition] = useState("bottom");
+  const [previewPreset, setPreviewPreset] = useState(null);
 
   const busy = captionState?.status === "rendering" || captionState?.status === "captioning";
   const appliedPreset = captionState?.status === "done" ? captionState.preset : null;
@@ -104,7 +112,7 @@ export function CaptionsPanel({ captionState, onGenerate, onReset, onDraftChange
 
         <div className="flex flex-col gap-1">
           <label className="text-[11px] font-medium text-muted-foreground">Text position</label>
-          <div className="grid grid-cols-3 gap-1.5">
+          <div className="grid grid-cols-2 gap-2">
             {POSITIONS.map((p) => (
               <button
                 key={p.value}
@@ -208,29 +216,74 @@ export function CaptionsPanel({ captionState, onGenerate, onReset, onDraftChange
         Pick a caption style we will transcribe the reel and burn in styled captions.
       </p>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         {CAPTION_PRESETS.map((p) => (
           <button
             key={p.id}
             onClick={() => openPreset(p)}
-            className={`relative rounded-lg border py-2 px-1.5 text-[11px] font-medium text-center transition-colors ${
+            className={`group relative rounded-lg border p-1.5 text-[11px] font-medium text-center transition-colors ${
               appliedPreset === p.id
                 ? "border-neutral-900 bg-neutral-900 text-white"
                 : "border-border/50 text-muted-foreground hover:text-foreground hover:bg-muted/40"
             }`}
           >
+            <div className="relative aspect-video w-full rounded-md overflow-hidden bg-neutral-100 mb-1.5">
+              <img
+                src={presetImageUrl(p)}
+                alt={p.label}
+                className="w-full h-full object-cover"
+                onError={(e) => { e.currentTarget.style.display = "none"; }}
+              />
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setPreviewPreset(p);
+                }}
+                className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/40 opacity-0 group-hover:opacity-100 transition-all"
+              >
+                <Eye className="w-4 h-4 text-white" />
+              </button>
+              {p.tier === "dynamic" && (
+                <span className="absolute top-1 right-1 text-[8px] font-semibold uppercase tracking-wide text-[#c7f038]">
+                  HD
+                </span>
+              )}
+            </div>
+
             {p.label}
-            {p.tier === "dynamic" && (
-              <span className="absolute top-1 right-1 text-[8px] font-semibold uppercase tracking-wide text-[#c7f038]">
-                HD
-              </span>
-            )}
             {appliedPreset === p.id && (
               <Check className="absolute -top-1.5 -left-1.5 w-3.5 h-3.5 bg-emerald-500 text-white rounded-full p-0.5" />
             )}
           </button>
         ))}
       </div>
+
+      <Dialog open={!!previewPreset} onOpenChange={(open) => !open && setPreviewPreset(null)}>
+        <DialogContent className="max-w-sm p-0 overflow-hidden gap-0">
+          {previewPreset && (
+            <>
+              <div className="relative aspect-video w-full bg-neutral-100">
+                <img
+                  src={presetImageUrl(previewPreset)}
+                  alt={previewPreset.label}
+                  className="w-full h-full object-cover"
+                  onError={(e) => { e.currentTarget.style.display = "none"; }}
+                />
+                <button
+                  onClick={() => setPreviewPreset(null)}
+                  className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <div className="p-3">
+                <p className="text-sm font-semibold">{previewPreset.label}</p>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
