@@ -1,5 +1,6 @@
 import {
   AbsoluteFill,
+  Img,
   Sequence,
   useVideoConfig,
   useCurrentFrame,
@@ -12,6 +13,48 @@ import {
 import { Audio } from "@remotion/media";
 import { IntroAnimation } from "./IntroAnimation";
 import { OutroAnimation } from "./OutroAnimation";
+
+/**
+ * A user-placed text or image overlay that stays on screen for the whole
+ * reel. Position is stored as a percent (x, y = center point) so it's
+ * resolution-independent between the editor's drag layer and this
+ * composition. Shape: { id, type: "text"|"image", x, y, width, text,
+ * fontSize, color, url }.
+ */
+function Overlay({ overlay }) {
+  const style = {
+    position: "absolute",
+    left: `${overlay.x}%`,
+    top: `${overlay.y}%`,
+    width: `${overlay.width}%`,
+    transform: "translate(-50%, -50%)",
+  };
+
+  if (overlay.type === "image") {
+    return (
+      <div style={style}>
+        <Img src={overlay.url} style={{ width: "100%", display: "block" }} />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        ...style,
+        fontSize: overlay.fontSize || 48,
+        color: overlay.color || "#ffffff",
+        fontWeight: 700,
+        textAlign: "center",
+        fontFamily: "sans-serif",
+        whiteSpace: "pre-wrap",
+        textShadow: "0 2px 10px rgba(0,0,0,0.55)",
+      }}
+    >
+      {overlay.text}
+    </div>
+  );
+}
 
 const INTRO_S = 3;
 const OUTRO_S = 3;
@@ -53,6 +96,7 @@ export function SeedanceReelComposition({
   introSubtitle  = "Living",
   introTagline   = "Where Every Detail Matters",
   outroBrandText = "thumbpin.ai",
+  overlays       = [],
 }) {
   const { fps } = useVideoConfig();
   const { isRendering } = getRemotionEnvironment();
@@ -170,6 +214,15 @@ export function SeedanceReelComposition({
         <Sequence from={outroAt} durationInFrames={outroFrames}>
           <OutroAnimation ctaText={ctaText} brandText={outroBrandText} />
         </Sequence>
+      )}
+
+      {/* 6 — User text/image overlays — on top of everything, full duration */}
+      {overlays.length > 0 && (
+        <AbsoluteFill>
+          {overlays.map((overlay) => (
+            <Overlay key={overlay.id} overlay={overlay} />
+          ))}
+        </AbsoluteFill>
       )}
     </AbsoluteFill>
   );
