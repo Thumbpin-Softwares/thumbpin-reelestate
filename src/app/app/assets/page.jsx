@@ -649,7 +649,7 @@ export default function AssetLibraryPage() {
         onChange={(e) => handleFileSelect(e, assetType)}
       />
 
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col pt-12 sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold font-heading">
             Asset Library
