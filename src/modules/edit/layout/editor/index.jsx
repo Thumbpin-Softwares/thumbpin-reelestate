@@ -23,6 +23,7 @@ import { CAPTION_PRESETS } from "@/lib/remotion/caption-presets";
 import { CaptionsPanel } from "@/modules/edit/components/caption-panel";
 import { OverlaysPanel } from "@/modules/edit/components/overlays-panel";
 import { OverlaysCanvasLayer } from "@/modules/edit/components/overlays-canvas-layer";
+import { MusicPanel } from "@/modules/edit/components/music-panel";
 import { Timeline } from "@/modules/edit/components/timeline-ruler";
 
 const FPS = 30;
@@ -30,15 +31,22 @@ const FPS = 30;
 function createOverlay(type) {
   const id = `${type}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   if (type === "text") {
-    return { id, type, x: 50, y: 50, width: 60, text: "Your text here", fontSize: 56, color: "#ffffff" };
+    return {
+      id, type, x: 50, y: 50, width: 60,
+      text: "Your text here", fontSize: 56, color: "#ffffff", fontFamily: "sans",
+      bgColor: "#000000", bgOpacity: 0,
+      hidden: false,
+    };
   }
-  return { id, type: "image", x: 50, y: 50, width: 40, url: "", aspect: null };
+  return { id, type: "image", x: 50, y: 50, width: 40, url: "", aspect: null, hidden: false };
 }
 
-function buildBaseRenderProps(compositionProps, overlays = []) {
+function buildBaseRenderProps(compositionProps, overlays = [], music = null) {
   return {
     ...compositionProps,
     overlays,
+    musicUrl:              music?.url || "",
+    musicTrimStartSeconds: music?.trimStart || 0,
     brollClips: clampBrollClips({
       avatarDuration: compositionProps.avatarDuration,
       brollClips:     compositionProps.brollClips,
@@ -64,20 +72,11 @@ function formatTime(seconds) {
   return `${m}:${String(s).padStart(2, "0")}.${String(ms).padStart(3, "0")}`;
 }
 
-function PlaceholderPanel({ label }) {
-  return (
-    <div className="flex flex-col items-center justify-center h-full gap-2 text-center">
-      <span className="text-sm font-medium text-muted-foreground">{label}</span>
-      <span className="text-xs text-muted-foreground/60">Coming soon</span>
-    </div>
-  );
-}
-
 // Isolated from Editor's frame-state re-renders via memo + forwardRef.
 // compositionProps comes from a reducer and is a stable reference during playback,
 // so this component only re-renders when the user actually changes the composition.
 const PlayerContainer = memo(
-  forwardRef(function PlayerContainer({ compositionProps, durationInFrames, overlays }, ref) {
+  forwardRef(function PlayerContainer({ compositionProps, durationInFrames, overlays, music }, ref) {
     const clampedBrollClips = clampBrollClips({
       avatarDuration: compositionProps.avatarDuration,
       brollClips:     compositionProps.brollClips,
@@ -97,6 +96,8 @@ const PlayerContainer = memo(
       outroBrandText: "thumbpin.ai",
       ctaText:        compositionProps.ctaText || "",
       overlays:       overlays || [],
+      musicUrl:              music?.url || "",
+      musicTrimStartSeconds: music?.trimStart || 0,
     };
 
     return (
@@ -129,8 +130,11 @@ export function Editor({ compositionProps, onExit }) {
 
   const [overlays, setOverlays] = useState([]);
   const [selectedOverlayId, setSelectedOverlayId] = useState(null);
+  const [editingOverlayId, setEditingOverlayId] = useState(null);
   const [overlayUploading, setOverlayUploading] = useState(false);
   const canvasBoxRef = useRef(null);
+
+  const [music, setMusic] = useState(null); // { key, url, name, trimStart } | null
 
   const playerRef = useRef(null);
   const [playing, setPlaying] = useState(false);
@@ -237,7 +241,7 @@ export function Editor({ compositionProps, onExit }) {
       const trimOutFrame = trim.out > 0 ? trim.out : durationInFrames;
 
       const renderProps = {
-        ...buildBaseRenderProps(compositionProps, overlays),
+        ...buildBaseRenderProps(compositionProps, overlays, music),
         trimInFrame,
         trimOutFrame,
       };
@@ -301,7 +305,7 @@ export function Editor({ compositionProps, onExit }) {
       const res = await fetch(sourceConfig.renderEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildBaseRenderProps(compositionProps, overlays)),
+        body: JSON.stringify(buildBaseRenderProps(compositionProps, overlays, music)),
       });
 
       if (!res.ok) throw new Error(`Render failed: ${res.status}`);
@@ -398,13 +402,43 @@ export function Editor({ compositionProps, onExit }) {
     setSelectedOverlayId((prev) => (prev === id ? null : prev));
   };
 
+  const handleToggleOverlayHidden = (id) => {
+    setOverlays((prev) => prev.map((o) => (o.id === id ? { ...o, hidden: !o.hidden } : o)));
+  };
+
+  // newOrder is the full overlays array in its new stacking order (index 0 =
+  // back of the stack, last = front) — the panel computes this from drag.
+  const handleReorderOverlays = (newOrder) => {
+    setOverlays(newOrder);
+  };
+
+  const handleStartEditOverlay = (id) => {
+    setSelectedOverlayId(id);
+    setEditingOverlayId(id);
+  };
+
+  const handleStopEditOverlay = () => setEditingOverlayId(null);
+
+  const handleSelectMusic = (track) => {
+    setMusic({ key: track.key, url: track.url, name: track.name, trimStart: 0 });
+  };
+
+  const handleTrimMusic = (trimStart) => {
+    setMusic((prev) => (prev ? { ...prev, trimStart } : prev));
+  };
+
+  const handleClearMusic = () => setMusic(null);
+
   return (
     <div className="absolute inset-x-0 bottom-0 top-12 z-10 bg-[#fafbfc] flex flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between gap-2 px-6 py-2 shrink-0 border-b border-border/40">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={onExit} className="gap-1.5 h-8 text-xs">
-            <ArrowLeft className="w-3.5 h-3.5" />
+          <Button
+            size="sm"
+            onClick={onExit}
+            className="h-8 text-xs bg-black text-[#c7f038] hover:bg-black hover:opacity-90"
+          >
             Back
           </Button>
           <div>
@@ -466,17 +500,22 @@ export function Editor({ compositionProps, onExit }) {
                 compositionProps={compositionProps}
                 durationInFrames={durationInFrames}
                 overlays={overlays}
+                music={music}
               />
             )}
 
             {!captionState.videoUrl && activePanel === "overlays" && (
               <OverlaysCanvasLayer
                 containerRef={canvasBoxRef}
-                overlays={overlays}
+                overlays={overlays.filter((o) => !o.hidden)}
                 selectedId={selectedOverlayId}
+                editingId={editingOverlayId}
                 onSelect={setSelectedOverlayId}
                 onMove={handleMoveOverlay}
                 onLoadAspect={(id, aspect) => handleUpdateOverlay(id, { aspect })}
+                onStartEdit={handleStartEditOverlay}
+                onEditChange={(id, text) => handleUpdateOverlay(id, { text })}
+                onStopEdit={handleStopEditOverlay}
               />
             )}
 
@@ -552,7 +591,15 @@ export function Editor({ compositionProps, onExit }) {
                     onReset={() => setCaptionState({ preset: null, status: "idle", progress: 0, message: "", videoUrl: null, error: null })}
                   />
                 )}
-                {activePanel === "music"    && <PlaceholderPanel label="Music" />}
+                {activePanel === "music" && (
+                  <MusicPanel
+                    music={music}
+                    reelDurationSeconds={durationInFrames / FPS}
+                    onSelect={handleSelectMusic}
+                    onTrimChange={handleTrimMusic}
+                    onClear={handleClearMusic}
+                  />
+                )}
                 {activePanel === "overlays" && (
                   <OverlaysPanel
                     overlays={overlays}
@@ -562,6 +609,8 @@ export function Editor({ compositionProps, onExit }) {
                     onAddImage={handleAddImageOverlay}
                     onUpdate={handleUpdateOverlay}
                     onRemove={handleRemoveOverlay}
+                    onToggleHidden={handleToggleOverlayHidden}
+                    onReorder={handleReorderOverlays}
                     uploading={overlayUploading}
                   />
                 )}
