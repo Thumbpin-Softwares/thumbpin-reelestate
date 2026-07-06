@@ -4,6 +4,7 @@ import { forwardRef, memo, useEffect, useRef, useState } from "react";
 import { Player } from "@remotion/player";
 import {
   AlertCircle,
+  AlertTriangle,
   ArrowLeft,
   Captions,
   ChevronLeft,
@@ -12,12 +13,14 @@ import {
   Music,
   Pause,
   Play,
+  Trash2,
   Type,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { SeedanceReelComposition } from "@/lib/remotion/SeedanceReelComposition";
-import { calcDurationInFrames, clampBrollClips } from "@/lib/remotion/duration";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { SeedanceReelComposition, calcSeedanceReelDurationInFrames } from "@/lib/remotion/SeedanceReelComposition";
+import { calcDurationInFrames, clampBrollClips, applyCutRanges, mapVirtualRangeToOriginal } from "@/lib/remotion/duration";
 import { EDITABLE_SOURCES } from "@/lib/editable-sources";
 import { CAPTION_PRESETS } from "@/lib/remotion/caption-presets";
 import { CaptionsPanel } from "@/modules/edit/components/caption-panel";
@@ -25,8 +28,20 @@ import { OverlaysPanel } from "@/modules/edit/components/overlays-panel";
 import { OverlaysCanvasLayer } from "@/modules/edit/components/overlays-canvas-layer";
 import { MusicPanel } from "@/modules/edit/components/music-panel";
 import { Timeline } from "@/modules/edit/components/timeline-ruler";
+import { loadDraft, saveDraft, clearDraft, draftKeyFor } from "@/modules/edit/utils/draft";
 
 const FPS = 30;
+
+// Identifies which composition a saved draft belongs to — if the user opens
+// a different video, a stale draft from a previous one won't get applied.
+function draftSignature(compositionProps) {
+  return [
+    compositionProps.source,
+    compositionProps.avatarVideoUrl,
+    compositionProps.ctaVideoUrl,
+    compositionProps.part2AudioUrl,
+  ].join("|");
+}
 
 function createOverlay(type) {
   const id = `${type}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -41,12 +56,14 @@ function createOverlay(type) {
   return { id, type: "image", x: 50, y: 50, width: 40, url: "", aspect: null, hidden: false };
 }
 
-function buildBaseRenderProps(compositionProps, overlays = [], music = null) {
+function buildBaseRenderProps(compositionProps, overlays = [], music = null, cutRanges = []) {
   return {
     ...compositionProps,
     overlays,
     musicUrl:              music?.url || "",
     musicTrimStartSeconds: music?.trimStart || 0,
+    musicVolume:           music?.volume ?? 0.25,
+    cutRanges,
     brollClips: clampBrollClips({
       avatarDuration: compositionProps.avatarDuration,
       brollClips:     compositionProps.brollClips,
@@ -76,7 +93,7 @@ function formatTime(seconds) {
 // compositionProps comes from a reducer and is a stable reference during playback,
 // so this component only re-renders when the user actually changes the composition.
 const PlayerContainer = memo(
-  forwardRef(function PlayerContainer({ compositionProps, durationInFrames, overlays, music }, ref) {
+  forwardRef(function PlayerContainer({ compositionProps, durationInFrames, overlays, music, cutRanges }, ref) {
     const clampedBrollClips = clampBrollClips({
       avatarDuration: compositionProps.avatarDuration,
       brollClips:     compositionProps.brollClips,
@@ -98,6 +115,8 @@ const PlayerContainer = memo(
       overlays:       overlays || [],
       musicUrl:              music?.url || "",
       musicTrimStartSeconds: music?.trimStart || 0,
+      musicVolume:           music?.volume ?? 0.25,
+      cutRanges:             cutRanges || [],
     };
 
     return (
@@ -118,28 +137,41 @@ const PlayerContainer = memo(
 );
 
 export function Editor({ compositionProps, onExit }) {
+  const signature = draftSignature(compositionProps);
+  const draftKey = draftKeyFor(compositionProps);
+  // Read once per mount — a draft only ever applies to the composition it
+  // was saved for, so a different video never inherits stale edits.
+  const [initialDraft] = useState(() => {
+    const stored = loadDraft(draftKey);
+    return stored && stored.signature === signature ? stored : null;
+  });
+
   const [rendering, setRendering] = useState(false);
   const [renderProgress, setRenderProgress] = useState(0);
   const [renderStatus, setRenderStatus] = useState("");
   const [renderError, setRenderError] = useState(null);
-  const [activePanel, setActivePanel] = useState(null);
-  const [captionState, setCaptionState] = useState({
-    preset: null, status: "idle", progress: 0, message: "", videoUrl: null, error: null,
-  });
+  const [activePanel, setActivePanel] = useState(initialDraft?.activePanel ?? null);
+  const [captionState, setCaptionState] = useState(
+    initialDraft?.captionState || { preset: null, status: "idle", progress: 0, message: "", videoUrl: null, error: null }
+  );
   const [captionDraft, setCaptionDraft] = useState(null);
 
-  const [overlays, setOverlays] = useState([]);
+  const [overlays, setOverlays] = useState(initialDraft?.overlays || []);
   const [selectedOverlayId, setSelectedOverlayId] = useState(null);
   const [editingOverlayId, setEditingOverlayId] = useState(null);
   const [overlayUploading, setOverlayUploading] = useState(false);
   const canvasBoxRef = useRef(null);
 
-  const [music, setMusic] = useState(null); // { key, url, name, trimStart } | null
+  const [music, setMusic] = useState(initialDraft?.music || null); // { key, url, name, trimStart } | null
+
+  const [cutRanges, setCutRanges] = useState(initialDraft?.cutRanges || []); // [{ start, end }] in the ORIGINAL (uncut) timeline
+
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
 
   const playerRef = useRef(null);
   const [playing, setPlaying] = useState(false);
   const [frame, setFrame] = useState(0);
-  const [trim, setTrim] = useState({ in: 0, out: 0 });
+  const [trim, setTrim] = useState(initialDraft?.trim || { in: 0, out: 0 });
 
   const captionVideoRef = useRef(null);
   const [captionPlaying, setCaptionPlaying] = useState(false);
@@ -148,20 +180,44 @@ export function Editor({ compositionProps, onExit }) {
 
   const sourceConfig = EDITABLE_SOURCES[compositionProps.source] || {};
 
-  // Computed for the timeline ruler and time display only — not passed to PlayerContainer.
-  const durationInFrames = calcDurationInFrames({
+  const clampedBrollClipsForDuration = clampBrollClips({
     avatarDuration: compositionProps.avatarDuration,
-    brollClips: clampBrollClips({
-      avatarDuration: compositionProps.avatarDuration,
-      brollClips:     compositionProps.brollClips,
-      ctaDuration:    compositionProps.ctaDuration,
-      showIntro:      false,
-      showOutro:      false,
-    }),
-    ctaDuration: compositionProps.ctaDuration,
-    showIntro:   false,
-    showOutro:   false,
+    brollClips:     compositionProps.brollClips,
+    ctaDuration:    compositionProps.ctaDuration,
+    showIntro:      false,
+    showOutro:      false,
   });
+
+  // Length of the raw, uncut reel — cutRanges (from the ruler's Cut tool)
+  // are stored in this original timeline's frame coordinates.
+  const originalDurationInFrames = calcDurationInFrames({
+    avatarDuration: compositionProps.avatarDuration,
+    brollClips:     clampedBrollClipsForDuration,
+    ctaDuration:    compositionProps.ctaDuration,
+    showIntro:      false,
+    showOutro:      false,
+  });
+
+  // What the Player/Timeline actually work with — the reel's length after
+  // cuts ripple everything shorter. Must match calcSeedanceReelDurationInFrames
+  // used server-side, so preview and export always agree.
+  const durationInFrames = calcSeedanceReelDurationInFrames({
+    avatarDuration: compositionProps.avatarDuration,
+    brollClips:     clampedBrollClipsForDuration,
+    ctaDuration:    compositionProps.ctaDuration,
+    showIntro:      false,
+    showOutro:      false,
+    cutRanges,
+  });
+
+  const { keepRanges } = applyCutRanges(originalDurationInFrames, cutRanges);
+
+  // Autosave the edit — so leaving the editor (or refreshing) never loses
+  // overlays/music/cuts/trim/caption progress for this composition, and it
+  // shows up as a resumable card on the /app/edit drafts dashboard.
+  useEffect(() => {
+    saveDraft(draftKey, { signature, compositionProps, overlays, music, cutRanges, trim, captionState, activePanel });
+  }, [draftKey, signature, compositionProps, overlays, music, cutRanges, trim, captionState, activePanel]);
 
   useEffect(() => {
     const player = playerRef.current;
@@ -241,7 +297,7 @@ export function Editor({ compositionProps, onExit }) {
       const trimOutFrame = trim.out > 0 ? trim.out : durationInFrames;
 
       const renderProps = {
-        ...buildBaseRenderProps(compositionProps, overlays, music),
+        ...buildBaseRenderProps(compositionProps, overlays, music, cutRanges),
         trimInFrame,
         trimOutFrame,
       };
@@ -305,7 +361,7 @@ export function Editor({ compositionProps, onExit }) {
       const res = await fetch(sourceConfig.renderEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildBaseRenderProps(compositionProps, overlays, music)),
+        body: JSON.stringify(buildBaseRenderProps(compositionProps, overlays, music, cutRanges)),
       });
 
       if (!res.ok) throw new Error(`Render failed: ${res.status}`);
@@ -420,14 +476,57 @@ export function Editor({ compositionProps, onExit }) {
   const handleStopEditOverlay = () => setEditingOverlayId(null);
 
   const handleSelectMusic = (track) => {
-    setMusic({ key: track.key, url: track.url, name: track.name, trimStart: 0 });
+    setMusic({ key: track.key, url: track.url, name: track.name, trimStart: 0, volume: 0.25 });
   };
 
   const handleTrimMusic = (trimStart) => {
     setMusic((prev) => (prev ? { ...prev, trimStart } : prev));
   };
 
+  const handleVolumeMusic = (volume) => {
+    setMusic((prev) => (prev ? { ...prev, volume } : prev));
+  };
+
   const handleClearMusic = () => setMusic(null);
+
+  // start/end here are VIRTUAL (already-cut) frame positions from the ruler —
+  // map them back to the original timeline before storing, so the excluded
+  // range survives future cuts/ripples correctly.
+  const handleDeleteSegment = (virtualStart, virtualEnd) => {
+    const originalRanges = mapVirtualRangeToOriginal(virtualStart, virtualEnd, keepRanges);
+    if (originalRanges.length === 0) return;
+    setCutRanges((prev) => [...prev, ...originalRanges]);
+    const seekTarget = Math.max(0, virtualStart - 1);
+    setFrame(seekTarget);
+    playerRef.current?.seekTo(seekTarget);
+  };
+
+  const handleRestoreLastCut = () => {
+    setCutRanges((prev) => prev.slice(0, -1));
+  };
+
+  const hasDraftContent =
+    overlays.length > 0 ||
+    cutRanges.length > 0 ||
+    !!music ||
+    trim.in > 0 ||
+    trim.out > 0 ||
+    captionState.status === "done";
+
+  const handleDiscardDraft = () => {
+    clearDraft(draftKey);
+    setOverlays([]);
+    setSelectedOverlayId(null);
+    setEditingOverlayId(null);
+    setMusic(null);
+    setCutRanges([]);
+    setTrim({ in: 0, out: 0 });
+    setCaptionState({ preset: null, status: "idle", progress: 0, message: "", videoUrl: null, error: null });
+    setCaptionDraft(null);
+    setActivePanel(null);
+    setShowDiscardConfirm(false);
+    toast.success("Draft discarded — back to the original reel.");
+  };
 
   return (
     <div className="absolute inset-x-0 bottom-0 top-12 z-10 bg-[#fafbfc] flex flex-col overflow-hidden">
@@ -441,6 +540,17 @@ export function Editor({ compositionProps, onExit }) {
           >
             Back
           </Button>
+          {hasDraftContent && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setShowDiscardConfirm(true)}
+              className="h-8 text-xs gap-1.5 text-muted-foreground hover:text-destructive"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Discard draft
+            </Button>
+          )}
           <div>
             <h1 className="text-base font-bold font-heading tracking-tight">Edit Reel</h1>
             <p className="text-xs text-muted-foreground truncate max-w-xs">{compositionProps.name || "Untitled reel"}</p>
@@ -501,6 +611,7 @@ export function Editor({ compositionProps, onExit }) {
                 durationInFrames={durationInFrames}
                 overlays={overlays}
                 music={music}
+                cutRanges={cutRanges}
               />
             )}
 
@@ -597,6 +708,7 @@ export function Editor({ compositionProps, onExit }) {
                     reelDurationSeconds={durationInFrames / FPS}
                     onSelect={handleSelectMusic}
                     onTrimChange={handleTrimMusic}
+                    onVolumeChange={handleVolumeMusic}
                     onClear={handleClearMusic}
                   />
                 )}
@@ -668,6 +780,9 @@ export function Editor({ compositionProps, onExit }) {
             playerRef.current?.seekTo(f);
           }}
           onTrimChange={({ trimIn, trimOut }) => setTrim({ in: trimIn, out: trimOut })}
+          onDeleteSegment={handleDeleteSegment}
+          cutCount={cutRanges.length}
+          onRestoreLastCut={handleRestoreLastCut}
           onToolbarAction={(action) => {
             if (!action?.startsWith("add:")) return;
             const panel = action.slice(4);
@@ -675,6 +790,31 @@ export function Editor({ compositionProps, onExit }) {
           }}
         />
       </div>
+
+      <Dialog open={showDiscardConfirm} onOpenChange={setShowDiscardConfirm}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-4 h-4 text-destructive" />
+              </div>
+              <DialogTitle>Discard draft?</DialogTitle>
+            </div>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            This removes all overlays, music, cuts, trim, and captions you&apos;ve added and goes back to the
+            original reel. This can&apos;t be undone.
+          </p>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="ghost" onClick={() => setShowDiscardConfirm(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDiscardDraft}>
+              Discard draft
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

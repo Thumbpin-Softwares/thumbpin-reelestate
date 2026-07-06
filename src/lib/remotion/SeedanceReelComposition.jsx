@@ -14,6 +14,7 @@ import { Audio } from "@remotion/media";
 import { IntroAnimation } from "./IntroAnimation";
 import { OutroAnimation } from "./OutroAnimation";
 import { getOverlayFontCss, hexToRgba } from "./overlay-fonts";
+import { calcDurationInFrames, applyCutRanges } from "./duration";
 
 /**
  * A user-placed text or image overlay that stays on screen for the whole
@@ -85,7 +86,7 @@ function FadeContent({ children, totalFrames, fade, fadeIn = true, fadeOut = tru
  *   ctaDuration     — CTA video length in seconds (default 10)
  *   ctaText         — text shown in outro card
  */
-export function SeedanceReelComposition({
+function ReelContent({
   avatarVideoUrl = "",
   brollClips     = [],
   ctaVideoUrl    = "",
@@ -104,6 +105,7 @@ export function SeedanceReelComposition({
   overlays       = [],
   musicUrl              = "",
   musicTrimStartSeconds = 0,
+  musicVolume           = 0.25,
 }) {
   const { fps } = useVideoConfig();
   const { isRendering } = getRemotionEnvironment();
@@ -240,11 +242,62 @@ export function SeedanceReelComposition({
         <Audio
           src={musicUrl}
           trimBefore={Math.round(musicTrimStartSeconds * fps)}
-          volume={0.25}
+          volume={musicVolume}
         />
       )}
     </AbsoluteFill>
   );
+}
+
+function originalDurationFor(props) {
+  return calcDurationInFrames({
+    avatarDuration: props.avatarDuration,
+    brollClips:     props.brollClips,
+    ctaDuration:    props.ctaDuration,
+    showIntro:      props.showIntro,
+    showOutro:      props.showOutro,
+  });
+}
+
+/**
+ * Wraps ReelContent with support for the editor's Cut tool: `cutRanges` is a
+ * list of { start, end } frame ranges (in the *original*, uncut timeline)
+ * that the user deleted. Each surviving chunk is re-mounted as its own pair
+ * of nested Sequences — the outer one places it at its new, rippled
+ * position; the inner one re-bases time back to the original frame it
+ * should render, via a negative `from` (Remotion shifts child frames by
+ * `parentFrame - from`, so a negative `from` shifts them forward).
+ *
+ * The exact same wrapper renders both the live <Player> preview and the
+ * server-side export, so what you cut in the editor is what gets rendered.
+ */
+export function SeedanceReelComposition({ cutRanges = [], ...rest }) {
+  const totalOriginalFrames = originalDurationFor(rest);
+  const { keepRanges } = applyCutRanges(totalOriginalFrames, cutRanges);
+
+  if (keepRanges.length === 0) {
+    return <AbsoluteFill style={{ backgroundColor: "#000000" }} />;
+  }
+
+  return (
+    <AbsoluteFill style={{ backgroundColor: "#000000" }}>
+      {keepRanges.map((kr, i) => (
+        <Sequence key={i} from={kr.virtualStart} durationInFrames={kr.virtualEnd - kr.virtualStart}>
+          <Sequence from={-kr.originalStart} durationInFrames={totalOriginalFrames - kr.originalStart}>
+            <ReelContent {...rest} />
+          </Sequence>
+        </Sequence>
+      ))}
+    </AbsoluteFill>
+  );
+}
+
+/** Total composition length after cuts — use this (not the raw calcDurationInFrames)
+ * anywhere the actual Player/export duration is needed once cuts are in play. */
+export function calcSeedanceReelDurationInFrames({ cutRanges = [], ...rest }) {
+  const total = originalDurationFor(rest);
+  const { keptDurationInFrames } = applyCutRanges(total, cutRanges);
+  return Math.max(1, keptDurationInFrames);
 }
 
 export { calcDurationInFrames } from "./duration";

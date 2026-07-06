@@ -43,10 +43,14 @@ function useVideos() {
   return { videos, pagination, fetching, load };
 }
 
-export function VideoPicker({ onSelect }) {
-  const { videos, pagination, fetching, load } = useVideos();
+export function VideoPicker({ onSelect, hideHeader = false, excludeIds = [] }) {
+  const { videos: allVideos, pagination, fetching, load } = useVideos();
   const [previewVideo, setPreviewVideo] = useState(null);
   const [selectingId, setSelectingId] = useState(null);
+
+  const videos = allVideos && excludeIds.length > 0
+    ? allVideos.filter((v) => !excludeIds.includes(v.id))
+    : allVideos;
 
   async function handleEditClick(video) {
     if (selectingId) return;
@@ -68,12 +72,14 @@ export function VideoPicker({ onSelect }) {
   const loading = videos === null;
 
   return (
-    <div className="py-10 space-y-6 sm:px-8 px-0">
+    <div className={hideHeader ? "space-y-6" : "py-10 space-y-6 sm:px-8 px-0"}>
       {/* Header */}
-      <div className="border-b border-black pb-4">
-        <h1 className="text-4xl font-heading tracking-tight">Edit a Video</h1>
-        <p className="text-sm text-muted-foreground mt-1">Pick a video below to open it in the editor</p>
-      </div>
+      {!hideHeader && (
+        <div className="border-b border-black pb-4">
+          <h1 className="text-4xl font-heading tracking-tight">Edit a Video</h1>
+          <p className="text-sm text-muted-foreground mt-1">Pick a video below to open it in the editor</p>
+        </div>
+      )}
 
       {/* Loading skeleton */}
       {loading && (

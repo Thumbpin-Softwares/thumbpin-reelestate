@@ -1,17 +1,54 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Captions, Music, Scissors, Type } from "lucide-react";
+import { Captions, Scissors, SplitSquareHorizontal, Trash2, Undo2 } from "lucide-react";
+
+function SplitMarker({ frame, durationInFrames, containerRef, minFrame, maxFrame, onMove, onRemove }) {
+  const dragRef = useRef(null);
+
+  const handlePointerDown = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = containerRef.current.getBoundingClientRect();
+    dragRef.current = { startX: e.clientX, startFrame: frame, rectW: rect.width };
+
+    const handleMove = (ev) => {
+      const d = dragRef.current;
+      if (!d) return;
+      const deltaFrames = ((ev.clientX - d.startX) / d.rectW) * durationInFrames;
+      onMove(Math.round(Math.min(maxFrame, Math.max(minFrame, d.startFrame + deltaFrames))));
+    };
+    const handleUp = () => {
+      dragRef.current = null;
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", handleUp);
+    };
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerup", handleUp);
+  };
+
+  return (
+    <div
+      onPointerDown={handlePointerDown}
+      onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); onRemove(); }}
+      className="absolute top-0 bottom-0 w-2.5 -ml-1.25 z-20 cursor-ew-resize flex justify-center group"
+      style={{ left: `${(frame / durationInFrames) * 100}%` }}
+      title="Drag to adjust — double-click to remove"
+    >
+      <div className="w-0.5 h-full bg-neutral-900 group-hover:bg-destructive transition-colors" />
+    </div>
+  );
+}
 
 const TOOLBAR_ACTIONS = [
-  { id: "trim",     label: "Trim",                   Icon: Scissors },
-  { id: "captions", label: "Captions",                Icon: Captions },
-  { id: "music",    label: "Music",                   Icon: Music },
-  { id: "overlays", label: "Text / Image Overlays",   Icon: Type },
+  { id: "trim",     label: "Trim",     Icon: Scissors },
+  { id: "captions", label: "Captions", Icon: Captions },
+  { id: "cut",      label: "Cut",      Icon: SplitSquareHorizontal },
 ];
 
-const HANDLE_HIT_PX = 10;
-const PEAK_BUCKETS  = 300;
+const HANDLE_HIT_PX  = 10;
+const PEAK_BUCKETS   = 300;
+const MIN_SPLIT_GAP_S = 0.15; // don't allow two split points closer than this
 
 function useWaveformPeaks(audioUrl) {
   const [peaks, setPeaks]     = useState(null);
@@ -121,10 +158,11 @@ export function Timeline({
   onSeek,
   onToolbarAction,
   onTrimChange,
+  onDeleteSegment,
+  onRestoreLastCut,
+  cutCount  = 0,
   audioUrl  = null,
   captions  = [],
-  music     = [],
-  overlays  = [],
 }) {
   const [activeAction, setActiveAction] = useState("trim");
   const prevCaptionsCount = useRef(captions.length);
@@ -143,6 +181,19 @@ export function Timeline({
   const [trimOut, setTrimOut] = useState(durationInFrames);
   const effectiveTrimOut = trimOut > 0 ? trimOut : durationInFrames;
 
+  // Cut tool: split points are ephemeral (frame positions on the *current*,
+  // already-cut timeline) used only to divide it into deletable segments.
+  // They reset whenever the timeline's length changes — e.g. right after a
+  // delete ripples everything shorter — since old positions no longer apply.
+  const [splitPoints, setSplitPoints] = useState([]);
+  const [selectedSegmentIdx, setSelectedSegmentIdx] = useState(null);
+  const [prevDurationForCut, setPrevDurationForCut] = useState(durationInFrames);
+  if (durationInFrames !== prevDurationForCut) {
+    setPrevDurationForCut(durationInFrames);
+    setSplitPoints([]);
+    setSelectedSegmentIdx(null);
+  }
+
   const { peaks, loading: waveformLoading } = useWaveformPeaks(audioUrl);
 
   const totalSeconds = durationInFrames / fps;
@@ -150,6 +201,57 @@ export function Timeline({
   const playheadPct  = durationInFrames > 0 ? (frame / durationInFrames) * 100 : 0;
   const trimInPct    = durationInFrames > 0 ? (trimIn          / durationInFrames) * 100 : 0;
   const trimOutPct   = durationInFrames > 0 ? (effectiveTrimOut / durationInFrames) * 100 : 100;
+
+  const cutSegments = (() => {
+    const bounds = [0, ...splitPoints, durationInFrames].sort((a, b) => a - b);
+    const segs = [];
+    for (let i = 0; i < bounds.length - 1; i++) {
+      if (bounds[i + 1] > bounds[i]) segs.push({ start: bounds[i], end: bounds[i + 1] });
+    }
+    return segs;
+  })();
+
+  const minGapFrames = Math.max(1, Math.round(fps * MIN_SPLIT_GAP_S));
+
+  const addSplitPoint = (f) => {
+    const tooClose = [0, durationInFrames, ...splitPoints].some((b) => Math.abs(b - f) < minGapFrames);
+    if (!tooClose) setSplitPoints((prev) => [...prev, f].sort((a, b) => a - b));
+  };
+
+  // Blade/razor tool: split exactly at the current playhead — no need to
+  // eyeball a click on the ruler (or "watch" the section) to find the spot,
+  // just scrub the playhead there first, like Premiere/iMovie's razor tool.
+  const handleSplitAtPlayhead = () => addSplitPoint(Math.round(frame));
+
+  const handleMoveSplitPoint = (idx, nextFrame) => {
+    setSplitPoints((prev) => {
+      const next = [...prev];
+      next[idx] = nextFrame;
+      return next;
+    });
+    setSelectedSegmentIdx(null);
+  };
+
+  const handleRemoveSplitPoint = (idx) => {
+    setSplitPoints((prev) => prev.filter((_, i) => i !== idx));
+    setSelectedSegmentIdx(null);
+  };
+
+  // Nearest split point to the playhead, within snapping distance — lets the
+  // toolbar button remove it without having to grab the thin marker by hand.
+  const splitAtPlayheadIdx = (() => {
+    let bestIdx = -1;
+    let bestDist = Infinity;
+    splitPoints.forEach((sp, idx) => {
+      const dist = Math.abs(sp - frame);
+      if (dist < bestDist) { bestDist = dist; bestIdx = idx; }
+    });
+    return bestDist <= minGapFrames ? bestIdx : -1;
+  })();
+
+  const handleRemoveSplitAtPlayhead = () => {
+    if (splitAtPlayheadIdx !== -1) handleRemoveSplitPoint(splitAtPlayheadIdx);
+  };
 
   const scrubRef     = useRef(null);
   const dragging     = useRef(false);
@@ -217,10 +319,12 @@ export function Timeline({
     draggingTrim.current = null;
   };
 
-  const trackData   = { captions, music, overlays };
-  const activeItems = (activeAction && activeAction !== "trim") ? (trackData[activeAction] ?? []) : [];
-  const showTrack   = activeAction && activeAction !== "trim";
+  const activeItems = activeAction === "captions" ? captions : [];
+  const showTrack   = activeAction === "captions";
   const showTrim    = activeAction === "trim";
+  const showCut     = activeAction === "cut";
+
+  const selectedSegment = selectedSegmentIdx !== null ? cutSegments[selectedSegmentIdx] : null;
 
   return (
     <div className="w-full rounded-2xl border border-border/50 bg-white overflow-hidden">
@@ -253,11 +357,53 @@ export function Timeline({
             {formatTime(trimIn / fps)} – {formatTime(effectiveTrimOut / fps)}
           </span>
         )}
+
+        {showCut && (
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={handleSplitAtPlayhead}
+              className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-neutral-900 text-[#c7f038] hover:opacity-90 transition-colors"
+            >
+              <Scissors className="w-3 h-3" />
+              Split at playhead
+            </button>
+            {splitAtPlayheadIdx !== -1 && (
+              <button
+                onClick={handleRemoveSplitAtPlayhead}
+                className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+              >
+                <Undo2 className="w-3 h-3" />
+                Remove split here
+              </button>
+            )}
+            {selectedSegment && (
+              <button
+                onClick={() => {
+                  onDeleteSegment?.(selectedSegment.start, selectedSegment.end);
+                  setSelectedSegmentIdx(null);
+                }}
+                className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
+              >
+                <Trash2 className="w-3 h-3" />
+                Delete clip
+              </button>
+            )}
+            {cutCount > 0 && (
+              <button
+                onClick={() => onRestoreLastCut?.()}
+                className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+              >
+                <Undo2 className="w-3 h-3" />
+                Undo last cut
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Ruler + optional track */}
       <div className="flex">
-        {(showTrack || showTrim) && (
+        {(showTrack || showTrim || showCut) && (
           <div className="w-28 shrink-0 border-r border-border/50">
             <div className="h-8 border-b border-border/40 bg-muted/30" />
             <div className="h-20 flex items-center px-3 text-[11px] text-muted-foreground font-medium capitalize">
@@ -336,7 +482,48 @@ export function Timeline({
             </div>
           )}
 
-          {/* Active track row (captions / music / overlays) */}
+          {/* Cut track row — click to split, click a clip to select it for deletion */}
+          {showCut && durationInFrames > 0 && (
+            <div className="relative h-20 bg-white">
+              {cutSegments.map((seg, idx) => (
+                <div
+                  key={`${seg.start}-${seg.end}`}
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    setSelectedSegmentIdx((prev) => (prev === idx ? null : idx));
+                  }}
+                  className={`absolute inset-y-1.5 rounded-md border flex items-center justify-center cursor-pointer transition-colors ${
+                    selectedSegmentIdx === idx
+                      ? "bg-destructive/15 border-destructive/60"
+                      : "bg-[#c7f038]/15 border-[#c7f038]/40 hover:bg-[#c7f038]/25"
+                  }`}
+                  style={{
+                    left:  `${(seg.start / durationInFrames) * 100}%`,
+                    width: `${((seg.end - seg.start) / durationInFrames) * 100}%`,
+                  }}
+                >
+                  <span className="text-[10px] font-medium text-neutral-600 truncate px-1">
+                    {formatTime(seg.start / fps)} – {formatTime(seg.end / fps)}
+                  </span>
+                </div>
+              ))}
+              {/* Split markers — draggable to nudge, double-click to remove */}
+              {splitPoints.map((sp, idx) => (
+                <SplitMarker
+                  key={sp}
+                  frame={sp}
+                  durationInFrames={durationInFrames}
+                  containerRef={scrubRef}
+                  minFrame={(idx === 0 ? 0 : splitPoints[idx - 1]) + minGapFrames}
+                  maxFrame={(idx === splitPoints.length - 1 ? durationInFrames : splitPoints[idx + 1]) - minGapFrames}
+                  onMove={(next) => handleMoveSplitPoint(idx, next)}
+                  onRemove={() => handleRemoveSplitPoint(idx)}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Active track row (captions) */}
           {showTrack && (
             <div className="relative h-20 bg-white">
               {activeItems.length === 0 ? (

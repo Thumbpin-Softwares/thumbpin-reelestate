@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Music, Pause, Play, X } from "lucide-react";
+import { Loader2, Music, Pause, Play, Volume2, X } from "lucide-react";
 
 function formatTime(seconds) {
   const clamped = Math.max(0, seconds || 0);
@@ -21,7 +21,7 @@ function formatTime(seconds) {
  * the trim start, so the user picks which section of the track plays under
  * the video instead of always using the beginning.
  */
-export function MusicPanel({ music, reelDurationSeconds, onSelect, onTrimChange, onClear }) {
+export function MusicPanel({ music, reelDurationSeconds, onSelect, onTrimChange, onVolumeChange, onClear }) {
   const [tracks, setTracks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [previewingKey, setPreviewingKey] = useState(null);
@@ -88,6 +88,21 @@ export function MusicPanel({ music, reelDurationSeconds, onSelect, onTrimChange,
     el.src = track.url;
     el.currentTime = 0;
   };
+
+  // The panel unmounts whenever the user switches to another tab (only
+  // rendered while active), so a track selected earlier needs to be
+  // re-loaded into the fresh <audio> element on remount — otherwise
+  // `duration` never gets set and the ruler is stuck on "Loading track…".
+  useEffect(() => {
+    if (music) loadTrack(music);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [music?.key]);
+
+  // Keep the preview's playback volume matching whatever will actually be
+  // baked into the export.
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = music?.volume ?? 0.25;
+  }, [music?.volume]);
 
   const toggleRowPreview = (track) => {
     const el = audioRef.current;
@@ -159,59 +174,6 @@ export function MusicPanel({ music, reelDurationSeconds, onSelect, onTrimChange,
         Pick a background track, preview it, then drag the window to choose which part plays under your reel.
       </p>
 
-      {music && (
-        <div className="flex flex-col gap-2 rounded-xl border border-border/50 p-3">
-          <div className="flex items-center justify-between gap-2">
-            <span className="flex items-center gap-1.5 text-xs font-semibold truncate">
-              <Music className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">{music.name}</span>
-            </span>
-            <button onClick={onClear} className="text-muted-foreground hover:text-destructive shrink-0">
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          {duration > 0 ? (
-            <>
-              <div
-                ref={rulerRef}
-                className="relative h-10 rounded-lg bg-neutral-200 overflow-hidden select-none"
-              >
-                <div
-                  onPointerDown={handleWindowPointerDown}
-                  className={`absolute inset-y-0 rounded-md border-2 border-[#c7f038] bg-[#c7f038]/30 ${
-                    maxTrimStart > 0 ? "cursor-grab active:cursor-grabbing" : ""
-                  }`}
-                  style={{ left: `${windowLeftPercent}%`, width: `${windowWidthPercent}%` }}
-                />
-              </div>
-              <div className="flex items-center justify-between text-[10px] text-muted-foreground tabular-nums">
-                <span>{formatTime(music.trimStart)} – {formatTime(music.trimStart + reelDurationSeconds)}</span>
-                <span>of {formatTime(duration)}</span>
-              </div>
-            </>
-          ) : (
-            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-              <Loader2 className="w-3 h-3 animate-spin" />
-              Loading track…
-            </div>
-          )}
-
-          <button
-            onClick={toggleSelectedPreview}
-            disabled={duration === 0}
-            className="flex items-center justify-center gap-1.5 rounded-lg border border-border/50 py-1.5 text-xs font-medium hover:bg-muted/40 transition-colors disabled:opacity-50"
-          >
-            {previewingKey === music.key && isPlaying ? (
-              <Pause className="w-3.5 h-3.5" />
-            ) : (
-              <Play className="w-3.5 h-3.5" />
-            )}
-            Preview selection
-          </button>
-        </div>
-      )}
-
       <div className="flex flex-col gap-1">
         <label className="text-[11px] font-medium text-muted-foreground">Library</label>
 
@@ -260,24 +222,73 @@ export function MusicPanel({ music, reelDurationSeconds, onSelect, onTrimChange,
                 </button>
               </div>
 
-              {isRowPreviewing && (
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-muted-foreground tabular-nums w-8">{formatTime(currentTime)}</span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={duration || 0}
-                    step={0.1}
-                    value={currentTime}
-                    onChange={(e) => {
-                      const el = audioRef.current;
-                      if (!el) return;
-                      previewWindowRef.current = false;
-                      el.currentTime = Number(e.target.value);
-                    }}
-                    className="flex-1"
-                  />
-                  <span className="text-[10px] text-muted-foreground tabular-nums w-8">{formatTime(duration)}</span>
+              {isSelected && (
+                <div className="flex flex-col gap-2 pt-1 border-t border-border/40 mt-1">
+                  {duration > 0 ? (
+                    <>
+                      <label className="text-[11px] font-medium text-muted-foreground">Section</label>
+                      <div
+                        ref={rulerRef}
+                        className="relative h-10 rounded-lg bg-neutral-200 overflow-hidden select-none"
+                      >
+                        <div
+                          onPointerDown={handleWindowPointerDown}
+                          className={`absolute inset-y-0 rounded-md border-2 border-[#c7f038] bg-[#c7f038]/30 ${
+                            maxTrimStart > 0 ? "cursor-grab active:cursor-grabbing" : ""
+                          }`}
+                          style={{ left: `${windowLeftPercent}%`, width: `${windowWidthPercent}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] text-muted-foreground tabular-nums">
+                        <span>{formatTime(music.trimStart)} – {formatTime(music.trimStart + reelDurationSeconds)}</span>
+                        <span>of {formatTime(duration)}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      Loading track…
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1.5">
+                      <Volume2 className="w-3.5 h-3.5" />
+                      Volume ({Math.round((music.volume ?? 0.25) * 100)}%)
+                    </label>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={Math.round((music.volume ?? 0.25) * 100)}
+                      onChange={(e) => {
+                        const volume = Number(e.target.value) / 100;
+                        if (audioRef.current) audioRef.current.volume = volume;
+                        onVolumeChange(volume);
+                      }}
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={toggleSelectedPreview}
+                      disabled={duration === 0}
+                      className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-border/50 py-1.5 text-xs font-medium hover:bg-muted/40 transition-colors disabled:opacity-50"
+                    >
+                      {previewingKey === music.key && isPlaying ? (
+                        <Pause className="w-3.5 h-3.5" />
+                      ) : (
+                        <Play className="w-3.5 h-3.5" />
+                      )}
+                      Preview selection
+                    </button>
+                    <button
+                      onClick={onClear}
+                      className="shrink-0 text-muted-foreground hover:text-destructive p-1.5"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

@@ -1,5 +1,5 @@
 import { Composition } from "remotion";
-import { SeedanceReelComposition } from "./SeedanceReelComposition";
+import { SeedanceReelComposition, calcSeedanceReelDurationInFrames } from "./SeedanceReelComposition";
 import { NewsAnchorComposition } from "./NewsAnchorComposition";
 import { BrollComposition, calcBrollDurationInFrames } from "./BrollComposition";
 import { ActionReelComposition } from "./ActionReelComposition";
@@ -23,14 +23,16 @@ export const RemotionRoot = () => {
           avatarDuration: 15,
           ctaDuration: 10,
           ctaText: "",
+          cutRanges: [],
         }}
         calculateMetadata={async ({ props }) => ({
-          durationInFrames: calcDurationInFrames({
+          durationInFrames: calcSeedanceReelDurationInFrames({
             avatarDuration: props.avatarDuration,
             brollClips:     props.brollClips,
             ctaDuration:    props.ctaDuration,
             showIntro:      props.showIntro,
             showOutro:      props.showOutro,
+            cutRanges:      props.cutRanges,
           }),
         })}
       />
