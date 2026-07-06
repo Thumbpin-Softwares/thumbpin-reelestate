@@ -80,10 +80,33 @@ export async function PATCH(request) {
     const id = searchParams.get("id");
     if (!id) return NextResponse.json({ error: "Missing asset ID" }, { status: 400 });
 
-    const { name } = await request.json();
-    if (!name?.trim()) return NextResponse.json({ error: "Name is required" }, { status: 400 });
+    const { name, thumbnailUrl } = await request.json();
+    if (!name?.trim() && !thumbnailUrl) {
+      return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
+    }
 
     await dbConnect();
+
+    if (thumbnailUrl) {
+      // Reorder metadata.urls so the chosen photo is first — every place that
+      // renders a collection's cover (the pipeline's presenter picker, the
+      // Asset Library) reads urls[0]/asset.url as the thumbnail.
+      const asset = await Asset.findOne({ _id: id, userId });
+      if (!asset) return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+
+      const urls = asset.metadata?.urls;
+      if (!Array.isArray(urls) || !urls.includes(thumbnailUrl)) {
+        return NextResponse.json({ error: "Photo not found in this collection" }, { status: 400 });
+      }
+
+      asset.metadata = { ...asset.metadata, urls: [thumbnailUrl, ...urls.filter((u) => u !== thumbnailUrl)] };
+      asset.url = thumbnailUrl;
+      if (name?.trim()) asset.name = name.trim();
+      await asset.save();
+
+      return NextResponse.json({ success: true, asset });
+    }
+
     const asset = await Asset.findOneAndUpdate(
       { _id: id, userId },
       { name: name.trim() },
