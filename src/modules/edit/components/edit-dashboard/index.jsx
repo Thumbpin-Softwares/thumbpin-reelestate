@@ -91,7 +91,7 @@ export function EditDashboard({ onOpen }) {
         {drafts.length > 0 && (
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Start a new edit</h2>
         )}
-        <VideoPicker onSelect={onOpen} hideHeader={drafts.length > 0} excludeIds={draftAssetIds} />
+        <VideoPicker onSelect={onOpen} hideHeader excludeIds={draftAssetIds} />
       </div>
 
       <Dialog open={!!pendingDelete} onOpenChange={(open) => !open && setPendingDelete(null)}>

@@ -1,13 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { useRouter } from "next/navigation";
-import {
-  EDITABLE_SOURCES,
-  COMPOSITION_STORAGE_KEY,
-  EDIT_PATH,
-  buildCompositionFromAsset,
-} from "@/lib/editable-sources";
+import { useState, useRef, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,126 +13,126 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { useAssets } from "@/hooks/use-assets";
 import { toast } from "sonner";
 import {
   Search,
   Upload,
   Eye,
-  CheckCircle,
   Trash2,
   Loader2,
   ImagePlus,
-  Sparkles,
-  Package,
   PenLine,
-  Play,
-  MoreVertical,
-  Pencil,
+  ChevronLeft,
+  ChevronRight,
+  Star,
   X,
 } from "lucide-react";
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
-// ─── Presenter Collection Card ────────────────────────────────────────────────
-function PresenterCollectionCard({ asset, onRename, onDelete, deleting }) {
+// ─── Collection Card ──────────────────────────────────────────────────────────
+// Same design as the "Choose Your Presenter" step in the pipeline: a cover
+// thumbnail with a "View" pill that only appears on hover (always visible on
+// touch), opening a swipeable carousel with all the collection's photos.
+// Used for both your own avatar collections (editable) and the shared RE
+// Agents pool (view-only).
+function CollectionCard({
+  name,
+  images,
+  coverUrl,
+  editable = false,
+  onRename,
+  onDelete,
+  deleting = false,
+  onView,
+}) {
   const [editing, setEditing] = useState(false);
-  const [name, setName] = useState(asset.name);
+  const [nameValue, setNameValue] = useState(name);
   const [saving, setSaving] = useState(false);
   const inputRef = useRef(null);
 
-  const urls = asset.metadata?.urls || [asset.url];
+  const cover = coverUrl || images[0]?.url;
+  const count = images.length;
 
   async function save() {
-    const trimmed = name.trim();
-    if (!trimmed || trimmed === asset.name) {
+    const trimmed = nameValue.trim();
+    if (!trimmed || trimmed === name) {
       setEditing(false);
-      setName(asset.name);
+      setNameValue(name);
       return;
     }
     setSaving(true);
     try {
-      await onRename(asset.id, trimmed);
+      await onRename(trimmed);
       setEditing(false);
     } catch {
       toast.error("Rename failed");
-      setName(asset.name);
+      setNameValue(name);
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <Card className="group border-border/50 overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1">
-      <CardContent className="p-0">
-        {/* 2×2 image grid */}
-        <div className="grid grid-cols-2 aspect-square">
-          {[0, 1, 2, 3].map((i) =>
-            urls[i] ? (
-              <div key={i} className="overflow-hidden relative">
-                <img src={urls[i]} alt="" className="w-full h-full object-cover" />
-              </div>
-            ) : (
-              <div key={i} className="bg-muted/20 flex items-center justify-center">
-                <ImagePlus className="w-4 h-4 text-muted-foreground/20" />
-              </div>
-            )
-          )}
-        </div>
+    <div className="group relative rounded-2xl overflow-hidden border-2 border-border/40 hover:border-[#c7f038] bg-card shadow-sm hover:shadow-md transition-all">
+      <div className="aspect-[4/5] overflow-hidden">
+        <img src={cover} alt={name} className="w-full h-full object-cover" />
+      </div>
+      <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent" />
 
-        <div className="p-3 space-y-2">
-          {/* Editable name */}
-          <div className="flex items-center gap-1.5 min-w-0">
-            {editing ? (
-              <input
-                ref={inputRef}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                onBlur={save}
-                onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") { setEditing(false); setName(asset.name); } }}
-                className="text-sm font-medium flex-1 min-w-0 border-b border-primary outline-none bg-transparent"
-                autoFocus
-              />
-            ) : (
-              <p className="text-sm font-medium truncate flex-1">{asset.name}</p>
-            )}
-            {saving ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0 text-muted-foreground" />
-            ) : (
-              <button
-                onClick={() => setEditing(true)}
-                className="shrink-0 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                <PenLine className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-
-          <div className="flex items-center justify-between">
-            <Badge variant="secondary" className="text-[10px]">
-              {urls.length} image{urls.length !== 1 ? "s" : ""}
-            </Badge>
-            <button
-              onClick={() => onDelete(asset.id)}
-              disabled={deleting === asset.id}
-              className="text-muted-foreground hover:text-destructive transition-colors"
-            >
-              {deleting === asset.id ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Trash2 className="w-3.5 h-3.5" />
-              )}
-            </button>
-          </div>
+      {count > 1 && (
+        <div className="absolute top-2 left-2 z-10 rounded-full bg-black/70 px-2 py-1 text-[10px] text-white">
+          {count} photos
         </div>
-      </CardContent>
-    </Card>
+      )}
+
+      <div className="absolute inset-0 z-0 flex items-center justify-center bg-black/40 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onView(); }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white text-black text-xs font-medium shadow-lg hover:bg-[#c7f038] transition-colors"
+        >
+          <Eye className="w-3.5 h-3.5" />
+          View
+        </button>
+      </div>
+
+      {editable && (
+        <div className="absolute top-2 right-2 z-20 flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+            className="w-6 h-6 rounded-full flex items-center justify-center bg-black/50 text-white hover:bg-black/70 transition-colors"
+          >
+            <PenLine className="w-3 h-3" />
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            disabled={deleting}
+            className="w-6 h-6 rounded-full flex items-center justify-center bg-black/50 text-white hover:bg-destructive transition-colors"
+          >
+            {deleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+          </button>
+        </div>
+      )}
+
+      {editing ? (
+        <input
+          ref={inputRef}
+          value={nameValue}
+          onChange={(e) => setNameValue(e.target.value)}
+          onBlur={save}
+          onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") { setEditing(false); setNameValue(name); } }}
+          className="absolute bottom-2 left-2 right-2 z-20 text-[11px] font-medium bg-black/70 text-white border-b border-white/60 outline-none px-1 py-0.5 rounded"
+          autoFocus
+          onClick={(e) => e.stopPropagation()}
+        />
+      ) : (
+        <p className="absolute bottom-2 left-2 right-2 z-10 text-[11px] text-white font-medium truncate pointer-events-none">
+          {saving ? "Saving…" : name}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -307,7 +300,6 @@ export default function AssetLibraryPage() {
     customAvatars,
     libraryAvatars,
     productImages,
-    videos,
     loading,
     loadingMore,
     hasMore,
@@ -319,7 +311,6 @@ export default function AssetLibraryPage() {
     refetch,
   } = useAssets();
 
-  const router = useRouter();
   const [search, setSearch] = useState("");
   const [selectedAsset, setSelectedAsset] = useState(null);
   const [previewAsset, setPreviewAsset] = useState(null);
@@ -329,25 +320,118 @@ export default function AssetLibraryPage() {
   const [assetName, setAssetName] = useState("");
   const [assetType, setAssetType] = useState("avatar");
   const [deleting, setDeleting] = useState(null);
-  const [editingVideoId, setEditingVideoId] = useState(null);
   const fileInputRef = useRef(null);
-
-  const handleEditVideo = async (asset) => {
-    if (editingVideoId) return;
-    setEditingVideoId(asset.id);
-    try {
-      const compositionProps = await buildCompositionFromAsset(asset);
-      if (!compositionProps) return;
-
-      sessionStorage.setItem(COMPOSITION_STORAGE_KEY, JSON.stringify(compositionProps));
-      router.push(EDIT_PATH);
-    } finally {
-      setEditingVideoId(null);
-    }
-  };
 
   // Avatar collection upload modal
   const [avatarCollectionOpen, setAvatarCollectionOpen] = useState(false);
+
+  // Shared "RE Agents" avatar pool — same source as the AI Walkthrough
+  // pipeline's "Choose Your Presenter" step (admin-curated collections +
+  // everyone's uploads), view-only here since it's not user-owned.
+  const [reAgents, setReAgents] = useState([]);
+  const [reAgentsLoading, setReAgentsLoading] = useState(true);
+  const [reAgentsError, setReAgentsError] = useState(null);
+
+  // Collection photo preview — swipeable carousel, same UX as the pipeline's
+  // "Choose Your Presenter" step.
+  const [previewCollection, setPreviewCollection] = useState(null);
+  const [previewIndex, setPreviewIndex] = useState(0);
+  const [loadedPreviewUrls, setLoadedPreviewUrls] = useState(() => new Set());
+  const touchStartXRef = useRef(null);
+
+  useEffect(() => {
+    if (!previewCollection?.images?.length) return;
+    let cancelled = false;
+    setLoadedPreviewUrls(new Set());
+    previewCollection.images.forEach((img) => {
+      if (!img.url) return;
+      const el = new window.Image();
+      el.onload = () => {
+        if (cancelled) return;
+        setLoadedPreviewUrls((prev) => {
+          if (prev.has(img.url)) return prev;
+          const next = new Set(prev);
+          next.add(img.url);
+          return next;
+        });
+      };
+      el.src = img.url;
+    });
+    return () => { cancelled = true; };
+  }, [previewCollection]);
+
+  const handlePreviewTouchStart = (e) => {
+    touchStartXRef.current = e.touches[0].clientX;
+  };
+
+  const handlePreviewTouchEnd = (e) => {
+    const startX = touchStartXRef.current;
+    const count = previewCollection?.images?.length || 0;
+    touchStartXRef.current = null;
+    if (startX === null || count < 2) return;
+
+    const deltaX = e.changedTouches[0].clientX - startX;
+    const SWIPE_THRESHOLD = 40;
+    if (Math.abs(deltaX) < SWIPE_THRESHOLD) return;
+
+    if (deltaX < 0) setPreviewIndex((i) => (i + 1) % count);
+    else setPreviewIndex((i) => (i - 1 + count) % count);
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadReAgents() {
+      setReAgentsLoading(true);
+      setReAgentsError(null);
+      setReAgents([]);
+      try {
+        const res = await fetch("/api/avatars/re");
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (cancelled) return;
+
+          buffer += decoder.decode(value, { stream: true });
+          const blocks = buffer.split("\n\n");
+          buffer = blocks.pop() ?? "";
+
+          for (const block of blocks) {
+            for (const line of block.split("\n")) {
+              if (!line.startsWith("data: ")) continue;
+              try {
+                const event = JSON.parse(line.slice(6));
+                if (event.type === "avatar") {
+                  setReAgents((prev) =>
+                    prev.some((a) => a.id === event.avatar.id) ? prev : [...prev, event.avatar]
+                  );
+                  setReAgentsLoading(false);
+                } else if (event.type === "done") {
+                  setReAgentsLoading(false);
+                } else if (event.type === "error") {
+                  setReAgentsError(event.message || "Failed to load RE Agents");
+                  setReAgentsLoading(false);
+                }
+              } catch (_) {}
+            }
+          }
+        }
+      } catch (err) {
+        if (!cancelled) setReAgentsError("Failed to load RE Agents");
+      } finally {
+        if (!cancelled) setReAgentsLoading(false);
+      }
+    }
+
+    loadReAgents();
+    return () => { cancelled = true; };
+  }, []);
 
   const filteredLibrary = libraryAvatars.filter(
     (a) =>
@@ -360,10 +444,6 @@ export default function AssetLibraryPage() {
   );
 
   const filteredProducts = productImages.filter((a) =>
-    a.name.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const filteredVideos = videos.filter((a) =>
     a.name.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -414,6 +494,26 @@ export default function AssetLibraryPage() {
     await refetch();
   }
 
+  async function setThumbnail(assetId, url) {
+    try {
+      const res = await fetch(`/api/assets?id=${assetId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ thumbnailUrl: url }),
+      });
+      if (!res.ok) throw new Error("Failed to set thumbnail");
+      await refetch();
+      // Reflect the new order in the open carousel immediately.
+      setPreviewCollection((prev) =>
+        prev ? { ...prev, images: [{ url }, ...prev.images.filter((img) => img.url !== url)] } : prev
+      );
+      setPreviewIndex(0);
+      toast.success("Thumbnail updated");
+    } catch (err) {
+      toast.error("Failed to set thumbnail", { description: err.message });
+    }
+  }
+
   async function handleDelete(id) {
     setDeleting(id);
     const result = await deleteAsset(id);
@@ -430,212 +530,53 @@ export default function AssetLibraryPage() {
 
   function AssetCard({ asset, showDelete = false }) {
     const isSelected = selectedAsset?.id === asset.id;
-    const isVideo = asset.type === "video" || asset.type === "clip";
-
-    // Video clips: landscape card with top title bar + centered play button on
-    // mobile (matches the dashboard "Recent Creations" mobile layout, since the
-    // hover-only action icons below are unreachable on touch); 9:16 hover-to-play
-    // card on sm+ (unchanged).
-    if (isVideo) {
-      const canEdit = !!EDITABLE_SOURCES[asset.metadata?.source];
-
-      const isDeleting = deleting === asset.id;
-
-      return (
-        <div
-          className={`group cursor-pointer aspect-video sm:aspect-9/16 bg-muted rounded-2xl overflow-hidden relative border transition-all duration-300 ${
-            isDeleting ? "animate-pulse pointer-events-none" : ""
-          } ${
-            isSelected ? "border-primary ring-2 ring-primary" : "border-transparent hover:border-[#c7f038]/60 hover:shadow-xl"
-          }`}
-          onClick={() => { if (!isDeleting) { setSelectedAsset(asset); setPreviewAsset(asset); } }}
-        >
-          <video
-            src={asset.url}
-            muted
-            loop
-            playsInline
-            preload="metadata"
-            className="w-full h-full object-cover"
-            onMouseEnter={(e) => e.currentTarget.play()}
-            onMouseLeave={(e) => {
-              e.currentTarget.pause();
-              e.currentTarget.currentTime = 0;
-            }}
-          />
-
-          {isDeleting && (
-            <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-2 z-10">
-              <Loader2 className="w-6 h-6 text-white animate-spin" />
-              <p className="text-xs text-white font-medium">Deleting…</p>
-            </div>
-          )}
-
-          {/* Title bar: top on mobile, bottom on sm+ */}
-          <div className="sm:hidden absolute inset-x-0 top-0 bg-linear-to-b from-black/70 via-black/30 to-transparent p-3 pr-12">
-            <p className="font-semibold text-sm text-white truncate">{asset.name}</p>
-            <p className="text-[11px] text-white/70">
-              {asset.is_custom ? "Added by you" : "Library Asset"}
-            </p>
-          </div>
-          <div className="hidden sm:block absolute inset-x-0 bottom-0 bg-linear-to-t from-black/80 via-black/40 to-transparent p-3 pt-8">
-            <p className="font-semibold text-sm text-white truncate">{asset.name}</p>
-            <p className="text-[11px] text-white/70">
-              {asset.is_custom ? "Added by you" : "Library Asset"}
-            </p>
-          </div>
-
-          {/* Mobile: centered play button + three-dot menu (hover icons below don't work on touch) */}
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); setPreviewAsset(asset); }}
-            className="sm:hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/90 flex items-center justify-center shadow-lg"
-            title="Play"
-          >
-            <Play className="w-5 h-5 text-black fill-black" />
-          </button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                onClick={(e) => e.stopPropagation()}
-                className="sm:hidden absolute top-2 right-2 w-8 h-8 rounded-full bg-black/40 flex items-center justify-center text-white"
-                title="More options"
-              >
-                {deleting === asset.id || editingVideoId === asset.id ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <MoreVertical className="w-4 h-4" />
-                )}
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-              <DropdownMenuItem onClick={() => setPreviewAsset(asset)} className="cursor-pointer">
-                <Eye className="mr-2 h-4 w-4" />
-                Preview
-              </DropdownMenuItem>
-              {canEdit && (
-                <DropdownMenuItem
-                  disabled={editingVideoId === asset.id}
-                  onClick={() => handleEditVideo(asset)}
-                  className="cursor-pointer"
-                >
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Edit
-                </DropdownMenuItem>
-              )}
-              {showDelete && (
-                <DropdownMenuItem
-                  disabled={deleting === asset.id}
-                  onClick={() => handleDelete(asset.id)}
-                  className="cursor-pointer text-destructive focus:text-destructive"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Desktop: hover action icons */}
-          <div className="hidden sm:flex absolute top-3 right-3 gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-300">
-            <button
-              className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center text-muted-foreground hover:text-[#c7f038] transition-colors"
-              onClick={(e) => { e.stopPropagation(); setPreviewAsset(asset); }}
-            >
-              <Eye className="w-4 h-4" />
-            </button>
-            {canEdit && (
-              <button
-                className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center text-muted-foreground hover:text-[#c7f038] transition-colors"
-                onClick={(e) => { e.stopPropagation(); handleEditVideo(asset); }}
-                disabled={editingVideoId === asset.id}
-              >
-                {editingVideoId === asset.id ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Pencil className="w-4 h-4" />
-                )}
-              </button>
-            )}
-            {showDelete && (
-              <button
-                className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors"
-                onClick={(e) => { e.stopPropagation(); handleDelete(asset.id); }}
-                disabled={deleting === asset.id}
-              >
-                {deleting === asset.id ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Trash2 className="w-4 h-4" />
-                )}
-              </button>
-            )}
-          </div>
-        </div>
-      );
-    }
 
     return (
-      <Card
-        className={`group cursor-pointer border-border/50 hover:shadow-lg transition-all hover:-translate-y-1 overflow-hidden ${
-          isSelected ? "ring-2 ring-primary border-primary" : ""
+      <div
+        className={`group rounded-lg overflow-hidden border bg-white hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer ${
+          isSelected ? "border-primary ring-2 ring-primary" : "border-neutral-200"
         }`}
         onClick={() => setSelectedAsset(asset)}
       >
-        <CardContent className="p-0">
-          <div className="aspect-square bg-linear-to-br from-primary/10 to-accent/10 relative flex items-center justify-center overflow-hidden">
-            <img
-              src={asset.url || asset.image_url}
-              alt={asset.name}
-              className="w-full h-full object-cover transition-transform group-hover:scale-105"
-            />
-            {/* Hover overlay */}
-            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-              <button
-                className="w-8 h-8 rounded-full bg-white/20 backdrop-blur flex items-center justify-center cursor-pointer hover:bg-white/30 transition-colors"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setPreviewAsset(asset);
-                }}
-              >
-                <Eye className="w-4 h-4 text-white" />
-              </button>
-              {showDelete && (
-                <button
-                  className="w-8 h-8 rounded-full bg-red-500/30 backdrop-blur flex items-center justify-center cursor-pointer hover:bg-red-500/50 transition-colors"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete(asset.id);
-                  }}
-                  disabled={deleting === asset.id}
-                >
-                  {deleting === asset.id ? (
-                    <Loader2 className="w-4 h-4 text-white animate-spin" />
-                  ) : (
-                    <Trash2 className="w-4 h-4 text-white" />
-                  )}
-                </button>
+        <div className="relative aspect-square overflow-hidden">
+          <img
+            src={asset.url || asset.image_url}
+            alt={asset.name}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+          <div className="absolute inset-0 bg-black/20 sm:bg-black/0 sm:group-hover:bg-black/20 transition-colors" />
+
+          <button
+            onClick={(e) => { e.stopPropagation(); setPreviewAsset(asset); }}
+            className="absolute inset-0 flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+          >
+            <div className="h-9 px-4 rounded-md bg-white/90 backdrop-blur flex items-center gap-2 shadow-md">
+              <Eye className="w-4 h-4 text-black" />
+              <span className="text-black text-sm font-medium">Preview</span>
+            </div>
+          </button>
+
+          {showDelete && (
+            <button
+              onClick={(e) => { e.stopPropagation(); handleDelete(asset.id); }}
+              disabled={deleting === asset.id}
+              className="absolute top-2 right-2 h-8 w-8 rounded-full bg-white/90 backdrop-blur flex items-center justify-center shadow-md opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity hover:bg-white"
+            >
+              {deleting === asset.id ? (
+                <Loader2 className="w-3.5 h-3.5 text-muted-foreground animate-spin" />
+              ) : (
+                <Trash2 className="w-3.5 h-3.5 text-destructive" />
               )}
-            </div>
-
-            <div className="absolute top-2 left-2">
-              <Badge className="bg-primary/80 text-white text-[10px] px-1.5 py-0.5 border-0 flex items-center gap-1">
-                {asset.type === "avatar" && <Sparkles className="w-2.5 h-2.5" />}
-                {asset.type === "product" && <Package className="w-2.5 h-2.5" />}
-                {asset.type === "avatar" ? "Avatar" : "Product"}
-              </Badge>
-            </div>
-
-          </div>
-          <div className="p-3">
-            <p className="text-sm font-medium truncate">{asset.name}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">
-              {asset.is_custom ? "Added by you" : "Library Asset"}
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+            </button>
+          )}
+        </div>
+        <div className="p-4">
+          <p className="font-medium text-sm line-clamp-1">{asset.name}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {asset.is_custom ? "Added by you" : "Library Asset"}
+          </p>
+        </div>
+      </div>
     );
   }
 
@@ -655,7 +596,7 @@ export default function AssetLibraryPage() {
             Asset Library
           </h1>
           <p className="text-muted-foreground mt-1">
-            Store and reuse your product images, avatars, and videos
+            Store and reuse your product images and avatars
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -697,20 +638,61 @@ export default function AssetLibraryPage() {
       ) : (
         <Tabs defaultValue="all" className="w-full">
           <TabsList className="bg-muted/50 p-1 max-w-full overflow-x-auto justify-start">
-            <TabsTrigger value="all" className="cursor-pointer shrink-0">All Assets ({assets.length})</TabsTrigger>
-            <TabsTrigger value="avatars" className="cursor-pointer shrink-0">Avatars ({avatars.length})</TabsTrigger>
-            <TabsTrigger value="videos" className="cursor-pointer shrink-0">Videos ({videos.length})</TabsTrigger>
+            <TabsTrigger value="all" className="cursor-pointer shrink-0">All Assets ({assets.filter((a) => a.type !== "video" && a.type !== "clip").length})</TabsTrigger>
+            <TabsTrigger value="prebuilt" className="cursor-pointer shrink-0">Prebuilt Avatars ({reAgents.length})</TabsTrigger>
+            <TabsTrigger value="mine" className="cursor-pointer shrink-0">My Avatars ({avatars.length})</TabsTrigger>
           </TabsList>
 
           <TabsContent value="all" className="mt-6">
             <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {assets.filter(a => a.name.toLowerCase().includes(search.toLowerCase())).map((asset) => (
-                <AssetCard key={asset.id} asset={asset} showDelete={asset.is_custom} />
-              ))}
+              {assets
+                .filter((a) => a.type !== "video" && a.type !== "clip")
+                .filter((a) => a.name.toLowerCase().includes(search.toLowerCase()))
+                .map((asset) => (
+                  <AssetCard key={asset.id} asset={asset} showDelete={asset.is_custom} />
+                ))}
             </div>
           </TabsContent>
 
-          <TabsContent value="avatars" className="mt-6">
+          <TabsContent value="prebuilt" className="mt-6">
+            {reAgentsLoading && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="aspect-[4/5] rounded-2xl bg-muted/60 animate-pulse" />
+                ))}
+              </div>
+            )}
+
+            {!reAgentsLoading && reAgentsError && (
+              <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-xs text-destructive">
+                {reAgentsError}
+              </div>
+            )}
+
+            {!reAgentsLoading && !reAgentsError && reAgents.length === 0 && (
+              <div className="rounded-xl border border-border/40 bg-muted/30 p-6 text-xs text-muted-foreground text-center">
+                No prebuilt avatars available yet.
+              </div>
+            )}
+
+            {!reAgentsLoading && !reAgentsError && reAgents.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {reAgents
+                  .filter((a) => a.name.toLowerCase().includes(search.toLowerCase()))
+                  .map((collection) => (
+                    <CollectionCard
+                      key={`re:${collection.id}`}
+                      name={collection.name}
+                      images={collection.images}
+                      coverUrl={collection.coverImage}
+                      onView={() => { setPreviewCollection(collection); setPreviewIndex(0); }}
+                    />
+                  ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="mine" className="mt-6">
             {avatars.length === 0 && !search ? (
               <div className="flex flex-col items-center justify-center py-20 space-y-4">
                 <div className="w-16 h-16 rounded-2xl border-2 border-dashed border-border flex items-center justify-center">
@@ -735,19 +717,25 @@ export default function AssetLibraryPage() {
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 {avatars
                   .filter(a => a.name.toLowerCase().includes(search.toLowerCase()))
-                  .map((asset) =>
-                    asset.type === "presenter" ? (
-                      <PresenterCollectionCard
+                  .map((asset) => {
+                    if (asset.type !== "presenter") {
+                      return <AssetCard key={asset.id} asset={asset} showDelete={asset.is_custom} />;
+                    }
+                    const urls = asset.metadata?.urls || [asset.url];
+                    const collection = { id: asset.id, name: asset.name, images: urls.map((url) => ({ url })), editable: true };
+                    return (
+                      <CollectionCard
                         key={asset.id}
-                        asset={asset}
-                        onRename={renameAsset}
-                        onDelete={handleDelete}
-                        deleting={deleting}
+                        name={asset.name}
+                        images={collection.images}
+                        editable
+                        onRename={(newName) => renameAsset(asset.id, newName)}
+                        onDelete={() => handleDelete(asset.id)}
+                        deleting={deleting === asset.id}
+                        onView={() => { setPreviewCollection(collection); setPreviewIndex(0); }}
                       />
-                    ) : (
-                      <AssetCard key={asset.id} asset={asset} showDelete={asset.is_custom} />
-                    )
-                  )}
+                    );
+                  })}
               </div>
             )}
           </TabsContent>
@@ -755,14 +743,6 @@ export default function AssetLibraryPage() {
           <TabsContent value="products" className="mt-6">
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {productImages.filter(a => a.name.toLowerCase().includes(search.toLowerCase())).map((asset) => (
-                <AssetCard key={asset.id} asset={asset} showDelete={asset.is_custom} />
-              ))}
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="videos" className="mt-6">
-            <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {videos.filter(a => a.name.toLowerCase().includes(search.toLowerCase())).map((asset) => (
                 <AssetCard key={asset.id} asset={asset} showDelete={asset.is_custom} />
               ))}
             </div>
@@ -793,11 +773,7 @@ export default function AssetLibraryPage() {
           </DialogTitle>
           <div className="relative w-full h-[80vh] flex items-center justify-center">
             {previewAsset && (
-              previewAsset.type === "video" || previewAsset.type === "clip" ? (
-                <video src={previewAsset.url} controls autoPlay className="max-w-full max-h-full object-contain" />
-              ) : (
-                <img src={previewAsset.url || previewAsset.image_url} alt={previewAsset.name} className="max-w-full max-h-full object-contain" />
-              )
+              <img src={previewAsset.url || previewAsset.image_url} alt={previewAsset.name} className="max-w-full max-h-full object-contain" />
             )}
             <div className="absolute top-4 left-4">
               <Badge className="bg-black/50 text-white border-white/20 backdrop-blur">
@@ -805,6 +781,119 @@ export default function AssetLibraryPage() {
               </Badge>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Collection photo preview — carousel, same UX as the pipeline's
+          "Choose Your Presenter" step: arrows + swipe + dot indicators. */}
+      <Dialog open={!!previewCollection} onOpenChange={(open) => !open && setPreviewCollection(null)}>
+        <DialogContent
+          showCloseButton={false}
+          className="max-w-none sm:max-w-lg md:max-w-sm w-full h-full sm:h-[80vh] p-0 sm:p-6 gap-0 border-0 flex flex-col"
+          style={{
+            paddingTop: "env(safe-area-inset-top)",
+            paddingBottom: "env(safe-area-inset-bottom)",
+          }}
+        >
+          <DialogHeader className="absolute top-0 left-0 right-0 z-20 p-4 sm:static sm:p-0 bg-white sm:bg-none">
+            <DialogTitle className="text-white sm:py-4 py-0 sm:text-foreground text-base sm:text-lg font-medium truncate pr-10">
+              {previewCollection?.name}
+            </DialogTitle>
+          </DialogHeader>
+
+          {previewCollection?.images?.length > 0 && (
+            <div className="flex-1 sm:flex-none flex flex-col justify-center h-full sm:h-auto space-y-0 sm:space-y-3">
+              <div
+                className="relative flex-1 sm:flex-none sm:h-[60vh] md:h-[65vh] overflow-hidden bg-black sm:bg-white sm:rounded-xl touch-pan-y select-none"
+                onTouchStart={handlePreviewTouchStart}
+                onTouchEnd={handlePreviewTouchEnd}
+              >
+                <img
+                  src={previewCollection.images[previewIndex]?.url}
+                  alt={`${previewCollection.name} ${previewIndex + 1}`}
+                  className="absolute inset-0 w-full h-full object-contain"
+                  draggable={false}
+                />
+
+                {!loadedPreviewUrls.has(previewCollection.images[previewIndex]?.url) && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/40 sm:bg-muted/60">
+                    <Loader2 className="w-6 h-6 sm:w-5 sm:h-5 animate-spin text-white/70 sm:text-neutral-500" />
+                  </div>
+                )}
+
+                {previewCollection.editable && (
+                  previewIndex === 0 ? (
+                    <div className="absolute top-2 left-2 sm:top-3 sm:left-3 flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/50 text-white/90 text-[11px] font-medium backdrop-blur-sm">
+                      <Star className="w-3 h-3 fill-current" />
+                      Thumbnail
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setThumbnail(previewCollection.id, previewCollection.images[previewIndex]?.url)}
+                      className="absolute top-2 left-2 sm:top-3 sm:left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white text-black text-[11px] font-medium shadow-lg hover:bg-[#c7f038] transition-colors"
+                    >
+                      <Star className="w-3 h-3" />
+                      Set as thumbnail
+                    </button>
+                  )
+                )}
+
+                {previewCollection.images.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPreviewIndex((i) => (i - 1 + previewCollection.images.length) % previewCollection.images.length)
+                      }
+                      className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 sm:bg-black/50 hover:bg-black/70 active:scale-90 flex items-center justify-center text-white transition-all backdrop-blur-sm"
+                      aria-label="Previous photo"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewIndex((i) => (i + 1) % previewCollection.images.length)}
+                      className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 sm:bg-black/50 hover:bg-black/70 active:scale-90 flex items-center justify-center text-white transition-all backdrop-blur-sm"
+                      aria-label="Next photo"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 sm:hidden text-white/50 text-xs font-medium bg-black/30 px-3 py-1 rounded-full backdrop-blur-sm pointer-events-none">
+                      Swipe to navigate
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {previewCollection.images.length > 1 && (
+                <div className="flex items-center justify-center gap-2 sm:gap-1.5 py-4 sm:py-0 bg-black sm:bg-transparent">
+                  {previewCollection.images.map((img, idx) => (
+                    <button
+                      key={img.url || idx}
+                      type="button"
+                      onClick={() => setPreviewIndex(idx)}
+                      aria-label={`Go to photo ${idx + 1}`}
+                      className={`h-2.5 sm:h-2 rounded-full transition-all ${
+                        idx === previewIndex
+                          ? "w-8 sm:w-6 bg-white sm:bg-neutral-900"
+                          : "w-2.5 sm:w-2 bg-white/40 sm:bg-neutral-300 hover:bg-white/60 sm:hover:bg-neutral-400"
+                      }`}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          <button
+            onClick={() => setPreviewCollection(null)}
+            className="absolute top-2 right-2 sm:top-3 sm:right-3 z-30 w-10 h-10 sm:w-8 sm:h-8 rounded-full bg-black/40 sm:bg-black/10 hover:bg-black/60 flex items-center justify-center text-white/90 sm:text-neutral-500 sm:hover:text-neutral-900 active:scale-90 transition-all"
+            aria-label="Close preview"
+          >
+            <X className="w-7 h-7 sm:w-4 sm:h-4" />
+          </button>
         </DialogContent>
       </Dialog>
 
