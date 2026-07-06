@@ -1,14 +1,39 @@
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth-config";
 import { fal } from "@fal-ai/client";
 import { synthesizeVoice } from "@/lib/voice-tts";
+import { hasSufficientCreditsForAction } from "@/lib/credit-system";
 
 if (process.env.FAL_KEY) {
   fal.config({ credentials: process.env.FAL_KEY });
 }
 export async function POST(request) {
-  const { voiceId, voiceLabel = "your narrator", language = "english", text } = await request.json();
+  const { voiceId, voiceLabel = "your narrator", language = "english", text, action } = await request.json();
   if (!voiceId) {
     return NextResponse.json({ error: "voiceId is required" }, { status: 400 });
+  }
+
+  // `action` is opt-in: only callers that pass their pipeline's credit-action
+  // key get gated here (action-reel, comedy-reel, veo-long-ad today). Callers
+  // that don't send it (e.g. seedance-reel) keep this route's old behavior.
+  if (action) {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const { resolveUserFromSession } = await import("@/lib/user-resolver");
+    const user = await resolveUserFromSession(request);
+    if (!user) {
+      return NextResponse.json({ error: "User not found." }, { status: 404 });
+    }
+    const affordability = await hasSufficientCreditsForAction({
+      userId: user._id.toString(),
+      action,
+    });
+    if (!affordability.ok) {
+      return NextResponse.json(affordability.payload, { status: affordability.status });
+    }
   }
 
   // When previewing the user's own script (not the canned sample), speak the

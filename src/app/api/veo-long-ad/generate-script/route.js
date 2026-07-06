@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { fal } from "@fal-ai/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-config";
+import { hasSufficientCreditsForAction } from "@/lib/credit-system";
 
 /**
  * POST /api/veo-long-ad/generate-script
@@ -106,7 +107,29 @@ export async function POST(request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { resolveUserFromSession } = await import("@/lib/user-resolver");
+    const user = await resolveUserFromSession(request);
+    if (!user) {
+      return NextResponse.json({ error: "User not found." }, { status: 404 });
+    }
+
     const body = await request.json();
+
+    // Read-only affordability check — this route calls the LLM 3 times
+    // (creative + translation + TTS-normalize) but doesn't charge credits
+    // itself; the actual generate-pipeline debits/refunds. This just blocks a
+    // 0-credit user from using the script writer at all. This route is
+    // shared by 3 callers with different pipeline costs (action-reel/comedy-reel
+    // = action_reel_video, veo-long-ad = real_estate_video) — the caller says
+    // which one it is; default to veo-long-ad's own action for back-compat.
+    const affordability = await hasSufficientCreditsForAction({
+      userId: user._id.toString(),
+      action: body.action || "real_estate_video",
+    });
+    if (!affordability.ok) {
+      return NextResponse.json(affordability.payload, { status: affordability.status });
+    }
+
     const {
       propertyName = "",
       location = "",

@@ -22,8 +22,13 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { LANGUAGES, TONES } from "@/utils/constants";
 import { compressImage } from "@/utils/compress-image";
+import { useUser } from "@/hooks/use-user";
+import { canAffordAction } from "@/lib/credit-costs";
+
+const PIPELINE_CREDIT_ACTION = "real_estate_video";
 
 const MIN_SCRIPT_WORDS = 20;
 const MAX_SCRIPT_WORDS = 500;
@@ -67,6 +72,8 @@ export function StepScript({
   onBack,
   onGenerate,
 }) {
+  const { profile } = useUser();
+  const affordability = canAffordAction({ profile, action: PIPELINE_CREDIT_ACTION });
   const [mode, setMode] = useState("manual"); // "manual" | "ai"
   const [language, setLanguage] = useState("english");
   const [tone, setTone] = useState("luxury");
@@ -116,9 +123,12 @@ export function StepScript({
       const res = await fetch("/api/veo-long-ad/preview-voice", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ voiceId: elevenLabsVoice, voiceLabel: voice?.label?.split(" (")[0], language }),
+        body: JSON.stringify({ voiceId: elevenLabsVoice, voiceLabel: voice?.label?.split(" (")[0], language, action: "real_estate_video" }),
       });
-      if (!res.ok) throw new Error("Preview failed");
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody.message || errBody.error || "Preview failed");
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       if (previewAudioRef.current) {
@@ -166,7 +176,7 @@ export function StepScript({
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Script generation failed");
+      if (!res.ok) throw new Error(data.message || data.error || "Script generation failed");
       setAiGeneratedScript(data.script || "");
       setScriptWordCount(data.wordCount || 0);
       setScriptEstDuration(data.estimatedDuration || 0);
@@ -212,7 +222,7 @@ export function StepScript({
         body: formData,
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Chunking failed");
+      if (!res.ok) throw new Error(data.message || data.error || "Chunking failed");
 
       setBeats(data.beats || []);
       setChunks(data.chunks || []);
@@ -535,27 +545,39 @@ export function StepScript({
               />
             </div>
 
-            <Button
-              onClick={handleGenerateAiScript}
-              disabled={
-                !qaAnswers.propertyName ||
-                !qaAnswers.location ||
-                generatingScript
-              }
-              className="w-full gradient-bg text-white hover:opacity-90 disabled:opacity-40 gap-2"
-            >
-              {generatingScript ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Writing script with AI…
-                </>
-              ) : (
-                <>
-                  <Wand2 className="w-4 h-4" />
-                  Generate Script with AI
-                </>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="block w-full">
+                  <Button
+                    onClick={handleGenerateAiScript}
+                    disabled={
+                      !qaAnswers.propertyName ||
+                      !qaAnswers.location ||
+                      generatingScript ||
+                      !affordability.ok
+                    }
+                    className="w-full gradient-bg text-white hover:opacity-90 disabled:opacity-40 gap-2"
+                  >
+                    {generatingScript ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Writing script with AI…
+                      </>
+                    ) : (
+                      <>
+                        <Wand2 className="w-4 h-4" />
+                        Generate Script with AI
+                      </>
+                    )}
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              {!affordability.ok && (
+                <TooltipContent>
+                  Not enough credits — need {affordability.required}, you have {affordability.credits}.
+                </TooltipContent>
               )}
-            </Button>
+            </Tooltip>
           </div>
 
           {/* AI Generated Script Preview */}
@@ -595,26 +617,37 @@ export function StepScript({
 
       {/* ── Chunk & Preview CTA ────────────────────────────────────────────── */}
       {isScriptReady && wordCount <= MAX_SCRIPT_WORDS && (
-        <Button
-          onClick={handleChunkAndPreview}
-          disabled={chunking}
-          variant="outline"
-          className="w-full gap-2 border-primary/40 text-primary hover:bg-primary/5"
-        >
-          {chunking ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              AI is chunking your script + writing Veo prompts…
-            </>
-          ) : (
-            <>
-              <Layers className="w-4 h-4" />
-              {chunks.length > 0
-                ? "Re-chunk Script & Preview"
-                : "Chunk Script & Preview Veo Prompts"}
-            </>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="block w-full">
+              <Button
+                onClick={handleChunkAndPreview}
+                disabled={chunking || !affordability.ok}
+                variant="outline"
+                className="w-full gap-2 border-primary/40 text-primary hover:bg-primary/5"
+              >
+                {chunking ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    AI is chunking your script + writing Veo prompts…
+                  </>
+                ) : (
+                  <>
+                    <Layers className="w-4 h-4" />
+                    {chunks.length > 0
+                      ? "Re-chunk Script & Preview"
+                      : "Chunk Script & Preview Veo Prompts"}
+                  </>
+                )}
+              </Button>
+            </span>
+          </TooltipTrigger>
+          {!affordability.ok && (
+            <TooltipContent>
+              Not enough credits — need {affordability.required}, you have {affordability.credits}.
+            </TooltipContent>
           )}
-        </Button>
+        </Tooltip>
       )}
 
       {/* ── Chunk preview ─────────────────────────────────────────────────── */}
@@ -737,14 +770,25 @@ export function StepScript({
           Back
         </Button>
 
-        <Button
-          onClick={handleGenerate}
-          disabled={chunks.length === 0}
-          className="gradient-bg text-white hover:opacity-90 disabled:opacity-40 shadow-lg gap-2 px-6"
-        >
-          <Sparkles className="w-4 h-4" />
-          Generate Long-Form Ad
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-block">
+              <Button
+                onClick={handleGenerate}
+                disabled={chunks.length === 0 || !affordability.ok}
+                className="gradient-bg text-white hover:opacity-90 disabled:opacity-40 shadow-lg gap-2 px-6"
+              >
+                <Sparkles className="w-4 h-4" />
+                Generate Long-Form Ad
+              </Button>
+            </span>
+          </TooltipTrigger>
+          {!affordability.ok && (
+            <TooltipContent>
+              Not enough credits — need {affordability.required}, you have {affordability.credits}.
+            </TooltipContent>
+          )}
+        </Tooltip>
       </div>
     </div>
   );

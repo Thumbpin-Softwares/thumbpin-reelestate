@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth-config";
 import { fal } from "@fal-ai/client";
 import { synthesizeVoice } from "@/lib/voice-tts";
+import { hasSufficientCreditsForAction } from "@/lib/credit-system";
 
 if (process.env.FAL_KEY) {
   fal.config({ credentials: process.env.FAL_KEY });
@@ -13,10 +16,30 @@ const MAX_PREVIEW_CHARS = 600;
  *
  * Previews the user's ACTUAL typed script text (unlike /api/veo-long-ad/preview-voice,
  * which only plays a canned per-language sample sentence). Fully ephemeral — no R2
- * upload, no DB writes, no credit charge — since this text gets re-synthesized after
- * the 2-way split + localization anyway.
+ * upload, no DB writes — but DOES require the user to be able to afford an Action
+ * Reel generation (read-only check, no deduction here) so a 0-credit user can't
+ * burn real ElevenLabs/Sarvam TTS calls on previews they could never actually render.
  */
 export async function POST(request) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { resolveUserFromSession } = await import("@/lib/user-resolver");
+  const user = await resolveUserFromSession(request);
+  if (!user) {
+    return NextResponse.json({ error: "User not found." }, { status: 404 });
+  }
+
+  const affordability = await hasSufficientCreditsForAction({
+    userId: user._id.toString(),
+    action: "action_reel_video",
+  });
+  if (!affordability.ok) {
+    return NextResponse.json(affordability.payload, { status: affordability.status });
+  }
+
   const { text, voiceId, language } = await request.json();
   if (!text || !text.trim()) {
     return NextResponse.json({ error: "text is required" }, { status: 400 });

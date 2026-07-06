@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { fal } from "@fal-ai/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-config";
+import { hasSufficientCreditsForAction } from "@/lib/credit-system";
 
 /**
  * POST /api/veo-long-ad/chunk-script
@@ -56,6 +57,24 @@ export async function POST(request) {
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { resolveUserFromSession } = await import("@/lib/user-resolver");
+    const user = await resolveUserFromSession(request);
+    if (!user) {
+      return NextResponse.json({ error: "User not found." }, { status: 404 });
+    }
+
+    // Read-only affordability check — this route lets the caller pick the LLM
+    // model (up to claude-opus-4/gpt-4o) and retries up to 3x, but doesn't
+    // charge credits itself; the actual veo-long-ad generate-pipeline debits/
+    // refunds. This just blocks a 0-credit user from using it at all.
+    const affordability = await hasSufficientCreditsForAction({
+      userId: user._id.toString(),
+      action: "real_estate_video",
+    });
+    if (!affordability.ok) {
+      return NextResponse.json(affordability.payload, { status: affordability.status });
     }
 
     const formData = await request.formData();

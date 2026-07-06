@@ -1,32 +1,9 @@
 import dbConnect from "@/lib/mongodb";
 import User from "@/models/User";
 import CreditTransaction from "@/models/CreditTransaction";
+import { FREE_QUOTA_LIMITS, CREDIT_ACTIONS } from "@/lib/credit-costs";
 
-export const FREE_QUOTA_LIMITS = {
-  video: 2,
-  avatar: 2,
-};
-
-export const CREDIT_ACTIONS = {
-  generate_video: { cost: 2, freeBucket: "video", label: "Basic Video Generation" },
-  text_to_video: { cost: 2, freeBucket: "video", label: "Text-to-Video" },
-  image_to_video: { cost: 2, freeBucket: "video", label: "Image-to-Video" },
-  ai_walkthrough: { cost: 2, freeBucket: "video", label: "AI Walkthrough" },
-  product_video: { cost: 1, freeBucket: "video", label: "Product Video" },
-  real_estate_video: { cost: 3, freeBucket: "video", label: "Real Estate Persona Video" },
-  real_estate_video_batch: { cost: 3, freeBucket: "video", label: "Real Estate Batch Video", isBatch: true },
-  action_reel_video: { cost: 4, freeBucket: "video", label: "Action Reel Video" },
-
-  avatar_photo: { cost: 1, freeBucket: "avatar", label: "AI Photo Avatar" },
-  avatar_looks: { cost: 1, freeBucket: "avatar", label: "Avatar Look Generation" },
-  product_avatar_image: { cost: 1, freeBucket: "avatar", label: "Product Avatar Image" },
-
-  image_generation: { cost: 1, freeBucket: null, label: "Image Generation" },
-  gemini_image_generation: { cost: 1, freeBucket: null, label: "Gemini Image Generation" },
-
-  avatar_group_training: { cost: 25, freeBucket: null, label: "Custom Avatar Training" },
-  digital_twin_training: { cost: 25, freeBucket: null, label: "Digital Twin Training" },
-};
+export { FREE_QUOTA_LIMITS, CREDIT_ACTIONS };
 
 /**
  * Calculate discounted batch cost for real estate video.
@@ -92,6 +69,48 @@ export function getCreditErrorPayload({ action, user }) {
     credits: user?.credits ?? 0,
     plan: user?.plan || "free",
     freeQuota: quota,
+  };
+}
+
+/**
+ * Read-only affordability check — does NOT deduct anything. For helper steps
+ * (script writing, voice previews) that precede a pipeline's real
+ * consumeCreditsForAction call: blocks a 0-credit user from using them at all,
+ * without double-charging on top of the pipeline's own debit/refund.
+ */
+export async function hasSufficientCreditsForAction({ userId, action }) {
+  const config = getActionOrThrow(action);
+  await dbConnect();
+
+  const user = await User.findById(userId).select(
+    "_id plan credits freeVideoGenerationsUsed freeAvatarGenerationsUsed"
+  );
+
+  if (!user) {
+    return { ok: false, status: 404, payload: { error: "User not found" } };
+  }
+
+  const isFreePlan = (user.plan || "free") === "free";
+
+  if (isFreePlan && config.freeBucket) {
+    const field = getFreeBucketField(config.freeBucket);
+    const limit = FREE_QUOTA_LIMITS[config.freeBucket];
+    const used = (field && user[field]) || 0;
+    if (field && used < limit) {
+      return { ok: true, status: 200, user };
+    }
+  }
+
+  const cost = config.cost || 0;
+  if (cost <= 0 || (user.credits || 0) >= cost) {
+    return { ok: true, status: 200, user };
+  }
+
+  return {
+    ok: false,
+    status: 402,
+    payload: getCreditErrorPayload({ action, user }),
+    user,
   };
 }
 

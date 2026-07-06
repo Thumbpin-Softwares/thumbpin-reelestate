@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth-config";
 import { fal } from "@fal-ai/client";
 import { ELEVENLABS_VOICE_SETTINGS } from "@/lib/elevenlabs-config";
+import { hasSufficientCreditsForAction } from "@/lib/credit-system";
 
 if (process.env.FAL_KEY) {
   fal.config({ credentials: process.env.FAL_KEY });
@@ -12,11 +15,33 @@ const MAX_PREVIEW_CHARS = 600;
  * POST /api/comedy-reel/preview-script
  *
  * Previews the user's ACTUAL typed script text — fully ephemeral, no R2
- * upload, no DB writes, no credit charge.
+ * upload, no DB writes — but DOES require the user to be able to afford a
+ * Comedy Reel generation (read-only check, no deduction here) so a 0-credit
+ * user can't burn real ElevenLabs TTS calls on previews they could never
+ * actually render.
  */
 export async function POST(request) {
   if (!process.env.FAL_KEY) {
     return NextResponse.json({ error: "FAL_KEY not configured" }, { status: 503 });
+  }
+
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { resolveUserFromSession } = await import("@/lib/user-resolver");
+  const user = await resolveUserFromSession(request);
+  if (!user) {
+    return NextResponse.json({ error: "User not found." }, { status: 404 });
+  }
+
+  const affordability = await hasSufficientCreditsForAction({
+    userId: user._id.toString(),
+    action: "action_reel_video",
+  });
+  if (!affordability.ok) {
+    return NextResponse.json(affordability.payload, { status: affordability.status });
   }
 
   const { text, voiceId } = await request.json();

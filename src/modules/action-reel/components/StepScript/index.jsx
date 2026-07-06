@@ -16,13 +16,18 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { LANGUAGES } from "@/utils/constants";
 import { ELEVENLABS_VOICES } from "@/lib/elevenlabs-config";
 import { SARVAM_VOICES } from "@/lib/sarvam-config";
+import { useUser } from "@/hooks/use-user";
+import { canAffordAction } from "@/lib/credit-costs";
 
 // Combined voice catalog across providers — the provider is an internal
 // routing detail (see lib/voice-tts.js), never surfaced in this dropdown.
 const ALL_VOICES = [...ELEVENLABS_VOICES, ...SARVAM_VOICES];
+
+const PIPELINE_CREDIT_ACTION = "action_reel_video";
 
 const MIN_SCRIPT_WORDS = 20;
 const MAX_SCRIPT_WORDS = 300;
@@ -54,6 +59,8 @@ const ChevronDown = () => (
  * - 2-part pipeline framing (hook + highlights/CTA) instead of 3-part.
  */
 export function StepScript({ onBack, onGenerate }) {
+  const { profile } = useUser();
+  const affordability = canAffordAction({ profile, action: PIPELINE_CREDIT_ACTION });
   const [mode, setMode] = useState("manual");
   const [language, setLanguage] = useState("english");
   const [elevenLabsVoice, setElevenLabsVoice] = useState(ALL_VOICES[0].id);
@@ -95,9 +102,13 @@ export function StepScript({ onBack, onGenerate }) {
           voiceId: elevenLabsVoice,
           voiceLabel: voice?.label?.split(" (")[0],
           language,
+          action: "action_reel_video",
         }),
       });
-      if (!res.ok) throw new Error("Preview failed");
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody.message || errBody.error || "Preview failed");
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       if (previewAudioRef.current) {
@@ -129,7 +140,10 @@ export function StepScript({ onBack, onGenerate }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text, voiceId: elevenLabsVoice, language }),
       });
-      if (!res.ok) throw new Error("Preview failed");
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody.message || errBody.error || "Preview failed");
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       if (scriptPreviewAudioRef.current) {
@@ -166,10 +180,11 @@ export function StepScript({ onBack, onGenerate }) {
           cta: qaAnswers.cta,
           language,
           tone,
+          action: "action_reel_video",
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Script generation failed");
+      if (!res.ok) throw new Error(data.message || data.error || "Script generation failed");
       setAiGeneratedScript(data.script || "");
       setScriptWordCount(data.wordCount || 0);
       setScriptEstDuration(data.estimatedDuration || 0);
@@ -393,17 +408,28 @@ export function StepScript({ onBack, onGenerate }) {
                 className="w-full text-sm border border-border/60 rounded-2xl bg-background px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 placeholder:text-muted-foreground/50"
               />
             </div>
-            <Button
-              onClick={handleGenerateAiScript}
-              disabled={!qaAnswers.propertyName || !qaAnswers.location || generatingScript}
-              className="w-full gradient-bg text-white hover:opacity-90 disabled:opacity-40 gap-2"
-            >
-              {generatingScript ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> Writing script with AI…</>
-              ) : (
-                <><Wand2 className="w-4 h-4" /> Generate Script with AI</>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="block w-full">
+                  <Button
+                    onClick={handleGenerateAiScript}
+                    disabled={!qaAnswers.propertyName || !qaAnswers.location || generatingScript || !affordability.ok}
+                    className="w-full gradient-bg text-white hover:opacity-90 disabled:opacity-40 gap-2"
+                  >
+                    {generatingScript ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Writing script with AI…</>
+                    ) : (
+                      <><Wand2 className="w-4 h-4" /> Generate Script with AI</>
+                    )}
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              {!affordability.ok && (
+                <TooltipContent>
+                  Not enough credits — need {affordability.required}, you have {affordability.credits}.
+                </TooltipContent>
               )}
-            </Button>
+            </Tooltip>
           </div>
 
           {aiGeneratedScript && (
@@ -465,14 +491,25 @@ export function StepScript({ onBack, onGenerate }) {
           <ChevronLeft className="w-4 h-4" />
           Back
         </Button>
-        <Button
-          onClick={handleGenerate}
-          disabled={!isScriptReady}
-          className="gradient-bg text-white hover:opacity-90 disabled:opacity-40 shadow-lg gap-2 px-6"
-        >
-          <Sparkles className="w-4 h-4" />
-          Generate Action Reel
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-block">
+              <Button
+                onClick={handleGenerate}
+                disabled={!isScriptReady || !affordability.ok}
+                className="gradient-bg text-white hover:opacity-90 disabled:opacity-40 shadow-lg gap-2 px-6"
+              >
+                <Sparkles className="w-4 h-4" />
+                Generate Action Reel
+              </Button>
+            </span>
+          </TooltipTrigger>
+          {!affordability.ok && (
+            <TooltipContent>
+              Not enough credits — need {affordability.required}, you have {affordability.credits}.
+            </TooltipContent>
+          )}
+        </Tooltip>
       </div>
     </div>
   );
