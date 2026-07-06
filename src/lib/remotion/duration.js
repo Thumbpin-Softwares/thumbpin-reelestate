@@ -55,6 +55,73 @@ export function calcDurationInFrames({
 }
 
 /**
+ * Given the full original timeline length and a list of excluded frame
+ * ranges (frames to cut out, in original-timeline coordinates), returns the
+ * resulting shorter "virtual" timeline plus the original<->virtual mapping
+ * for each surviving chunk. Overlapping/adjacent excluded ranges are merged.
+ *
+ * Used by the editor's Cut tool: deleting a clip on the ruler removes that
+ * span from the composition (both preview and export), rippling everything
+ * after it earlier — rather than just muting/hiding it in place.
+ */
+export function applyCutRanges(totalDurationInFrames, excludedRanges = []) {
+  const merged = excludedRanges
+    .map((r) => ({
+      start: Math.max(0, Math.min(r.start, totalDurationInFrames)),
+      end:   Math.max(0, Math.min(r.end,   totalDurationInFrames)),
+    }))
+    .filter((r) => r.end > r.start)
+    .sort((a, b) => a.start - b.start)
+    .reduce((acc, r) => {
+      const last = acc[acc.length - 1];
+      if (last && r.start <= last.end) last.end = Math.max(last.end, r.end);
+      else acc.push({ ...r });
+      return acc;
+    }, []);
+
+  const keepRanges = [];
+  let cursor = 0;
+  for (const r of merged) {
+    if (r.start > cursor) keepRanges.push({ originalStart: cursor, originalEnd: r.start });
+    cursor = Math.max(cursor, r.end);
+  }
+  if (cursor < totalDurationInFrames) {
+    keepRanges.push({ originalStart: cursor, originalEnd: totalDurationInFrames });
+  }
+
+  let virtualCursor = 0;
+  for (const kr of keepRanges) {
+    kr.virtualStart = virtualCursor;
+    virtualCursor += kr.originalEnd - kr.originalStart;
+    kr.virtualEnd = virtualCursor;
+  }
+
+  return { keptDurationInFrames: virtualCursor, keepRanges };
+}
+
+/**
+ * Maps a frame range in the *virtual* (post-cut) timeline back to one or
+ * more ranges in the *original* timeline, using the keepRanges produced by
+ * applyCutRanges. Needed when the user deletes a clip they selected on the
+ * (already-cut) ruler — we need to know what original footage that
+ * corresponds to so it can be added to the excluded-ranges list.
+ */
+export function mapVirtualRangeToOriginal(virtualStart, virtualEnd, keepRanges) {
+  const ranges = [];
+  for (const kr of keepRanges) {
+    const start = Math.max(virtualStart, kr.virtualStart);
+    const end   = Math.min(virtualEnd,   kr.virtualEnd);
+    if (end > start) {
+      ranges.push({
+        start: kr.originalStart + (start - kr.virtualStart),
+        end:   kr.originalStart + (end   - kr.virtualStart),
+      });
+    }
+  }
+  return ranges;
+}
+
+/**
  * Duration calculator for the "Action Reel" composition — two independent,
  * already-baked-audio Seedance clips back to back, no broll/intro/outro layers.
  */
