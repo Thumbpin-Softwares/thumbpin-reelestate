@@ -21,7 +21,7 @@
     "@remotion/media": "^4.0.478",
     "@remotion/player": "^4.0.478",
     "@remotion/renderer": "^4.0.478",
-    "@remotion/transitions": "^4.0.478",
+    "@remotion/transitions": "4.0.479",
     "autoprefixer": "^10.5.0",
     "bcryptjs": "^3.0.3",
     "canvas-confetti": "^1.9.4",
