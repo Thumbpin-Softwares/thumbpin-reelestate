@@ -22,6 +22,7 @@
     "@remotion/player": "^4.0.478",
     "@remotion/renderer": "^4.0.478",
     "@remotion/transitions": "4.0.479",
+    "@smithy/node-http-handler": "^4.9.3",
     "autoprefixer": "^10.5.0",
     "bcryptjs": "^3.0.3",
     "canvas-confetti": "^1.9.4",
