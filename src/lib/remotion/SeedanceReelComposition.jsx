@@ -13,13 +13,14 @@ import {
 import { Audio } from "@remotion/media";
 import { IntroAnimation } from "./IntroAnimation";
 import { OutroAnimation } from "./OutroAnimation";
+import { getOverlayFontCss, hexToRgba } from "./overlay-fonts";
 
 /**
  * A user-placed text or image overlay that stays on screen for the whole
  * reel. Position is stored as a percent (x, y = center point) so it's
  * resolution-independent between the editor's drag layer and this
  * composition. Shape: { id, type: "text"|"image", x, y, width, text,
- * fontSize, color, url }.
+ * fontSize, color, fontFamily, bgColor, bgOpacity, url }.
  */
 function Overlay({ overlay }) {
   const style = {
@@ -42,13 +43,17 @@ function Overlay({ overlay }) {
     <div
       style={{
         ...style,
+        boxSizing: "border-box",
         fontSize: overlay.fontSize || 48,
         color: overlay.color || "#ffffff",
         fontWeight: 700,
         textAlign: "center",
-        fontFamily: "sans-serif",
+        fontFamily: getOverlayFontCss(overlay.fontFamily),
         whiteSpace: "pre-wrap",
         textShadow: "0 2px 10px rgba(0,0,0,0.55)",
+        backgroundColor: hexToRgba(overlay.bgColor, overlay.bgOpacity),
+        padding: overlay.bgOpacity ? "0.3em 0.5em" : 0,
+        borderRadius: overlay.bgOpacity ? 12 : 0,
       }}
     >
       {overlay.text}
@@ -97,6 +102,8 @@ export function SeedanceReelComposition({
   introTagline   = "Where Every Detail Matters",
   outroBrandText = "thumbpin.ai",
   overlays       = [],
+  musicUrl              = "",
+  musicTrimStartSeconds = 0,
 }) {
   const { fps } = useVideoConfig();
   const { isRendering } = getRemotionEnvironment();
@@ -216,13 +223,25 @@ export function SeedanceReelComposition({
         </Sequence>
       )}
 
-      {/* 6 — User text/image overlays — on top of everything, full duration */}
+      {/* 6 — User text/image overlays — on top of everything, full duration.
+          Array order is the stacking order: later entries render on top. */}
       {overlays.length > 0 && (
         <AbsoluteFill>
-          {overlays.map((overlay) => (
+          {overlays.filter((overlay) => !overlay.hidden).map((overlay) => (
             <Overlay key={overlay.id} overlay={overlay} />
           ))}
         </AbsoluteFill>
+      )}
+
+      {/* 7 — Background music, trimmed to whichever section the user picked
+          in the editor. Playback is naturally cut off at the composition's
+          own duration, so no explicit trimAfter is needed. */}
+      {musicUrl && (
+        <Audio
+          src={musicUrl}
+          trimBefore={Math.round(musicTrimStartSeconds * fps)}
+          volume={0.25}
+        />
       )}
     </AbsoluteFill>
   );
