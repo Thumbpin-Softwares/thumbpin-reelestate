@@ -47,6 +47,7 @@ function buildBaseRenderProps(compositionProps, overlays = [], music = null) {
     overlays,
     musicUrl:              music?.url || "",
     musicTrimStartSeconds: music?.trimStart || 0,
+    musicVolume:           music?.volume ?? 0.25,
     brollClips: clampBrollClips({
       avatarDuration: compositionProps.avatarDuration,
       brollClips:     compositionProps.brollClips,
@@ -98,6 +99,7 @@ const PlayerContainer = memo(
       overlays:       overlays || [],
       musicUrl:              music?.url || "",
       musicTrimStartSeconds: music?.trimStart || 0,
+      musicVolume:           music?.volume ?? 0.25,
     };
 
     return (
@@ -420,11 +422,15 @@ export function Editor({ compositionProps, onExit }) {
   const handleStopEditOverlay = () => setEditingOverlayId(null);
 
   const handleSelectMusic = (track) => {
-    setMusic({ key: track.key, url: track.url, name: track.name, trimStart: 0 });
+    setMusic({ key: track.key, url: track.url, name: track.name, trimStart: 0, volume: 0.25 });
   };
 
   const handleTrimMusic = (trimStart) => {
     setMusic((prev) => (prev ? { ...prev, trimStart } : prev));
+  };
+
+  const handleVolumeMusic = (volume) => {
+    setMusic((prev) => (prev ? { ...prev, volume } : prev));
   };
 
   const handleClearMusic = () => setMusic(null);
@@ -597,6 +603,7 @@ export function Editor({ compositionProps, onExit }) {
                     reelDurationSeconds={durationInFrames / FPS}
                     onSelect={handleSelectMusic}
                     onTrimChange={handleTrimMusic}
+                    onVolumeChange={handleVolumeMusic}
                     onClear={handleClearMusic}
                   />
                 )}

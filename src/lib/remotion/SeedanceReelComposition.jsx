@@ -104,6 +104,7 @@ export function SeedanceReelComposition({
   overlays       = [],
   musicUrl              = "",
   musicTrimStartSeconds = 0,
+  musicVolume           = 0.25,
 }) {
   const { fps } = useVideoConfig();
   const { isRendering } = getRemotionEnvironment();
@@ -240,7 +241,7 @@ export function SeedanceReelComposition({
         <Audio
           src={musicUrl}
           trimBefore={Math.round(musicTrimStartSeconds * fps)}
-          volume={0.25}
+          volume={musicVolume}
         />
       )}
     </AbsoluteFill>
