@@ -95,7 +95,7 @@ async function callSeedanceAndUpload(seedanceInput, userId, keyName) {
 }
 
 // ── Fixed master templates — reproduced as-is except for the quoted dialogue ─
-const MASTER_TEMPLATE_A = `A hyper-realistic, vertical (9:16) UGC-style action real estate indian accent vlog. Natural, dynamic lighting. It looks like a high-budget smartphone video. All spoken dialogue is delivered in a natural, conversational Hindi accent — casual everyday rhythm and pacing, like a real person talking to a friend, not overly enunciated or textbook-perfect.
+const MASTER_TEMPLATE_A = `A hyper-realistic, vertical (9:16) UGC-style action real estate indian accent vlog. Natural, dynamic lighting. It looks like a high-budget smartphone video. All spoken dialogue is delivered in a natural, indian accent conversational indian accent — casual everyday rhythm and pacing, like a real person talking to a friend, not overly enunciated or textbook-perfect.
 
 [0:00 - 0:05] The video opens with an action-packed, fast-paced shot. A sleek black luxury helicopter hovers just above the ground. The female agent, Anvi (using #image7 for her facial features and #image5 for her black outfit), dramatically slides down a thick rope from the helicopter door. The moment her feet hit the ground, she immediately grabs the camera selfie-style. With her hair blowing wildly from the helicopter blades, she looks directly into the lens with intense high energy and says: "Kya aap bhi usi purani balcony se shehar ki bheed dekh kar bore ho gaye hain? Hello, main hoon Anvi..."
 
@@ -105,7 +105,7 @@ const MASTER_TEMPLATE_A = `A hyper-realistic, vertical (9:16) UGC-style action r
 
 [0:11 - 0:15] Hard cut. Back to the agent Anvi (#image7 and #image5) standing on the ground. The helicopter is still hovering in the background behind her. She smiles confidently, holding the camera selfie-style, and finishes her sentence: "...aapki real estate expert, aur aaj main aapko dikhane waali hoon aapka naya ultra-luxury ghar!" She stops speaking at exactly 13 seconds and spends the final 2 seconds simply holding a bright, confident smile at the camera as the wind blows her hair, ending the video naturally.`;
 
-const MASTER_TEMPLATE_B = `A hyper-realistic, vertical (9:16) UGC-style high-energy real estate indian accent vlog. Dynamic, fast-paced cinematic editing. Natural interior lighting. All spoken dialogue is delivered in a natural, conversational Hindi accent — casual everyday rhythm and pacing, like a real person talking to a friend, not overly enunciated or textbook-perfect.
+const MASTER_TEMPLATE_B = `A hyper-realistic, vertical (9:16) UGC-style high-energy real estate indian accent vlog. Dynamic, fast-paced cinematic editing. Natural interior lighting. All spoken dialogue is delivered in a natural, indian accent conversational indian accent — casual everyday rhythm and pacing, like a real person talking to a friend, not overly enunciated or textbook-perfect.
 
 [0:00 - 0:03] The video opens with a fast, FPV drone-style sweeping shot moving towards the modern luxury villa exterior, matching exactly with #image1. The voiceover starts: "Zara sochiye... aapka apna ultra-luxury ghar..."
 
