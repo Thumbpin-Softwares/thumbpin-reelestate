@@ -45,7 +45,7 @@ export default function Footer() {
               />
             </div>
 
-            <span className="text-xl">ThumbGram</span>
+            <span className="text-xl">Thumbplay.ai</span>
           </div>
 
           <p className="text-sm max-w-sm text-neutral-800">
@@ -95,7 +95,7 @@ export default function Footer() {
       {/* Bottom */}
       <div className="max-w-7xl mx-auto px-6 md:px-12 lg:px-24 py-4 flex flex-col sm:flex-row gap-4 sm:gap-0 items-center justify-between">
         <span className="text-neutral-500 text-sm text-center sm:text-left">
-          © 2026 ThumbGram. All rights reserved.
+          © 2026 Thumbplay.ai. All rights reserved.
         </span>
 
         <ul className="flex flex-wrap justify-center gap-4 text-neutral-500 text-sm">

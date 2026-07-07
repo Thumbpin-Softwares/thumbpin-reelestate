@@ -49,7 +49,7 @@ export default function ProfilePage() {
           <div className="flex items-start justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">
-                ThumbGram Card
+                Thumbplay.ai Card
               </p>
 
               <h2 className="text-xl font-bold text-white mt-2">

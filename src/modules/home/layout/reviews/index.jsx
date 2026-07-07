@@ -21,11 +21,11 @@ export default function Review() {
           </span>
 
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold">
-            Proof from teams scaling creative faster with ThumbGram.
+            Proof from teams scaling creative faster with Thumbplay.ai.
           </h1>
 
           <p className="text-neutral-500 text-sm sm:text-base">
-            Real growth teams use ThumbGram to ship more creative, test more
+            Real growth teams use Thumbplay.ai to ship more creative, test more
             angles, and put budget toward what converts.
           </p>
         </div>
@@ -78,7 +78,7 @@ export default function Review() {
           </div>
 
           <p className="text-lg sm:text-xl lg:text-2xl">
-            “ThumbGram cut our creative turnaround from days to minutes. We can
+            “Thumbplay.ai cut our creative turnaround from days to minutes. We can
             launch more angles, react faster to what is working, and scale
             performance without growing the team behind the ads.”
           </p>
@@ -106,7 +106,7 @@ export default function Review() {
           {[
             {
               brand: "Brandboost",
-              text: "We scaled creative output without adding headcount. ThumbGram gives us launch-ready ads that stay on-brand and ready for testing.",
+              text: "We scaled creative output without adding headcount. Thumbplay.ai gives us launch-ready ads that stay on-brand and ready for testing.",
               stats: [
                 ["$2.4M", "revenue generated"],
                 ["240%", "lift in ROAS"],

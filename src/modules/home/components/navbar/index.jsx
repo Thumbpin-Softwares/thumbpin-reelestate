@@ -45,7 +45,7 @@ export function Navbar() {
               <RectangleGoggles className="w-4 h-4" fill="#c7f038" />
             </div>
             <span className="text-lg sm:text-xl font-semibold">
-              ThumbGram
+              Thumbplay.ai
             </span>
           </Link>
 

@@ -218,10 +218,18 @@ export function CaptionsPanel({ captionState, onGenerate, onReset, onDraftChange
 
       <div className="grid grid-cols-2 gap-2">
         {CAPTION_PRESETS.map((p) => (
-          <button
+          <div
             key={p.id}
+            role="button"
+            tabIndex={0}
             onClick={() => openPreset(p)}
-            className={`group relative rounded-lg border p-1.5 text-[11px] font-medium text-center transition-colors ${
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                openPreset(p);
+              }
+            }}
+            className={`group relative rounded-lg border p-1.5 text-[11px] font-medium text-center transition-colors cursor-pointer ${
               appliedPreset === p.id
                 ? "border-neutral-900 bg-neutral-900 text-white"
                 : "border-border/50 text-muted-foreground hover:text-foreground hover:bg-muted/40"
@@ -255,7 +263,7 @@ export function CaptionsPanel({ captionState, onGenerate, onReset, onDraftChange
             {appliedPreset === p.id && (
               <Check className="absolute -top-1.5 -left-1.5 w-3.5 h-3.5 bg-emerald-500 text-white rounded-full p-0.5" />
             )}
-          </button>
+          </div>
         ))}
       </div>
 

@@ -95,7 +95,7 @@ export default function UserNav() {
                 <div className="bg-black flex items-center justify-center p-2 rounded-full shrink-0">
                   <RectangleGoggles className="w-4 h-4" fill="#c7f038" />
                 </div>
-                <span className="text-xl font-semibold">ThumbGram</span>
+                <span className="text-xl font-semibold">Thumbplay.ai</span>
               </Link>
             </SheetTitle>
           </SheetHeader>
