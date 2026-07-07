@@ -1,21 +1,43 @@
 // Pipelines whose generated videos can be reopened in the unified Remotion
 // editor at /app/edit. Each entry maps the Asset's metadata.source to the
 // render API and the "back to generator" path for that pipeline.
+//
+// compositionType selects which Remotion component/duration-calc the Editor
+// (modules/edit/layout/editor) uses for preview + render props:
+//   "seedance"    — avatarVideoUrl + brollClips + ctaVideoUrl + part2AudioUrl
+//                   (SeedanceReelComposition) — seedance-reel/news-anchor/home-tour
+//   "action-reel" — part1VideoUrl + part2VideoUrl, two flat baked-audio clips
+//                   (ActionReelComposition) — action-reel/comedy-reel
 export const EDITABLE_SOURCES = {
   "seedance-reel": {
+    compositionType: "seedance",
     renderEndpoint: "/api/seedance-reel/render-remotion",
     generatorPath: "/app/seedance-reel",
     downloadFilename: "seedance-reel.mp4",
   },
   "news-anchor": {
+    compositionType: "seedance",
     renderEndpoint: "/api/news-anchor/render-remotion",
     generatorPath: "/app/news-anchor",
     downloadFilename: "news-anchor.mp4",
   },
   "home-tour": {
+    compositionType: "seedance",
     renderEndpoint: "/api/home-tour/render-remotion",
     generatorPath: "/app/home-tour",
     downloadFilename: "home-tour.mp4",
+  },
+  "action-reel": {
+    compositionType: "action-reel",
+    renderEndpoint: "/api/action-reel/render-remotion",
+    generatorPath: "/app/action-reel",
+    downloadFilename: "action-reel.mp4",
+  },
+  "comedy-reel": {
+    compositionType: "action-reel",
+    renderEndpoint: "/api/comedy-reel/render-remotion",
+    generatorPath: "/app/comedy-reel",
+    downloadFilename: "comedy-reel.mp4",
   },
 };
 
@@ -57,7 +79,26 @@ export async function getAudioDuration(url) {
  * exact values used at generation time). */
 export async function buildCompositionFromAsset(asset) {
   const source = asset.metadata?.source;
-  if (!EDITABLE_SOURCES[source]) return null;
+  const sourceConfig = EDITABLE_SOURCES[source];
+  if (!sourceConfig) return null;
+
+  if (sourceConfig.compositionType === "action-reel") {
+    const { part1VideoUrl, part2VideoUrl } = asset.metadata;
+    const [part1Dur, part2Dur] = await Promise.all([
+      getVideoDuration(part1VideoUrl),
+      getVideoDuration(part2VideoUrl),
+    ]);
+
+    return {
+      source,
+      assetId: asset.id || "",
+      name: asset.name || "",
+      part1VideoUrl: part1VideoUrl || "",
+      part2VideoUrl: part2VideoUrl || "",
+      part1Duration: part1Dur > 0 ? part1Dur : 15,
+      part2Duration: part2Dur > 0 ? part2Dur : 15,
+    };
+  }
 
   const { avatarVideoUrl, walkthroughVideoUrl, ctaVideoUrl, part2AudioUrl } = asset.metadata;
 

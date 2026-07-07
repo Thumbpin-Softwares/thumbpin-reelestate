@@ -20,7 +20,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SeedanceReelComposition, calcSeedanceReelDurationInFrames } from "@/lib/remotion/SeedanceReelComposition";
-import { calcDurationInFrames, clampBrollClips, applyCutRanges, mapVirtualRangeToOriginal } from "@/lib/remotion/duration";
+import { ActionReelComposition, calcActionReelDurationInFrames } from "@/lib/remotion/ActionReelComposition";
+import { calcDurationInFrames, calcActionReelBaseDurationInFrames, clampBrollClips, applyCutRanges, mapVirtualRangeToOriginal } from "@/lib/remotion/duration";
 import { EDITABLE_SOURCES } from "@/lib/editable-sources";
 import { CAPTION_PRESETS } from "@/lib/remotion/caption-presets";
 import { CaptionsPanel } from "@/modules/edit/components/caption-panel";
@@ -40,6 +41,8 @@ function draftSignature(compositionProps) {
     compositionProps.avatarVideoUrl,
     compositionProps.ctaVideoUrl,
     compositionProps.part2AudioUrl,
+    compositionProps.part1VideoUrl,
+    compositionProps.part2VideoUrl,
   ].join("|");
 }
 
@@ -56,14 +59,26 @@ function createOverlay(type) {
   return { id, type: "image", x: 50, y: 50, width: 40, url: "", aspect: null, hidden: false };
 }
 
-function buildBaseRenderProps(compositionProps, overlays = [], music = null, cutRanges = []) {
-  return {
-    ...compositionProps,
+// Shared by the live Player preview and the render/caption POST bodies — the
+// two composition shapes need different extra fields (action-reel has no
+// broll/intro/outro layer at all), so this is the one place that decides
+// which fields belong on top of the raw compositionProps + overlays/music/cuts.
+function buildFullCompositionProps({ compositionProps, isActionReelType, overlays = [], music = null, cutRanges = [] }) {
+  const shared = {
     overlays,
     musicUrl:              music?.url || "",
     musicTrimStartSeconds: music?.trimStart || 0,
     musicVolume:           music?.volume ?? 0.25,
     cutRanges,
+  };
+
+  if (isActionReelType) {
+    return { ...compositionProps, ...shared };
+  }
+
+  return {
+    ...compositionProps,
+    ...shared,
     brollClips: clampBrollClips({
       avatarDuration: compositionProps.avatarDuration,
       brollClips:     compositionProps.brollClips,
@@ -81,6 +96,11 @@ function buildBaseRenderProps(compositionProps, overlays = [], music = null, cut
   };
 }
 
+function buildBaseRenderProps(compositionProps, overlays = [], music = null, cutRanges = []) {
+  const isActionReelType = EDITABLE_SOURCES[compositionProps.source]?.compositionType === "action-reel";
+  return buildFullCompositionProps({ compositionProps, isActionReelType, overlays, music, cutRanges });
+}
+
 function formatTime(seconds) {
   const clamped = Math.max(0, seconds);
   const m = Math.floor(clamped / 60);
@@ -93,36 +113,20 @@ function formatTime(seconds) {
 // compositionProps comes from a reducer and is a stable reference during playback,
 // so this component only re-renders when the user actually changes the composition.
 const PlayerContainer = memo(
-  forwardRef(function PlayerContainer({ compositionProps, durationInFrames, overlays, music, cutRanges }, ref) {
-    const clampedBrollClips = clampBrollClips({
-      avatarDuration: compositionProps.avatarDuration,
-      brollClips:     compositionProps.brollClips,
-      ctaDuration:    compositionProps.ctaDuration,
-      showIntro:      false,
-      showOutro:      false,
+  forwardRef(function PlayerContainer({ compositionProps, compositionType, durationInFrames, overlays, music, cutRanges }, ref) {
+    const isActionReelType = compositionType === "action-reel";
+    const previewProps = buildFullCompositionProps({
+      compositionProps,
+      isActionReelType,
+      overlays: overlays || [],
+      music,
+      cutRanges: cutRanges || [],
     });
-
-    const previewProps = {
-      ...compositionProps,
-      brollClips:     clampedBrollClips,
-      showIntro:      false,
-      showOutro:      false,
-      introTitle:     "",
-      introSubtitle:  "",
-      introTagline:   "",
-      outroBrandText: "thumbpin.ai",
-      ctaText:        compositionProps.ctaText || "",
-      overlays:       overlays || [],
-      musicUrl:              music?.url || "",
-      musicTrimStartSeconds: music?.trimStart || 0,
-      musicVolume:           music?.volume ?? 0.25,
-      cutRanges:             cutRanges || [],
-    };
 
     return (
       <Player
         ref={ref}
-        component={SeedanceReelComposition}
+        component={isActionReelType ? ActionReelComposition : SeedanceReelComposition}
         inputProps={previewProps}
         durationInFrames={durationInFrames}
         compositionWidth={1080}
@@ -179,8 +183,9 @@ export function Editor({ compositionProps, onExit }) {
   const [captionDuration, setCaptionDuration] = useState(0);
 
   const sourceConfig = EDITABLE_SOURCES[compositionProps.source] || {};
+  const isActionReelType = sourceConfig.compositionType === "action-reel";
 
-  const clampedBrollClipsForDuration = clampBrollClips({
+  const clampedBrollClipsForDuration = isActionReelType ? [] : clampBrollClips({
     avatarDuration: compositionProps.avatarDuration,
     brollClips:     compositionProps.brollClips,
     ctaDuration:    compositionProps.ctaDuration,
@@ -190,25 +195,37 @@ export function Editor({ compositionProps, onExit }) {
 
   // Length of the raw, uncut reel — cutRanges (from the ruler's Cut tool)
   // are stored in this original timeline's frame coordinates.
-  const originalDurationInFrames = calcDurationInFrames({
-    avatarDuration: compositionProps.avatarDuration,
-    brollClips:     clampedBrollClipsForDuration,
-    ctaDuration:    compositionProps.ctaDuration,
-    showIntro:      false,
-    showOutro:      false,
-  });
+  const originalDurationInFrames = isActionReelType
+    ? calcActionReelBaseDurationInFrames({
+        part1Duration: compositionProps.part1Duration,
+        part2Duration: compositionProps.part2Duration,
+      })
+    : calcDurationInFrames({
+        avatarDuration: compositionProps.avatarDuration,
+        brollClips:     clampedBrollClipsForDuration,
+        ctaDuration:    compositionProps.ctaDuration,
+        showIntro:      false,
+        showOutro:      false,
+      });
 
   // What the Player/Timeline actually work with — the reel's length after
-  // cuts ripple everything shorter. Must match calcSeedanceReelDurationInFrames
-  // used server-side, so preview and export always agree.
-  const durationInFrames = calcSeedanceReelDurationInFrames({
-    avatarDuration: compositionProps.avatarDuration,
-    brollClips:     clampedBrollClipsForDuration,
-    ctaDuration:    compositionProps.ctaDuration,
-    showIntro:      false,
-    showOutro:      false,
-    cutRanges,
-  });
+  // cuts ripple everything shorter. Must match the cuts-aware calculator
+  // used server-side (calcSeedanceReelDurationInFrames / calcActionReelDurationInFrames),
+  // so preview and export always agree.
+  const durationInFrames = isActionReelType
+    ? calcActionReelDurationInFrames({
+        part1Duration: compositionProps.part1Duration,
+        part2Duration: compositionProps.part2Duration,
+        cutRanges,
+      })
+    : calcSeedanceReelDurationInFrames({
+        avatarDuration: compositionProps.avatarDuration,
+        brollClips:     clampedBrollClipsForDuration,
+        ctaDuration:    compositionProps.ctaDuration,
+        showIntro:      false,
+        showOutro:      false,
+        cutRanges,
+      });
 
   const { keepRanges } = applyCutRanges(originalDurationInFrames, cutRanges);
 
@@ -608,6 +625,7 @@ export function Editor({ compositionProps, onExit }) {
               <PlayerContainer
                 ref={playerRef}
                 compositionProps={compositionProps}
+                compositionType={sourceConfig.compositionType}
                 durationInFrames={durationInFrames}
                 overlays={overlays}
                 music={music}
@@ -765,7 +783,7 @@ export function Editor({ compositionProps, onExit }) {
           durationInFrames={durationInFrames}
           frame={frame}
           fps={FPS}
-          audioUrl={compositionProps.avatarVideoUrl || null}
+          audioUrl={compositionProps.avatarVideoUrl || compositionProps.part1VideoUrl || null}
           captions={
             captionState.status === "done"
               ? [{

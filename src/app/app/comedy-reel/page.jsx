@@ -73,7 +73,7 @@ function ComedyReelContent() {
 
   const step0Valid = locationImages.length >= 1 && avatarHook.selectedAvatars.length >= 1;
 
-  const handleGenerate = ({ script, voiceId, language, tone }) => {
+  const handleGenerate = ({ script, voiceId, language, tone, customVoiceFile }) => {
     const avatarUrls = avatarHook.selectedAvatars
       .slice(0, 3)
       .map((av) => av.url)
@@ -86,6 +86,7 @@ function ComedyReelContent() {
       tone,
       locationImages,
       avatarUrls,
+      customVoiceFile,
     });
     setStep(2);
 

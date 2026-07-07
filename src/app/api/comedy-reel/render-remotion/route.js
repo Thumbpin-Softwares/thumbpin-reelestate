@@ -44,52 +44,85 @@ async function renderMediaWithRetry(params, attempts = 2) {
 /**
  * POST /api/comedy-reel/render-remotion
  *
- * Body (JSON): part1VideoUrl, part2VideoUrl, part1Duration, part2Duration
- * Returns: { url } — final MP4 on R2
+ * Body (JSON): part1VideoUrl, part2VideoUrl, part1Duration, part2Duration,
+ *   plus editor additions — overlays, musicUrl, musicTrimStartSeconds,
+ *   musicVolume, cutRanges, trimInFrame, trimOutFrame.
  *
- * Reuses the "ActionReel" Remotion composition — comedy-reel's output shape
- * (two baked-audio clips, hard cut, no overlay audio) is identical to
- * action-reel's, so no separate composition is needed.
+ * Streams SSE progress events ({ type: "status"|"progress"|"done"|"error" })
+ * so it can be driven by the shared /app/edit Editor the same way
+ * seedance-reel's render-remotion is. Reuses the "ActionReel" Remotion
+ * composition — comedy-reel's output shape (two baked-audio clips, hard cut)
+ * is identical to action-reel's, so no separate composition is needed.
  */
 export async function POST(request) {
   const session = await getServerSession(authOptions);
   const userId = session?.user?.id || session?.user?._id || "anon";
-
   const inputProps = await request.json();
 
-  try {
-    const serveUrl = await getBundle();
+  const { readable, writable } = new TransformStream();
+  const writer = writable.getWriter();
+  const enc = new TextEncoder();
 
-    const composition = await selectComposition({
-      serveUrl,
-      id: "ActionReel",
-      inputProps,
-    });
+  const send = (obj) => {
+    try { writer.write(enc.encode(`data: ${JSON.stringify(obj)}\n\n`)); } catch (_) {}
+  };
 
-    const outputPath = join(tmpdir(), `comedy-reel-${Date.now()}.mp4`);
+  (async () => {
+    try {
+      send({ type: "status", message: "Bundling…" });
+      const serveUrl = await getBundle();
 
-    await renderMediaWithRetry({
-      composition,
-      serveUrl,
-      codec: "h264",
-      outputLocation: outputPath,
-      inputProps,
-      chromiumOptions: {
-        disableWebSecurity: true,
-      },
-      x264Preset: "fast",
-      onProgress: () => {},
-    });
+      send({ type: "status", message: "Preparing composition…" });
+      const composition = await selectComposition({
+        serveUrl,
+        id: "ActionReel",
+        inputProps,
+      });
 
-    const videoBuf = readFileSync(outputPath);
-    try { unlinkSync(outputPath); } catch (_) {}
+      const outputPath = join(tmpdir(), `comedy-reel-${Date.now()}.mp4`);
 
-    const key = buildUserKey(userId, "videos", "mp4", `comedy-final-${Date.now()}`);
-    const url = await uploadToR2(videoBuf, key, "video/mp4");
+      send({ type: "status", message: "Rendering frames…" });
+      const { trimInFrame, trimOutFrame, ...compositionInputProps } = inputProps;
+      const frameRange = (
+        typeof trimInFrame === "number" && typeof trimOutFrame === "number" &&
+        (trimInFrame > 0 || trimOutFrame < composition.durationInFrames)
+      ) ? [trimInFrame, trimOutFrame - 1] : undefined;
 
-    return Response.json({ url });
-  } catch (err) {
-    console.error("[comedy-reel render-remotion] Error:", err);
-    return Response.json({ error: err.message || "Render failed" }, { status: 500 });
-  }
+      await renderMediaWithRetry({
+        composition,
+        serveUrl,
+        codec: "h264",
+        outputLocation: outputPath,
+        inputProps: compositionInputProps,
+        chromiumOptions: { disableWebSecurity: true },
+        x264Preset: "fast",
+        ...(frameRange ? { frameRange } : {}),
+        onProgress: ({ progress }) => {
+          send({ type: "progress", progress: Math.round(progress * 100) });
+        },
+      });
+
+      send({ type: "status", message: "Uploading…" });
+      const videoBuf = readFileSync(outputPath);
+      try { unlinkSync(outputPath); } catch (_) {}
+
+      const key = buildUserKey(userId, "videos", "mp4", `comedy-final-${Date.now()}`);
+      const url = await uploadToR2(videoBuf, key, "video/mp4");
+
+      send({ type: "done", url });
+    } catch (err) {
+      console.error("[comedy-reel render-remotion] Error:", err);
+      send({ type: "error", error: err.message || "Render failed" });
+    } finally {
+      try { writer.close(); } catch (_) {}
+    }
+  })();
+
+  return new Response(readable, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      "Connection": "keep-alive",
+    },
+  });
 }

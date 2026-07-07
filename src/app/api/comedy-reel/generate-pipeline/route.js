@@ -6,7 +6,7 @@ import { authOptions } from "@/lib/auth-config";
 import Asset from "@/models/Asset";
 import SeedanceJob from "@/models/SeedanceJob";
 import dbConnect from "@/lib/mongodb";
-import { uploadToR2, buildUserKey } from "@/lib/r2-upload";
+import { uploadToR2, buildUserKey, extFromMime } from "@/lib/r2-upload";
 import { R2_PUBLIC_URL } from "@/lib/r2";
 import {
   consumeCreditsForAction,
@@ -290,6 +290,19 @@ export async function POST(request) {
       }
     }
 
+    // User's own recorded/uploaded voice, if provided — bypasses ElevenLabs
+    // TTS entirely and goes straight to Seedance as the audio_urls reference
+    // for both parts (see Stage 2 below).
+    let customVoiceBuf = null;
+    let customVoiceMimeType = null;
+    const customVoiceFile = formData.get("customVoiceFile");
+    if (customVoiceFile && typeof customVoiceFile !== "string") {
+      try {
+        customVoiceBuf = Buffer.from(await customVoiceFile.arrayBuffer());
+        customVoiceMimeType = customVoiceFile.type || "audio/webm";
+      } catch (_) {}
+    }
+
     if (avatarUrls.length === 0 && locationBufs.length === 0) {
       return NextResponse.json(
         { error: "At least avatar URLs or location images are required" },
@@ -341,6 +354,21 @@ export async function POST(request) {
       console.error(
         `[ComedyReel] All ${locationBufs.length} location image upload(s) failed.`,
       );
+    }
+
+    // Upload the user's own voice recording/upload, if provided.
+    let customVoiceUrl = null;
+    if (customVoiceBuf) {
+      try {
+        const ext = extFromMime(customVoiceMimeType);
+        const key = buildUserKey(userId, "audio", ext, "comedy-custom-voice");
+        customVoiceUrl = await uploadToR2(customVoiceBuf, key, customVoiceMimeType);
+      } catch (e) {
+        console.warn(
+          "[ComedyReel] Custom voice upload failed, falling back to TTS:",
+          e.message,
+        );
+      }
     }
 
     const encoder = new TextEncoder();
@@ -553,33 +581,46 @@ ${part2}`;
           send({ type: "script_split", part1, part2, part1Words, part2Words });
           await persistJob({ status: "splitting", part1, part2 });
 
-          // ── Stage 2: Generate both TTS in parallel ────────────────────────
-          send({
-            type: "voice_generating",
-            message: "Generating voiceovers for both parts in parallel…",
-          });
+          // ── Stage 2: Voice — the user's own recording (if provided) goes
+          // straight to Seedance as the reference audio for BOTH parts,
+          // bypassing ElevenLabs TTS entirely; the selected prebuilt voice is
+          // ignored in that case. Otherwise, generate both TTS parts. ───────
+          let part1AudioUrl = null;
+          let part2AudioUrl = null;
 
-          const [p1TtsResult, p2TtsResult] = await Promise.allSettled([
-            generateAndUploadTTS(part1_tts, voiceId, userId, "comedy-part1-voice"),
-            generateAndUploadTTS(part2_tts, voiceId, userId, "comedy-part2-voice"),
-          ]);
+          if (customVoiceUrl) {
+            send({
+              type: "voice_generating",
+              message: "Using your uploaded voice as the reference audio…",
+            });
+            part1AudioUrl = customVoiceUrl;
+            part2AudioUrl = customVoiceUrl;
+          } else {
+            send({
+              type: "voice_generating",
+              message: "Generating voiceovers for both parts in parallel…",
+            });
 
-          let part1AudioUrl = null,
-            part2AudioUrl = null;
-          if (p1TtsResult.status === "fulfilled") {
-            part1AudioUrl = p1TtsResult.value;
-          } else
-            console.error(
-              "[ComedyReel] Part 1 TTS failed:",
-              p1TtsResult.reason?.message,
-            );
-          if (p2TtsResult.status === "fulfilled") {
-            part2AudioUrl = p2TtsResult.value;
-          } else
-            console.error(
-              "[ComedyReel] Part 2 TTS failed:",
-              p2TtsResult.reason?.message,
-            );
+            const [p1TtsResult, p2TtsResult] = await Promise.allSettled([
+              generateAndUploadTTS(part1_tts, voiceId, userId, "comedy-part1-voice"),
+              generateAndUploadTTS(part2_tts, voiceId, userId, "comedy-part2-voice"),
+            ]);
+
+            if (p1TtsResult.status === "fulfilled") {
+              part1AudioUrl = p1TtsResult.value;
+            } else
+              console.error(
+                "[ComedyReel] Part 1 TTS failed:",
+                p1TtsResult.reason?.message,
+              );
+            if (p2TtsResult.status === "fulfilled") {
+              part2AudioUrl = p2TtsResult.value;
+            } else
+              console.error(
+                "[ComedyReel] Part 2 TTS failed:",
+                p2TtsResult.reason?.message,
+              );
+          }
 
           send({ type: "voice_all_ready", part1AudioUrl, part2AudioUrl });
           await persistJob({ status: "voices", part1AudioUrl, part2AudioUrl });

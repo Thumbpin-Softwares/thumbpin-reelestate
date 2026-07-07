@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   Loader2,
   CheckCircle2,
@@ -14,11 +15,11 @@ import {
   Sparkles,
   FileText,
   Zap,
-  Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { compressImage } from "@/utils/compress-image";
+import { COMPOSITION_STORAGE_KEY, EDIT_PATH } from "@/lib/editable-sources";
 
 /** Probe video duration via browser <video> element (header only, no full download). */
 async function getVideoDuration(url) {
@@ -42,7 +43,7 @@ const STATUS = {
   SPLITTING: "splitting",
   VOICES:    "voices",
   SEEDANCE:  "seedance",
-  RENDERING: "rendering",
+  COMBINING: "combining",
   DONE:      "done",
   ERROR:     "error",
 };
@@ -52,7 +53,7 @@ const STAGE_LABELS = {
   [STATUS.SPLITTING]: "Splitting script into 2 parts…",
   [STATUS.VOICES]:    "Generating voiceovers for both parts…",
   [STATUS.SEEDANCE]:  "Generating 2 videos in parallel (Seedance 2.0)…",
-  [STATUS.RENDERING]: "Rendering final reel via Remotion…",
+  [STATUS.COMBINING]: "Preparing Remotion composition…",
   [STATUS.DONE]:      "Done!",
   [STATUS.ERROR]:     "Error",
 };
@@ -70,7 +71,7 @@ const ORDERED_STAGES = [
   STATUS.SPLITTING,
   STATUS.VOICES,
   STATUS.SEEDANCE,
-  STATUS.RENDERING,
+  STATUS.COMBINING,
 ];
 
 const JOB_STATUS_TO_LOCAL = {
@@ -88,8 +89,12 @@ function formatElapsed(secs) {
 
 /**
  * GenerationProgress for the Comedy Reel pipeline — forked from
- * action-reel's GenerationProgress (same 2-video-slot shape, same
- * render-remotion + inline preview/download flow, no /app/edit handoff).
+ * action-reel's GenerationProgress (same 2-video-slot shape).
+ *
+ * Once both Seedance clips are ready, hands off to the shared /app/edit
+ * Remotion editor (same as seedance-reel/action-reel) instead of rendering
+ * inline — ActionReelComposition supports overlays/music/cuts/trim there,
+ * and the final MP4 only gets rendered when the user hits Export.
  */
 export function GenerationProgress({
   generationParams,
@@ -97,8 +102,8 @@ export function GenerationProgress({
   source = "comedy-reel",
   jobIdKey = "comedy_reel_job_id",
   resumeKey = "comedy_reel_resume",
-  onReset,
 }) {
+  const router = useRouter();
   const {
     script       = "",
     voiceId      = "21m00Tcm4TlvDq8ikWAM",
@@ -106,6 +111,7 @@ export function GenerationProgress({
     tone         = "luxury",
     locationImages = [],
     avatarUrls   = [],
+    customVoiceFile = null,
   } = generationParams || {};
 
   const [status, setStatus] = useState(STATUS.IDLE);
@@ -121,8 +127,7 @@ export function GenerationProgress({
   const [part1VideoUrl, setPart1VideoUrl] = useState(null);
   const [part2VideoUrl, setPart2VideoUrl] = useState(null);
 
-  const [renderProgress, setRenderProgress] = useState("");
-  const [finalVideoUrl, setFinalVideoUrl]   = useState(null);
+  const [combineProgress, setCombineProgress] = useState("");
 
   // Seedance waiting UX
   const [seedanceStart, setSeedanceStart]     = useState(null);
@@ -131,6 +136,12 @@ export function GenerationProgress({
   const [fakeBonus, setFakeBonus]             = useState(0);
 
   const hasStarted = useRef(false);
+  // Set once the stream reaches a real terminal event ("video_ready" or
+  // "error") — lets startPipeline tell a clean finish apart from the
+  // connection just dropping mid-generation (proxy/function timeout etc.),
+  // which otherwise looks identical (reader.read() returning done:true) but
+  // would silently freeze the UI on whatever stage it was in.
+  const reachedTerminalEvent = useRef(false);
 
   useEffect(() => {
     if (status === STATUS.SEEDANCE) {
@@ -162,7 +173,7 @@ export function GenerationProgress({
   const stageProgress  = ORDERED_STAGES.indexOf(status);
   const rawPercent     = status === STATUS.DONE ? 100 : status === STATUS.ERROR ? 0
     : Math.max(4, ((stageProgress + 1) / ORDERED_STAGES.length) * 90);
-  const progressPercent = Math.round(Math.min(96, rawPercent + (status === STATUS.RENDERING ? 0 : fakeBonus)));
+  const progressPercent = Math.round(Math.min(96, rawPercent + (status === STATUS.COMBINING ? 0 : fakeBonus)));
 
   useEffect(() => {
     if (hasStarted.current) return;
@@ -202,7 +213,7 @@ export function GenerationProgress({
 
         if (job.status === "done") {
           try { sessionStorage.removeItem(jobIdKey); } catch (_) {}
-          await renderFinal(job.part1VideoUrl, job.part2VideoUrl);
+          await prepareComposition(job.part1VideoUrl, job.part2VideoUrl);
           return;
         }
         if (job.status === "error") {
@@ -229,11 +240,11 @@ export function GenerationProgress({
     setPart1(""); setPart2("");
     setPart1AudioUrl(null); setPart2AudioUrl(null);
     setPart1VideoUrl(null); setPart2VideoUrl(null);
-    setFinalVideoUrl(null);
     setFakeBonus(0);
 
     const jobId = crypto.randomUUID();
     try { sessionStorage.setItem(jobIdKey, jobId); } catch (_) {}
+    reachedTerminalEvent.current = false;
 
     try {
       const formData = new FormData();
@@ -242,6 +253,7 @@ export function GenerationProgress({
       formData.append("voiceId", voiceId);
       formData.append("language", language);
       formData.append("tone", tone);
+      if (customVoiceFile) formData.append("customVoiceFile", customVoiceFile);
 
       avatarUrls.slice(0, 3).forEach((url, i) => formData.append(`avatarUrl_${i}`, url));
 
@@ -280,6 +292,21 @@ export function GenerationProgress({
             try { handleEvent(JSON.parse(line.slice(6))); } catch (_) {}
           }
         }
+      }
+
+      // Stream closed without ever reaching "video_ready" or "error" — the
+      // connection dropped (e.g. a serverless function timeout) mid-generation
+      // rather than the pipeline finishing cleanly. Surface it instead of
+      // leaving the UI frozen on whatever stage it was last in. Deliberately
+      // skip clearing jobIdKey (unlike the catch block below) — a refresh will
+      // try to resume this job, since it may still be running server-side.
+      if (!reachedTerminalEvent.current) {
+        const message =
+          "Lost connection to the server mid-generation. Refresh this page — it'll try to resume the job in progress.";
+        console.error("[ComedyReel] Stream ended without a terminal event");
+        setStatus(STATUS.ERROR);
+        setError(message);
+        toast.error("Connection lost", { description: message });
       }
     } catch (err) {
       console.error("[ComedyReel] Error:", err);
@@ -336,10 +363,12 @@ export function GenerationProgress({
         break;
 
       case "video_ready":
-        renderFinal(event.part1VideoUrl, event.part2VideoUrl);
+        reachedTerminalEvent.current = true;
+        prepareComposition(event.part1VideoUrl, event.part2VideoUrl);
         break;
 
       case "error":
+        reachedTerminalEvent.current = true;
         try { sessionStorage.removeItem(jobIdKey); } catch (_) {}
         setStatus(STATUS.ERROR);
         setError(event.message || "Pipeline failed");
@@ -351,17 +380,18 @@ export function GenerationProgress({
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** Both Seedance clips already carry baked, lip-synced audio — stitching
-   * them is just a hard-cut Remotion render, no Player/editor step needed. */
-  const renderFinal = async (p1Url, p2Url) => {
+  /** Both Seedance clips already carry baked, lip-synced audio. Probe their
+   * durations, build the ActionReel composition props, and hand off to the
+   * shared /app/edit Remotion editor. */
+  const prepareComposition = async (p1Url, p2Url) => {
     if (!p1Url && !p2Url) {
       setStatus(STATUS.ERROR);
       setError("No videos were generated. Check server logs.");
       return;
     }
 
-    setStatus(STATUS.RENDERING);
-    setRenderProgress("Probing video durations…");
+    setStatus(STATUS.COMBINING);
+    setCombineProgress("Probing video durations for Remotion composition…");
 
     try {
       const [part1Duration, part2Duration] = await Promise.all([
@@ -369,30 +399,24 @@ export function GenerationProgress({
         getVideoDuration(p2Url),
       ]);
 
-      setRenderProgress("Stitching both clips together via Remotion…");
+      const props = {
+        source,
+        part1VideoUrl: p1Url || "",
+        part2VideoUrl: p2Url || "",
+        part1Duration: part1Duration > 0 ? part1Duration : 15,
+        part2Duration: part2Duration > 0 ? part2Duration : 15,
+      };
 
-      const res = await fetch(`${apiBasePath}/render-remotion`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          part1VideoUrl: p1Url || "",
-          part2VideoUrl: p2Url || "",
-          part1Duration: part1Duration > 0 ? part1Duration : 15,
-          part2Duration: part2Duration > 0 ? part2Duration : 15,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.url) throw new Error(data.error || "Render failed");
-
+      sessionStorage.setItem(COMPOSITION_STORAGE_KEY, JSON.stringify(props));
       try { sessionStorage.removeItem(jobIdKey); } catch (_) {}
       try { sessionStorage.removeItem(resumeKey); } catch (_) {}
-      setFinalVideoUrl(data.url);
       setStatus(STATUS.DONE);
-      toast.success("🎬 Comedy Reel ready!");
+      toast.success("🎬 Reel ready! Opening editor…");
+      router.push(EDIT_PATH);
     } catch (err) {
-      console.error("[ComedyReel] renderFinal failed:", err);
+      console.error("[ComedyReel] prepareComposition failed:", err);
       setStatus(STATUS.ERROR);
-      setError(`Final render failed: ${err.message}`);
+      setError(`Composition prep failed: ${err.message}`);
     }
   };
 
@@ -404,16 +428,16 @@ export function GenerationProgress({
       <div className="text-center space-y-1">
         <h2 className="text-2xl font-bold font-heading tracking-tight">
           {status === STATUS.DONE
-            ? "Your Comedy Reel is Ready!"
-            : status === STATUS.RENDERING
-            ? "Rendering Final Reel…"
+            ? "Opening Editor…"
+            : status === STATUS.COMBINING
+            ? "Building Remotion Composition…"
             : "Generating Comedy Reel"}
         </h2>
         <p className="text-sm text-muted-foreground">
           {status === STATUS.DONE
-            ? "Preview and download below"
-            : status === STATUS.RENDERING
-            ? renderProgress || "Stitching both clips together…"
+            ? "Taking you to the edit page"
+            : status === STATUS.COMBINING
+            ? combineProgress || "Probing durations and preparing Remotion Player…"
             : STAGE_LABELS[status] || "Processing…"}
         </p>
       </div>
@@ -423,7 +447,7 @@ export function GenerationProgress({
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground font-medium truncate max-w-[75%]">
-              {status === STATUS.RENDERING ? renderProgress : STAGE_LABELS[status] || "Processing…"}
+              {status === STATUS.COMBINING ? combineProgress : STAGE_LABELS[status] || "Processing…"}
             </span>
             <span className="font-semibold text-primary shrink-0">{progressPercent}%</span>
           </div>
@@ -456,7 +480,7 @@ export function GenerationProgress({
             const isActive = idx === stageIdx;
             const icons    = [FileText, Mic, Video, Clapperboard];
             const StageIcon = icons[idx] || Sparkles;
-            const names    = ["Split", "Voiceovers", "2 Videos", "Render"];
+            const names    = ["Split", "Voiceovers", "2 Videos", "Assemble"];
             return (
               <div key={stage} className="flex items-center shrink-0">
                 {idx > 0 && (
@@ -590,7 +614,7 @@ export function GenerationProgress({
       `}</style>
 
       {/* ── General status card (non-Seedance active stages) ──────────────── */}
-      {isGenerating && status !== STATUS.SEEDANCE && status !== STATUS.RENDERING && (
+      {isGenerating && status !== STATUS.SEEDANCE && status !== STATUS.COMBINING && (
         <div className="rounded-2xl border border-border/50 bg-muted/20 p-4 flex gap-3">
           <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
             {status === STATUS.VOICES
@@ -608,34 +632,18 @@ export function GenerationProgress({
         </div>
       )}
 
-      {/* ── Rendering status card ───────────────────────────────────────────── */}
-      {status === STATUS.RENDERING && (
-        <div className="rounded-2xl border border-border/50 bg-muted/20 p-4 flex gap-3">
-          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-            <Clapperboard className="w-4 h-4 text-primary" />
-          </div>
-          <div>
-            <p className="text-sm font-medium">{renderProgress || STAGE_LABELS[status]}</p>
-            <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1.5">
-              <Clock className="w-3 h-3" />
-              Hard-cutting both clips together — usually under a minute.
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* ── Error ──────────────────────────────────────────────────────────── */}
       {status === STATUS.ERROR && (
         <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 flex gap-3">
           <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-semibold text-destructive">
-              {part1VideoUrl && part2VideoUrl ? "Final render failed" : "Generation failed"}
+              {part1VideoUrl && part2VideoUrl ? "Editor prep failed" : "Generation failed"}
             </p>
             <p className="text-xs text-muted-foreground mt-1">{error}</p>
             {part1VideoUrl && part2VideoUrl && (
               <p className="text-[11px] text-muted-foreground mt-1">
-                Both videos already generated — retrying just re-stitches them, no credits used.
+                Both videos already generated — retrying just reopens the editor, no credits used.
               </p>
             )}
             <Button
@@ -644,7 +652,7 @@ export function GenerationProgress({
               onClick={() => {
                 if (part1VideoUrl && part2VideoUrl) {
                   setError(null);
-                  renderFinal(part1VideoUrl, part2VideoUrl);
+                  prepareComposition(part1VideoUrl, part2VideoUrl);
                 } else {
                   hasStarted.current = false;
                   startPipeline();
@@ -659,26 +667,11 @@ export function GenerationProgress({
         </div>
       )}
 
-      {/* ── Done — inline preview + download (no /app/edit handoff) ────────── */}
-      {status === STATUS.DONE && finalVideoUrl && (
-        <div className="flex flex-col items-center gap-4 py-4">
-          <div className="w-full max-w-72 rounded-2xl overflow-hidden border border-border/40 bg-black" style={{ aspectRatio: "9/16" }}>
-            <video src={finalVideoUrl} controls playsInline className="w-full h-full object-contain" />
-          </div>
-          <div className="flex gap-3">
-            <a href={finalVideoUrl} download={`${source}.mp4`}>
-              <Button className="gap-2 bg-neutral-900 text-[#c7f038] hover:opacity-90 hover:bg-neutral-900">
-                <Download className="w-4 h-4" />
-                Download
-              </Button>
-            </a>
-            {onReset && (
-              <Button variant="outline" onClick={onReset} className="gap-2">
-                <RotateCcw className="w-4 h-4" />
-                Create Another
-              </Button>
-            )}
-          </div>
+      {/* Done — navigating to editor automatically */}
+      {status === STATUS.DONE && (
+        <div className="flex flex-col items-center gap-3 py-6">
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Redirecting to editor…</p>
         </div>
       )}
     </div>

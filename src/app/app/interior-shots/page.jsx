@@ -319,7 +319,7 @@ export default function InteriorShotsPage() {
                 <div className="absolute inset-0 rounded-full border-2 border-violet-400/60 animate-ping" />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-semibold text-violet-800">Seedance 2.0 — Interior Walkthrough</p>
+                <p className="text-sm font-semibold text-violet-800">Interior Walkthrough</p>
                 <p className="text-xs text-violet-500 mt-0.5 flex items-center gap-1.5">
                   <Clock className="w-3 h-3" />
                   Running for {formatTime(elapsed)} · typical: 4–8 minutes

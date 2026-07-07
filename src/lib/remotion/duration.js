@@ -122,10 +122,13 @@ export function mapVirtualRangeToOriginal(virtualStart, virtualEnd, keepRanges) 
 }
 
 /**
- * Duration calculator for the "Action Reel" composition — two independent,
- * already-baked-audio Seedance clips back to back, no broll/intro/outro layers.
+ * Base duration calculator for the "Action Reel" composition — two
+ * independent, already-baked-audio Seedance clips back to back, no
+ * broll/intro/outro layers. Raw (no cuts) — the cuts-aware wrapper used
+ * everywhere the actual Player/export duration matters is
+ * calcActionReelDurationInFrames, exported from ActionReelComposition.jsx.
  */
-export function calcActionReelDurationInFrames({
+export function calcActionReelBaseDurationInFrames({
   part1Duration = 15,
   part2Duration = 15,
   fps           = 30,

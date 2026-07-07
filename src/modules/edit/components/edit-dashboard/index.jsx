@@ -8,7 +8,12 @@ import { listDrafts, clearDraft } from "@/modules/edit/utils/draft";
 import { VideoPicker } from "@/modules/edit/components/video-picker";
 
 function thumbnailFor(draft) {
-  return draft.compositionProps?.avatarVideoUrl || draft.compositionProps?.brollClips?.[0]?.url || "";
+  return (
+    draft.compositionProps?.avatarVideoUrl ||
+    draft.compositionProps?.brollClips?.[0]?.url ||
+    draft.compositionProps?.part1VideoUrl ||
+    ""
+  );
 }
 
 function timeAgo(ts) {

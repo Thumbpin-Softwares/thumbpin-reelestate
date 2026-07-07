@@ -2,8 +2,8 @@ import { Composition } from "remotion";
 import { SeedanceReelComposition, calcSeedanceReelDurationInFrames } from "./SeedanceReelComposition";
 import { NewsAnchorComposition } from "./NewsAnchorComposition";
 import { BrollComposition, calcBrollDurationInFrames } from "./BrollComposition";
-import { ActionReelComposition } from "./ActionReelComposition";
-import { calcDurationInFrames, calcActionReelDurationInFrames } from "./duration";
+import { ActionReelComposition, calcActionReelDurationInFrames } from "./ActionReelComposition";
+import { calcDurationInFrames, calcActionReelBaseDurationInFrames } from "./duration";
 
 export const RemotionRoot = () => {
   return (
@@ -87,17 +87,23 @@ export const RemotionRoot = () => {
         fps={30}
         width={1080}
         height={1920}
-        durationInFrames={calcActionReelDurationInFrames()}
+        durationInFrames={calcActionReelBaseDurationInFrames()}
         defaultProps={{
           part1VideoUrl: "",
           part2VideoUrl: "",
           part1Duration: 15,
           part2Duration: 15,
+          overlays: [],
+          musicUrl: "",
+          musicTrimStartSeconds: 0,
+          musicVolume: 0.25,
+          cutRanges: [],
         }}
         calculateMetadata={async ({ props }) => ({
           durationInFrames: calcActionReelDurationInFrames({
             part1Duration: props.part1Duration,
             part2Duration: props.part2Duration,
+            cutRanges:     props.cutRanges,
           }),
         })}
       />
