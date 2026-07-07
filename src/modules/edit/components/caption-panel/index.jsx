@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Check, ChevronLeft, Eye, Loader2, Sparkles, X } from "lucide-react";
 import { CAPTION_PRESETS } from "@/lib/remotion/caption-presets";
+import { computeCaptionCreditCost } from "@/lib/credit-costs";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 // Preset preview clips are hosted on Cloudflare R2 — falls back to a plain
@@ -70,7 +71,7 @@ const POSITIONS = [
   { value: "bottom", label: "Bottom" },
 ];
 
-export function CaptionsPanel({ captionState, onGenerate, onReset, onDraftChange }) {
+export function CaptionsPanel({ captionState, onGenerate, onReset, onDraftChange, reelDurationSeconds = 0 }) {
   const [view, setView] = useState("grid");
   const [selected, setSelected] = useState(null);
   const [language, setLanguage] = useState("");
@@ -103,6 +104,11 @@ export function CaptionsPanel({ captionState, onGenerate, onReset, onDraftChange
 
   if (view === "detail" && selected) {
     const isAppliedHere = captionState?.status === "done" && captionState.preset === selected.id;
+    const { credits: estimatedCredits } = computeCaptionCreditCost({
+      durationSeconds: reelDurationSeconds,
+      isDynamicPreset: selected.tier === "dynamic",
+      hasTranslation: !!translateTo,
+    });
 
     return (
       <div className="flex flex-col gap-3">
@@ -182,7 +188,7 @@ export function CaptionsPanel({ captionState, onGenerate, onReset, onDraftChange
           ) : (
             <>
               <Sparkles className="w-3.5 h-3.5" />
-              Add caption
+              Add caption · {estimatedCredits} credit{estimatedCredits === 1 ? "" : "s"}
             </>
           )}
         </button>
@@ -234,7 +240,7 @@ export function CaptionsPanel({ captionState, onGenerate, onReset, onDraftChange
                 openPreset(p);
               }
             }}
-            onMouseEnter={(e) => { e.currentTarget.querySelector("video")?.play(); }}
+            onMouseEnter={(e) => { e.currentTarget.querySelector("video")?.play().catch(() => {}); }}
             onMouseLeave={(e) => {
               const v = e.currentTarget.querySelector("video");
               if (v) { v.pause(); v.currentTime = THUMBNAIL_FRAME_TIME; }
