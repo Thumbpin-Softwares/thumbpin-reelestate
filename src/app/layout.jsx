@@ -6,7 +6,7 @@ import { AuthProvider } from "@/components/auth-provider";
 import SmoothScroll from "@/modules/common/smooth-scroll";
 
 export const metadata = {
-  title: "ThumbGram Generate UGC Video Ads in 60 Seconds",
+  title: "Thumbplay.ai Generate UGC Video Ads in 60 Seconds",
   description:
     "AI-powered UGC video ad generator for Indian brands & creators. Script to Reel in under 2 minutes with Indian-accent voices, AI avatars, and lip-sync technology.",
   keywords: [

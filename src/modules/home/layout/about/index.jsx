@@ -68,7 +68,7 @@ export default function About() {
           </h1>
 
           <p className="text-neutral-500 text-sm sm:text-base">
-            See how ThumbGram transforms listings and assets into image and
+            See how Thumbplay.ai transforms listings and assets into image and
             video ads ready to launch.
           </p>
         </div>

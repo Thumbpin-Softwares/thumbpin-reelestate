@@ -56,7 +56,7 @@ export default function AdminLoginPage() {
             <RectangleGoggles className="w-5 h-5 text-[#c7f038]" />
           </div>
           <span className="text-neutral-900 font-semibold tracking-tight">
-            ThumbGram
+            Thumbplay.ai
           </span>
         </div>
 

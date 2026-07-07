@@ -540,23 +540,22 @@ export function Editor({ compositionProps, onExit }) {
           >
             Back
           </Button>
-          {hasDraftContent && (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setShowDiscardConfirm(true)}
-              className="h-8 text-xs gap-1.5 text-muted-foreground hover:text-destructive"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              Discard draft
-            </Button>
-          )}
           <div>
             <h1 className="text-base font-bold font-heading tracking-tight">Edit Reel</h1>
             <p className="text-xs text-muted-foreground truncate max-w-xs">{compositionProps.name || "Untitled reel"}</p>
           </div>
         </div>
-        <div className="flex flex-col items-end gap-1">
+        <div className="flex gap-4 items-center justify-center">
+          {hasDraftContent && (
+            <Button
+              onClick={() => setShowDiscardConfirm(true)}
+              className="gap-2 border border-red-500 text-white hover:bg-red-600 bg-red-500 duration-300 hover:text-white"
+            >
+              <Trash2 className="w-4 h-4" />
+              Discard draft
+            </Button>
+          )}
+          <div className="flex flex-col items-end gap-1">
           <Button onClick={handleDownload} disabled={rendering} className="gap-2 bg-linear-to-b from-black to-neutral-600 text-[#c7f038] min-w-32">
             {rendering ? (
               <>
@@ -585,6 +584,7 @@ export function Editor({ compositionProps, onExit }) {
             </div>
           )}
         </div>
+          </div>
       </div>
 
       {/* Canvas + right panel */}

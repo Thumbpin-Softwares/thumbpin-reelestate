@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   FolderOpen,
@@ -27,10 +27,19 @@ const whatsNewItem = { label: "What's New", href: "/app/whats-new", icon: Megaph
 
 export default function Aside() {
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem(STORAGE_KEY) === "1";
-  });
+  // Always start expanded to match the server-rendered markup — reading
+  // localStorage in the initializer would return a different value than SSR
+  // on the client's first render, causing a hydration mismatch. Apply the
+  // persisted preference right after mount instead.
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    // One-time sync from a browser-only external system (localStorage) —
+    // there's no SSR-safe way to read this during render, so an effect is
+    // the correct tool here, not a workaround.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCollapsed(localStorage.getItem(STORAGE_KEY) === "1");
+  }, []);
 
   const toggleCollapsed = () => {
     setCollapsed((prev) => {
