@@ -2,6 +2,8 @@ export const maxDuration = 300;
 
 import { NextResponse } from "next/server";
 import { uploadToR2, buildUserKey } from "@/lib/r2-upload";
+import dbConnect from "@/lib/mongodb";
+import Asset from "@/models/Asset";
 import { consumeCreditsForAction, refundCreditsForAction } from "@/lib/credit-system";
 import { computeCaptionCreditCost } from "@/lib/credit-costs";
 import { CAPTION_PRESETS } from "@/lib/remotion/caption-presets";
@@ -68,6 +70,23 @@ export async function POST(request) {
 
     const key = buildUserKey(userId, "videos", "mp4", `captions-${preset}-${Date.now()}`);
     const url = await uploadToR2(videoBuf, key, "video/mp4");
+
+    // Save the captioned/exported video as its own asset so it shows up in
+    // "My Videos" — metadata.source deliberately isn't an EDITABLE_SOURCES key
+    // (it's a flattened mp4 with captions burned in, not reopenable as a
+    // Remotion composition).
+    try {
+      await dbConnect();
+      await Asset.create({
+        userId,
+        name: `Captioned Reel (${presetConfig.label}) — ${new Date().toLocaleDateString()}`,
+        url,
+        type: "video",
+        metadata: { source: "captions-export", preset },
+      });
+    } catch (dbErr) {
+      console.error("[captions/generate] DB save error:", dbErr);
+    }
 
     return NextResponse.json({ url, creditsCharged: creditsCost });
   } catch (err) {
