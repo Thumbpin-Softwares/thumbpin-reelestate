@@ -2,11 +2,10 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Loader2, CheckCircle2, AlertCircle, RotateCcw, Download } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
 import { compressImage } from "@/utils/compress-image";
 import { clampBrollClips } from "@/lib/remotion/duration";
+import { GenerationProgressShell } from "@/modules/common/components/generation-progress-shell";
 
 /** Probe audio duration via browser <audio> element (header only, no full download). */
 async function getAudioDuration(url) {
@@ -532,8 +531,6 @@ export function GenerationProgress({
     }
   };
 
-  const isGenerating = ![STATUS.DONE, STATUS.ERROR, STATUS.IDLE].includes(status);
-
   /** Detach from the running job and hand control back to the caller — the
    * server-side render may still finish in the background, but this tab stops
    * waiting on it and the user gets their filled-in form back. */
@@ -563,81 +560,15 @@ export function GenerationProgress({
   };
 
   return (
-    <div className="flex flex-col items-center gap-4 animate-fade-in">
-      {/* ── 9:16 mobile-shaped stage with a single centered loader ─────────── */}
-      <div className="relative mx-auto w-full max-w-[220px] aspect-1/2 rounded-xl border-8 border-neutral-900 bg-neutral-950 overflow-hidden shadow-2xl">
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-8 text-center">
-          {status === STATUS.ERROR ? (
-            <>
-              <AlertCircle className="w-10 h-10 text-destructive" />
-              <div className="space-y-1">
-                <p className="text-sm font-semibold text-white">Generation failed</p>
-                <p className="text-xs text-white/60">{error}</p>
-              </div>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleRetry}
-                className="gap-2 text-xs"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                Retry
-              </Button>
-            </>
-          ) : status === STATUS.DONE ? (
-            <>
-              <CheckCircle2 className="w-10 h-10 text-emerald-400" />
-              <p className="text-sm font-medium text-white">Your reel is ready!</p>
-              <Button
-                size="sm"
-                onClick={handleDownload}
-                className="gap-2 text-xs bg-[#c7f038] text-black hover:bg-[#c7f038]/90"
-              >
-                <Download className="w-3.5 h-3.5" />
-                Download reel
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => router.push(editPath)}
-                className="gap-1.5 text-xs text-white/60 hover:text-white hover:bg-white/10"
-              >
-                Open in editor
-              </Button>
-            </>
-          ) : (
-            <>
-              <Loader2 className="w-10 h-10 text-white animate-spin" />
-              <p
-                key={status}
-                className="text-sm font-medium text-white"
-                style={{ animation: "fadeInUp 0.4s ease" }}
-              >
-                {STAGE_TEXT[status] || "Processing…"}
-                {status === STATUS.RENDERING && renderPercent > 0 ? ` ${renderPercent}%` : ""}
-              </p>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={abortGeneration}
-                className="gap-2 text-xs text-white hover:text-white bg-red-500 hover:bg-red-500"
-              >
-                Abort
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-
-      {isGenerating && (
-        <p className="text-xs text-muted-foreground text-center max-w-[380px]">
-          Don&apos;t close this tab refreshing is safe, we&apos;ll pick up right where we left off.
-        </p>
-      )}
-
-      <style>{`
-        @keyframes fadeInUp { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
-      `}</style>
-    </div>
+    <GenerationProgressShell
+      phase={status === STATUS.ERROR ? "error" : status === STATUS.DONE ? "done" : "loading"}
+      stageText={STAGE_TEXT[status]}
+      renderPercent={status === STATUS.RENDERING ? renderPercent : 0}
+      error={error}
+      onRetry={handleRetry}
+      onAbort={abortGeneration}
+      onDownload={handleDownload}
+      onOpenEditor={() => router.push(editPath)}
+    />
   );
 }

@@ -21,8 +21,8 @@ const REAL_ESTATE_TEMPLATES = [
     tag: "Popular",
   },
   {
-    title: "Model doing Home Tour of the property",
-    href: "/app/home-tour",
+    title: "Frustrated Anchor",
+    href: "/app/comedy-reel",
     video: "https://content.thumbpin.in/web-assets/hometour-final-1782134969657-1782134969657-3ac17d57.mp4",
     tag: "Popular"
   },

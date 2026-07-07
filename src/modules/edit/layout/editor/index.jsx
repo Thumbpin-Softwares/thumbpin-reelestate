@@ -441,7 +441,16 @@ export function Editor({ compositionProps, onExit }) {
       setCaptionDraft(null);
     } catch (err) {
       console.error("[Editor] Caption generation failed:", err);
-      setCaptionState((s) => ({ ...s, status: "error", error: err.message || "Caption generation failed" }));
+      // VEED's raw "Transcript language ... not supported for subtitle rendering"
+      // message (and any other backend error) is meaningless to end users —
+      // surface a generic toast for that specific case and always keep the
+      // inline hint actionable rather than echoing the raw error.
+      if (/not supported for subtitle rendering/i.test(err.message || "")) {
+        toast.error("Internal server error", {
+          description: "The request is not currently supported. Try again later.",
+        });
+      }
+      setCaptionState((s) => ({ ...s, status: "error", error: "Try different settings." }));
     }
   };
 

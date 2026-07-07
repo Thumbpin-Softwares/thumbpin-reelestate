@@ -1,8 +1,9 @@
 export const maxDuration = 300;
 
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth-config";
+import { NextResponse } from "next/server";
 import { uploadToR2, buildUserKey } from "@/lib/r2-upload";
+import dbConnect from "@/lib/mongodb";
+import Asset from "@/models/Asset";
 import { bundle } from "@remotion/bundler";
 import { renderMedia, selectComposition } from "@remotion/renderer";
 import { join } from "path";
@@ -55,8 +56,11 @@ async function renderMediaWithRetry(params, attempts = 2) {
  * is identical to action-reel's, so no separate composition is needed.
  */
 export async function POST(request) {
-  const session = await getServerSession(authOptions);
-  const userId = session?.user?.id || session?.user?._id || "anon";
+  const { resolveUserFromSession } = await import("@/lib/user-resolver");
+  const user = await resolveUserFromSession(request);
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = user._id.toString();
+
   const inputProps = await request.json();
 
   const { readable, writable } = new TransformStream();
@@ -108,6 +112,22 @@ export async function POST(request) {
 
       const key = buildUserKey(userId, "videos", "mp4", `comedy-final-${Date.now()}`);
       const url = await uploadToR2(videoBuf, key, "video/mp4");
+
+      // Save the final exported/combined reel as its own asset so it shows up
+      // in "My Videos" — metadata.source deliberately isn't an EDITABLE_SOURCES
+      // key (it's a flattened mp4, not reopenable as a Remotion composition).
+      try {
+        await dbConnect();
+        await Asset.create({
+          userId,
+          name: `Comedy Reel (exported) — ${new Date().toLocaleDateString()}`,
+          url,
+          type: "video",
+          metadata: { source: "comedy-reel-export", exportedFrom: "comedy-reel" },
+        });
+      } catch (dbErr) {
+        console.error("[comedy-reel render-remotion] DB save error:", dbErr);
+      }
 
       send({ type: "done", url });
     } catch (err) {
