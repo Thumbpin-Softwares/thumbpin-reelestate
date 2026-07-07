@@ -229,7 +229,10 @@ function SeedanceReelContent() {
           {step === 3 && generationParams && (
             <GenerationProgress
               generationParams={generationParams}
-              onReset={handleReset}
+              onAbort={() => {
+                try { sessionStorage.removeItem(RESUME_KEY); } catch (_) {}
+                setStep(2);
+              }}
               source="seedance-reel"
             />
           )}

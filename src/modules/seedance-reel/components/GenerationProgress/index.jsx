@@ -1,22 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import {
-  Loader2,
-  CheckCircle2,
-  AlertCircle,
-  Clock,
-  Clapperboard,
-  RotateCcw,
-  Mic,
-  Video,
-  User,
-  Sparkles,
-  FileText,
-  Zap,
-  Building2,
-} from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Loader2, CheckCircle2, AlertCircle, RotateCcw, Download } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { compressImage } from "@/utils/compress-image";
@@ -62,36 +48,21 @@ const STATUS = {
   VOICES:    "voices",
   SEEDANCE:  "seedance",
   COMBINING: "combining",
+  RENDERING: "rendering",
   DONE:      "done",
   ERROR:     "error",
 };
 
-const STAGE_LABELS = {
+// Short line shown inside the loader — this is the only "state" the UI exposes.
+const STAGE_TEXT = {
   [STATUS.IDLE]:      "Starting…",
-  [STATUS.SPLITTING]: "Splitting script into 3 parts…",
-  [STATUS.VOICES]:    "Generating voiceovers for all 3 parts…",
-  [STATUS.SEEDANCE]:  "Generating 3 videos in parallel (Seedance 2.0)…",
-  [STATUS.COMBINING]: "Preparing Remotion composition…",
-  [STATUS.DONE]:      "Done!",
-  [STATUS.ERROR]:     "Error",
+  [STATUS.SPLITTING]: "Writing your script…",
+  [STATUS.VOICES]:    "Generating voice…",
+  [STATUS.SEEDANCE]:  "Generating video…",
+  [STATUS.COMBINING]: "Merging everything…",
+  [STATUS.RENDERING]: "Rendering your reel…",
+  [STATUS.DONE]:      "All done!",
 };
-
-const SEEDANCE_TIPS = [
-  "Seedance 2.0 is rendering your intro avatar, property walkthrough, and CTA simultaneously…",
-  "Placing your presenter at the luxury property entrance…",
-  "Building a seamless architectural walkthrough from your location photos…",
-  "Crafting the CTA moment — charming, witty, unforgettable…",
-  "Syncing lip movements to dialogue phonetics across all 3 clips…",
-  "Applying natural handheld camera stabilisation and golden-hour lighting…",
-  "Rendering hyper-realistic skin texture and interior lighting transitions…",
-];
-
-const ORDERED_STAGES = [
-  STATUS.SPLITTING,
-  STATUS.VOICES,
-  STATUS.SEEDANCE,
-  STATUS.COMBINING,
-];
 
 const JOB_STATUS_TO_LOCAL = {
   running:    STATUS.SPLITTING,
@@ -101,11 +72,29 @@ const JOB_STATUS_TO_LOCAL = {
   combining:  STATUS.COMBINING,
 };
 
-function formatElapsed(secs) {
-  const m = Math.floor(secs / 60);
-  const s = secs % 60;
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
+// UI-only fixture for `?mockStage=`, so the screen can be styled without
+// spending Seedance/ElevenLabs credits or waiting on a real render.
+const MOCK_DATA = {
+  part1: "Welcome to this stunning luxury villa, perfectly nestled in the hills.",
+  part2: "As you step inside, natural light floods the open-concept living space, leading out to a private infinity pool overlooking the valley.",
+  part3Cta: "Ready to make this yours? Book a private tour today.",
+  part1AudioUrl: "/mock/part1-audio.mp3",
+  part2AudioUrl: "/mock/part2-audio.mp3",
+  avatarVideoUrl: "/mock/avatar-video.mp4",
+  walkthroughVideoUrl: "/mock/walkthrough-video.mp4",
+  ctaVideoUrl: "/mock/cta-video.mp4",
+  finalVideoUrl: "/mock/final-reel.mp4",
+};
+
+const MOCK_STAGE_ORDER = [
+  STATUS.SPLITTING,
+  STATUS.VOICES,
+  STATUS.SEEDANCE,
+  STATUS.COMBINING,
+  STATUS.RENDERING,
+  STATUS.DONE,
+  STATUS.ERROR,
+];
 
 /**
  * GenerationProgress drives the same Seedance 3-part pipeline for any route
@@ -115,6 +104,7 @@ function formatElapsed(secs) {
  */
 export function GenerationProgress({
   generationParams,
+  onAbort,
   apiBasePath = "/api/seedance-reel",
   source = "seedance-reel",
   editPath = "/app/edit",
@@ -123,6 +113,11 @@ export function GenerationProgress({
   resumeKey = "seedance_resume",
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // `?mockStage=seedance` (or splitting/voices/combining/done/error) drives this
+  // screen with fixture data instead of calling the real pipeline — for styling
+  // this UI without spending Seedance/ElevenLabs credits.
+  const mockStage = searchParams.get("mockStage");
   const {
     script       = "",
     voiceId      = "21m00Tcm4TlvDq8ikWAM",
@@ -149,54 +144,55 @@ export function GenerationProgress({
   const [walkthroughVideoUrl, setWalkthroughVideoUrl] = useState(null);
   const [ctaVideoUrl, setCtaVideoUrl]             = useState(null);
 
-  const [combineProgress, setCombineProgress] = useState("");
-
-  // Seedance waiting UX
-  const [seedanceStart, setSeedanceStart]     = useState(null);
-  const [seedanceElapsed, setSeedanceElapsed] = useState(0);
-  const [tipIndex, setTipIndex]               = useState(0);
-  const [fakeBonus, setFakeBonus]             = useState(0);
+  const [renderPercent, setRenderPercent] = useState(0);
+  const [finalVideoUrl, setFinalVideoUrl] = useState(null);
 
   const hasStarted = useRef(false);
+  const aborted = useRef(false);
+  const abortController = useRef(null);
+  const lastRenderProps = useRef(null);
 
-  // Elapsed timer for SEEDANCE stage
-  useEffect(() => {
-    if (status === STATUS.SEEDANCE) {
-      if (!seedanceStart) setSeedanceStart(Date.now());
-    } else {
-      setSeedanceStart(null);
-      setSeedanceElapsed(0);
+  /** Populate the screen with fixture data for the requested stage — no network calls. */
+  const runMockPreview = (stage) => {
+    setPart1(MOCK_DATA.part1);
+    setPart2(MOCK_DATA.part2);
+    setPart3Cta(MOCK_DATA.part3Cta);
+
+    const idx = MOCK_STAGE_ORDER.indexOf(stage);
+
+    if (idx >= MOCK_STAGE_ORDER.indexOf(STATUS.VOICES)) {
+      setPart1AudioUrl(MOCK_DATA.part1AudioUrl);
+      setPart2AudioUrl(MOCK_DATA.part2AudioUrl);
     }
-  }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (idx >= MOCK_STAGE_ORDER.indexOf(STATUS.SEEDANCE)) {
+      setAvatarVideoUrl(MOCK_DATA.avatarVideoUrl);
+      setWalkthroughVideoUrl(MOCK_DATA.walkthroughVideoUrl);
+      setCtaVideoUrl(MOCK_DATA.ctaVideoUrl);
+    }
+    if (idx >= MOCK_STAGE_ORDER.indexOf(STATUS.DONE)) {
+      setFinalVideoUrl(MOCK_DATA.finalVideoUrl);
+    }
+    if (stage === STATUS.RENDERING) {
+      setRenderPercent(42);
+    }
 
-  useEffect(() => {
-    if (!seedanceStart) return;
-    const t = setInterval(() => setSeedanceElapsed(Math.floor((Date.now() - seedanceStart) / 1000)), 1000);
-    return () => clearInterval(t);
-  }, [seedanceStart]);
+    if (stage === STATUS.ERROR) {
+      setStatus(STATUS.ERROR);
+      setError("Mock error — preview only, nothing was actually generated.");
+      return;
+    }
 
-  // Rotating tips during SEEDANCE
-  useEffect(() => {
-    if (status !== STATUS.SEEDANCE) { setTipIndex(0); return; }
-    const t = setInterval(() => setTipIndex(i => (i + 1) % SEEDANCE_TIPS.length), 4000);
-    return () => clearInterval(t);
-  }, [status]);
-
-  // Fake progress fill during long stages
-  useEffect(() => {
-    if (status !== STATUS.SEEDANCE) { setFakeBonus(0); return; }
-    const t = setInterval(() => setFakeBonus(p => Math.min(14, p + 0.04)), 1000);
-    return () => clearInterval(t);
-  }, [status]);
-
-  const stageProgress  = ORDERED_STAGES.indexOf(status);
-  const rawPercent     = status === STATUS.DONE ? 100 : status === STATUS.ERROR ? 0
-    : Math.max(4, ((stageProgress + 1) / ORDERED_STAGES.length) * 90);
-  const progressPercent = Math.round(Math.min(96, rawPercent + (status === STATUS.COMBINING ? 0 : fakeBonus)));
+    setStatus(idx === -1 ? STATUS.SPLITTING : stage);
+  };
 
   useEffect(() => {
     if (hasStarted.current) return;
     hasStarted.current = true;
+
+    if (mockStage) {
+      runMockPreview(mockStage);
+      return;
+    }
 
     let existingJobId = null;
     try { existingJobId = sessionStorage.getItem(jobIdKey); } catch (_) {}
@@ -215,8 +211,10 @@ export function GenerationProgress({
     setStatus(STATUS.SPLITTING);
 
     const poll = async () => {
+      if (aborted.current) return;
       try {
         const res = await fetch(`${apiBasePath}/jobs/${jobId}`);
+        if (aborted.current) return;
         if (res.status === 404) {
           // Job record gone (cleared/expired) — nothing to resume from.
           try { sessionStorage.removeItem(jobIdKey); } catch (_) {}
@@ -248,10 +246,10 @@ export function GenerationProgress({
         }
 
         if (JOB_STATUS_TO_LOCAL[job.status]) setStatus(JOB_STATUS_TO_LOCAL[job.status]);
-        setTimeout(poll, 3000);
+        if (!aborted.current) setTimeout(poll, 3000);
       } catch (err) {
         console.error("[GenerationProgress] Resume poll failed:", err);
-        setTimeout(poll, 5000);
+        if (!aborted.current) setTimeout(poll, 5000);
       }
     };
 
@@ -264,10 +262,12 @@ export function GenerationProgress({
     setPart1(""); setPart2(""); setPart3Cta("");
     setPart1AudioUrl(null); setPart2AudioUrl(null);
     setAvatarVideoUrl(null); setWalkthroughVideoUrl(null); setCtaVideoUrl(null);
-    setFakeBonus(0);
 
     const jobId = crypto.randomUUID();
     try { sessionStorage.setItem(jobIdKey, jobId); } catch (_) {}
+
+    const controller = new AbortController();
+    abortController.current = controller;
 
     try {
       const formData = new FormData();
@@ -293,7 +293,11 @@ export function GenerationProgress({
         })
       );
 
-      const res = await fetch(`${apiBasePath}/generate-pipeline`, { method: "POST", body: formData });
+      const res = await fetch(`${apiBasePath}/generate-pipeline`, {
+        method: "POST",
+        body: formData,
+        signal: controller.signal,
+      });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || `Server error: ${res.status}`);
@@ -305,6 +309,7 @@ export function GenerationProgress({
       let buffer    = "";
 
       while (true) {
+        if (aborted.current) break;
         const { done, value } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
@@ -318,6 +323,7 @@ export function GenerationProgress({
         }
       }
     } catch (err) {
+      if (err.name === "AbortError" || aborted.current) return;
       console.error("[GenerationProgress] Error:", err);
       try { sessionStorage.removeItem(jobIdKey); } catch (_) {}
       setStatus(STATUS.ERROR);
@@ -418,7 +424,6 @@ export function GenerationProgress({
     }
 
     setStatus(STATUS.COMBINING);
-    setCombineProgress("Probing video durations for Remotion composition…");
 
     try {
       const [avatarDur, walkthroughVideoDur, ctaDur, part2AudioDur] = await Promise.all([
@@ -454,12 +459,13 @@ export function GenerationProgress({
         ctaText: part3Cta || "",
       };
 
+      // Still saved so "Open in editor" (or a future edit) can pick up right
+      // where the 3 raw clips left off, even though we no longer auto-redirect.
       sessionStorage.setItem(compositionKey, JSON.stringify(props));
       try { sessionStorage.removeItem(jobIdKey); } catch (_) {}
       try { sessionStorage.removeItem(resumeKey); } catch (_) {}
-      setStatus(STATUS.DONE);
-      toast.success("🎬 Reel ready! Opening editor…");
-      router.push(editPath);
+
+      await renderFinalVideo(props);
     } catch (err) {
       console.error("[GenerationProgress] prepareComposition failed:", err);
       setStatus(STATUS.ERROR);
@@ -467,258 +473,165 @@ export function GenerationProgress({
     }
   };
 
+  /** Render the 3 clips into one downloadable mp4 via the project's Remotion render endpoint. */
+  const renderFinalVideo = async (props) => {
+    lastRenderProps.current = props;
+    setStatus(STATUS.RENDERING);
+    setRenderPercent(0);
+
+    try {
+      const res = await fetch(`${apiBasePath}/render-remotion`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(props),
+      });
+      if (!res.ok || !res.body) throw new Error(`Render failed: ${res.status}`);
+
+      const reader  = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer    = "";
+      let doneUrl   = null;
+      let renderErr = null;
+
+      while (true) {
+        if (aborted.current) return;
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split("\n\n");
+        buffer = events.pop() ?? "";
+        for (const eventBlock of events) {
+          for (const line of eventBlock.split("\n")) {
+            if (!line.startsWith("data: ")) continue;
+            try {
+              const evt = JSON.parse(line.slice(6));
+              if (evt.type === "progress") setRenderPercent(evt.progress || 0);
+              if (evt.type === "done") doneUrl = evt.url;
+              if (evt.type === "error") renderErr = evt.error;
+            } catch (_) {}
+          }
+        }
+      }
+
+      if (renderErr || !doneUrl) throw new Error(renderErr || "Render finished with no output");
+
+      setFinalVideoUrl(doneUrl);
+      setStatus(STATUS.DONE);
+      toast.success("🎬 Your reel is ready!");
+    } catch (err) {
+      if (aborted.current) return;
+      console.error("[GenerationProgress] renderFinalVideo failed:", err);
+      setStatus(STATUS.ERROR);
+      setError(err.message || "Final render failed");
+    }
+  };
+
   const isGenerating = ![STATUS.DONE, STATUS.ERROR, STATUS.IDLE].includes(status);
 
+  /** Detach from the running job and hand control back to the caller — the
+   * server-side render may still finish in the background, but this tab stops
+   * waiting on it and the user gets their filled-in form back. */
+  const abortGeneration = () => {
+    aborted.current = true;
+    try { abortController.current?.abort(); } catch (_) {}
+    try { sessionStorage.removeItem(jobIdKey); } catch (_) {}
+    try { sessionStorage.removeItem(resumeKey); } catch (_) {}
+    onAbort?.();
+  };
+
+  /** If the failure happened during the final render, retry just that step
+   * (the 3 raw clips already exist) instead of re-running the whole pipeline. */
+  const handleRetry = () => {
+    if (lastRenderProps.current) {
+      renderFinalVideo(lastRenderProps.current);
+      return;
+    }
+    hasStarted.current = false;
+    startPipeline();
+  };
+
+  const handleDownload = () => {
+    if (!finalVideoUrl) return;
+    const proxyUrl = `/api/download?url=${encodeURIComponent(finalVideoUrl)}&name=${encodeURIComponent(`${source}-reel.mp4`)}`;
+    window.location.href = proxyUrl;
+  };
+
   return (
-    <div className="space-y-5 animate-fade-in">
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="text-center space-y-1">
-        <h2 className="text-2xl font-bold font-heading tracking-tight">
-          {status === STATUS.DONE
-            ? "Opening Editor…"
-            : status === STATUS.COMBINING
-            ? "Building Remotion Composition…"
-            : "Generating Seedance Reel"}
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          {status === STATUS.DONE
-            ? "Taking you to the edit page"
-            : status === STATUS.COMBINING
-            ? combineProgress || "Probing durations and preparing Remotion Player…"
-            : STAGE_LABELS[status] || "Processing…"}
-        </p>
+    <div className="flex flex-col items-center gap-4 animate-fade-in">
+      {/* ── 9:16 mobile-shaped stage with a single centered loader ─────────── */}
+      <div className="relative mx-auto w-full max-w-[220px] aspect-1/2 rounded-xl border-8 border-neutral-900 bg-neutral-950 overflow-hidden shadow-2xl">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-8 text-center">
+          {status === STATUS.ERROR ? (
+            <>
+              <AlertCircle className="w-10 h-10 text-destructive" />
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-white">Generation failed</p>
+                <p className="text-xs text-white/60">{error}</p>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleRetry}
+                className="gap-2 text-xs"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Retry
+              </Button>
+            </>
+          ) : status === STATUS.DONE ? (
+            <>
+              <CheckCircle2 className="w-10 h-10 text-emerald-400" />
+              <p className="text-sm font-medium text-white">Your reel is ready!</p>
+              <Button
+                size="sm"
+                onClick={handleDownload}
+                className="gap-2 text-xs bg-[#c7f038] text-black hover:bg-[#c7f038]/90"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Download reel
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => router.push(editPath)}
+                className="gap-1.5 text-xs text-white/60 hover:text-white hover:bg-white/10"
+              >
+                Open in editor
+              </Button>
+            </>
+          ) : (
+            <>
+              <Loader2 className="w-10 h-10 text-white animate-spin" />
+              <p
+                key={status}
+                className="text-sm font-medium text-white"
+                style={{ animation: "fadeInUp 0.4s ease" }}
+              >
+                {STAGE_TEXT[status] || "Processing…"}
+                {status === STATUS.RENDERING && renderPercent > 0 ? ` ${renderPercent}%` : ""}
+              </p>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={abortGeneration}
+                className="gap-2 text-xs text-white hover:text-white bg-red-500 hover:bg-red-500"
+              >
+                Abort
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
-      {/* ── Progress bar ───────────────────────────────────────────────────── */}
-      {status !== STATUS.DONE && status !== STATUS.ERROR && (
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground font-medium truncate max-w-[75%]">
-              {status === STATUS.COMBINING ? combineProgress : STAGE_LABELS[status] || "Processing…"}
-            </span>
-            <span className="font-semibold text-primary shrink-0">{progressPercent}%</span>
-          </div>
-          <div className="h-2.5 rounded-full bg-muted/40 overflow-hidden relative">
-            <div
-              className="h-full rounded-full bg-linear-to-r from-primary to-violet-500 transition-all duration-1000 ease-out"
-              style={{ width: `${Math.max(progressPercent, isGenerating ? 4 : 0)}%` }}
-            />
-            {isGenerating && (
-              <div
-                className="absolute inset-0 rounded-full opacity-40"
-                style={{
-                  background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.6) 50%, transparent 100%)",
-                  animation: "shimmer 2s infinite linear",
-                  backgroundSize: "200% 100%",
-                }}
-              />
-            )}
-          </div>
-          <style>{`@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }`}</style>
-        </div>
-      )}
-
-      {/* ── Stage rail ─────────────────────────────────────────────────────── */}
       {isGenerating && (
-        <div className="flex items-center overflow-x-auto pb-1 gap-0">
-          {ORDERED_STAGES.map((stage, idx) => {
-            const stageIdx = ORDERED_STAGES.indexOf(status);
-            const isDone   = idx < stageIdx;
-            const isActive = idx === stageIdx;
-            const icons    = [FileText, Mic, Video, Clapperboard];
-            const StageIcon = icons[idx] || Sparkles;
-            const names    = ["Split", "Voiceovers", "3 Videos", "Assemble"];
-            return (
-              <div key={stage} className="flex items-center shrink-0">
-                {idx > 0 && (
-                  <div className={`h-0.5 w-4 sm:w-6 transition-colors duration-700 ${isDone ? "bg-primary" : "bg-border/40"}`} />
-                )}
-                <div className="flex flex-col items-center gap-1">
-                  <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
-                    isDone  ? "border-primary bg-primary shadow-sm shadow-primary/30"
-                    : isActive ? "border-primary bg-primary/10"
-                    : "border-border/40 bg-muted/20"
-                  }`}>
-                    {isDone   ? <CheckCircle2 className="w-3.5 h-3.5 text-white" />
-                    : isActive ? <Loader2 className="w-3 h-3 text-primary animate-spin" />
-                    : <StageIcon className="w-3 h-3 text-muted-foreground/60" />}
-                  </div>
-                  <span className={`text-[9px] font-medium ${isDone || isActive ? "text-primary" : "text-muted-foreground/50"}`}>
-                    {names[idx]}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <p className="text-xs text-muted-foreground text-center max-w-[380px]">
+          Don&apos;t close this tab refreshing is safe, we&apos;ll pick up right where we left off.
+        </p>
       )}
 
-      {/* ── Script split preview ───────────────────────────────────────────── */}
-      {(part1 || part2 || part3Cta) && status !== STATUS.DONE && (
-        <div className="grid sm:grid-cols-3 gap-3">
-          <div className="rounded-2xl border border-blue-200/60 bg-blue-50/40 dark:border-blue-700/20 dark:bg-blue-900/10 p-3 space-y-1.5">
-            <div className="flex items-center gap-1.5">
-              <User className="w-3 h-3 text-blue-600 dark:text-blue-400" />
-              <span className="text-[10px] font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wide">Part 1 — Intro</span>
-            </div>
-            <p className="text-[11px] text-blue-800 dark:text-blue-200 leading-relaxed">{part1}</p>
-            {part1AudioUrl && (
-              <div className="flex items-center gap-1 text-[10px] text-emerald-600">
-                <CheckCircle2 className="w-3 h-3" /> Voice ready
-              </div>
-            )}
-          </div>
-
-          <div className="rounded-2xl border border-emerald-200/60 bg-emerald-50/40 dark:border-emerald-700/20 dark:bg-emerald-900/10 p-3 space-y-1.5">
-            <div className="flex items-center gap-1.5">
-              <Building2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-              <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 uppercase tracking-wide">Part 2 — Walkthrough</span>
-            </div>
-            <p className="text-[11px] text-emerald-800 dark:text-emerald-200 leading-relaxed line-clamp-4">{part2}</p>
-            {part2AudioUrl && (
-              <div className="flex items-center gap-1 text-[10px] text-emerald-600">
-                <CheckCircle2 className="w-3 h-3" /> Voice ready
-              </div>
-            )}
-          </div>
-
-          <div className="rounded-2xl border border-orange-200/60 bg-orange-50/40 dark:border-orange-700/20 dark:bg-orange-900/10 p-3 space-y-1.5">
-            <div className="flex items-center gap-1.5">
-              <Sparkles className="w-3 h-3 text-orange-600 dark:text-orange-400" />
-              <span className="text-[10px] font-semibold text-orange-700 dark:text-orange-300 uppercase tracking-wide">Part 3 — CTA</span>
-            </div>
-            <p className="text-[11px] text-orange-800 dark:text-orange-200 leading-relaxed">{part3Cta}</p>
-          </div>
-        </div>
-      )}
-
-      {/* ── Seedance 2.0 waiting card ──────────────────────────────────────── */}
-      {status === STATUS.SEEDANCE && (
-        <div className="rounded-2xl border border-violet-200/60 bg-violet-50/40 dark:border-violet-800/20 dark:bg-violet-900/10 p-5 space-y-4">
-          {/* Header */}
-          <div className="flex items-start gap-3">
-            <div className="relative mt-0.5 shrink-0">
-              <div className="w-10 h-10 rounded-full bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center">
-                <Zap className="w-5 h-5 text-violet-600 dark:text-violet-400" />
-              </div>
-              <div className="absolute inset-0 rounded-full border-2 border-violet-400/60 animate-ping" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-violet-800 dark:text-violet-200">
-                Seedance 2.0 — 3 videos generating in parallel
-              </p>
-              <p className="text-xs text-violet-600/80 dark:text-violet-400/80 mt-0.5 flex items-center gap-1.5">
-                <Clock className="w-3 h-3 shrink-0" />
-                Running for {formatElapsed(seedanceElapsed)} · typical: 4–8 minutes
-              </p>
-            </div>
-            <div className="shrink-0 rounded-lg bg-violet-100 dark:bg-violet-900/50 border border-violet-200/60 dark:border-violet-700/30 px-2.5 py-1 text-center min-w-14">
-              <p className="text-base font-bold font-mono text-violet-700 dark:text-violet-300 tabular-nums">
-                {formatElapsed(seedanceElapsed)}
-              </p>
-              <p className="text-[9px] text-violet-500 uppercase tracking-wide">elapsed</p>
-            </div>
-          </div>
-
-          {/* Per-video progress */}
-          <div className="grid grid-cols-3 gap-2">
-            {[
-              { label: "Intro Avatar", url: avatarVideoUrl,      icon: User      },
-              { label: "Walkthrough",  url: walkthroughVideoUrl, icon: Building2 },
-              { label: "CTA Avatar",   url: ctaVideoUrl,         icon: Sparkles  },
-            ].map(({ label, url }) => (
-              <div key={label} className={`rounded-xl border p-2.5 flex flex-col items-center gap-1.5 transition-all ${
-                url
-                  ? "border-emerald-300/60 bg-emerald-50/60 dark:border-emerald-700/30 dark:bg-emerald-900/20"
-                  : "border-violet-200/40 bg-white/40 dark:border-violet-800/20 dark:bg-white/5"
-              }`}>
-                {url
-                  ? <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                  : <Loader2 className="w-4 h-4 text-violet-400 animate-spin" />
-                }
-                <span className={`text-[10px] font-medium text-center ${url ? "text-emerald-700 dark:text-emerald-300" : "text-violet-600 dark:text-violet-400"}`}>
-                  {label}
-                </span>
-                {url && <span className="text-[9px] text-emerald-500">Done</span>}
-              </div>
-            ))}
-          </div>
-
-          {/* Animated tip */}
-          <div className="rounded-xl bg-white/60 dark:bg-white/5 border border-violet-100 dark:border-violet-800/30 px-3 py-2.5 min-h-10">
-            <p
-              key={tipIndex}
-              className="text-[11px] text-violet-700 dark:text-violet-300 leading-relaxed"
-              style={{ animation: "fadeInUp 0.4s ease" }}
-            >
-              {SEEDANCE_TIPS[tipIndex]}
-            </p>
-          </div>
-
-          {/* Animated dots */}
-          <div className="flex items-center gap-1.5 justify-center">
-            {[0, 1, 2, 3, 4].map(i => (
-              <div key={i} className="w-1.5 h-1.5 rounded-full bg-violet-400 dark:bg-violet-500"
-                style={{ animation: `bounce 1.2s ease-in-out ${i * 0.15}s infinite` }} />
-            ))}
-          </div>
-
-          <p className="text-[10px] text-center text-violet-500 dark:text-violet-500/70">
-            Do not close or refresh this tab — all 3 generations will be lost.
-          </p>
-        </div>
-      )}
       <style>{`
         @keyframes fadeInUp { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
-        @keyframes bounce { 0%,80%,100%{ transform:scaleY(1); } 40%{ transform:scaleY(1.6); } }
       `}</style>
-
-      {/* ── General status card (non-Seedance active stages) ──────────────── */}
-      {isGenerating && status !== STATUS.SEEDANCE && status !== STATUS.COMBINING && (
-        <div className="rounded-2xl border border-border/50 bg-muted/20 p-4 flex gap-3">
-          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-            {status === STATUS.VOICES
-              ? <Mic className="w-4 h-4 text-primary" />
-              : <Clapperboard className="w-4 h-4 text-primary" />
-            }
-          </div>
-          <div>
-            <p className="text-sm font-medium">{STAGE_LABELS[status]}</p>
-            <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1.5">
-              <Clock className="w-3 h-3" />
-              Keep this tab open while generation runs.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* ── Error ──────────────────────────────────────────────────────────── */}
-      {status === STATUS.ERROR && (
-        <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 flex gap-3">
-          <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-semibold text-destructive">Generation failed</p>
-            <p className="text-xs text-muted-foreground mt-1">{error}</p>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => { hasStarted.current = false; startPipeline(); }}
-              className="mt-3 gap-2 text-xs"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              Retry
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Done — navigating to editor automatically */}
-      {status === STATUS.DONE && (
-        <div className="flex flex-col items-center gap-3 py-6">
-          <Loader2 className="w-6 h-6 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Redirecting to editor…</p>
-        </div>
-      )}
     </div>
   );
 }
