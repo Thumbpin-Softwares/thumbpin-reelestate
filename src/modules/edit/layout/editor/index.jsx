@@ -229,6 +229,12 @@ export function Editor({ compositionProps, onExit }) {
 
   const { keepRanges } = applyCutRanges(originalDurationInFrames, cutRanges);
 
+  // The reel's actual final length after both cuts (baked into durationInFrames
+  // above) and the in/out trim handles — this is what gets rendered/exported
+  // and what caption billing is based on.
+  const trimOutFrame = trim.out > 0 ? trim.out : durationInFrames;
+  const trimmedDurationInFrames = trimOutFrame - trim.in;
+
   // Autosave the edit — so leaving the editor (or refreshing) never loses
   // overlays/music/cuts/trim/caption progress for this composition, and it
   // shows up as a resumable card on the /app/edit drafts dashboard.
@@ -310,12 +316,9 @@ export function Editor({ compositionProps, onExit }) {
     setRenderStatus("Starting…");
     setRenderError(null);
     try {
-      const trimInFrame  = trim.in;
-      const trimOutFrame = trim.out > 0 ? trim.out : durationInFrames;
-
       const renderProps = {
         ...buildBaseRenderProps(compositionProps, overlays, music, cutRanges),
-        trimInFrame,
+        trimInFrame: trim.in,
         trimOutFrame,
       };
 
@@ -375,10 +378,19 @@ export function Editor({ compositionProps, onExit }) {
   const handleGenerateCaptions = async (preset, language, translationLanguage, position) => {
     setCaptionState({ preset, status: "rendering", progress: 0, message: "Assembling video…", videoUrl: null, error: null });
     try {
+      // Respect the same in/out trim as the regular render — otherwise the
+      // captioned video (and its billed duration) would include footage the
+      // user already trimmed away.
+      const captionedDurationSeconds = trimmedDurationInFrames / FPS;
+
       const res = await fetch(sourceConfig.renderEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildBaseRenderProps(compositionProps, overlays, music, cutRanges)),
+        body: JSON.stringify({
+          ...buildBaseRenderProps(compositionProps, overlays, music, cutRanges),
+          trimInFrame: trim.in,
+          trimOutFrame,
+        }),
       });
 
       if (!res.ok) throw new Error(`Render failed: ${res.status}`);
@@ -418,6 +430,7 @@ export function Editor({ compositionProps, onExit }) {
           language: language || undefined,
           translationLanguage: translationLanguage || undefined,
           position: position || undefined,
+          durationSeconds: captionedDurationSeconds,
         }),
       });
 
@@ -687,7 +700,7 @@ export function Editor({ compositionProps, onExit }) {
                   {playing ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3 ml-0.5" />}
                 </button>
                 <span className="text-xs text-muted-foreground tabular-nums">
-                  {formatTime(Math.max(0, frame - trim.in) / FPS)} / {formatTime(((trim.out > 0 ? trim.out : durationInFrames) - trim.in) / FPS)}
+                  {formatTime(Math.max(0, frame - trim.in) / FPS)} / {formatTime(trimmedDurationInFrames / FPS)}
                 </span>
               </>
             )}
@@ -718,6 +731,7 @@ export function Editor({ compositionProps, onExit }) {
                     onGenerate={handleGenerateCaptions}
                     onDraftChange={setCaptionDraft}
                     onReset={() => setCaptionState({ preset: null, status: "idle", progress: 0, message: "", videoUrl: null, error: null })}
+                    reelDurationSeconds={trimmedDurationInFrames / FPS}
                   />
                 )}
                 {activePanel === "music" && (

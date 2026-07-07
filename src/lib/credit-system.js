@@ -57,10 +57,10 @@ function buildQuotaSnapshot(user) {
   };
 }
 
-export function getCreditErrorPayload({ action, user }) {
+export function getCreditErrorPayload({ action, user, costOverride }) {
   const config = getActionOrThrow(action);
   const quota = buildQuotaSnapshot(user);
-  const requiredCredits = config.cost || 0;
+  const requiredCredits = costOverride ?? config.cost ?? 0;
 
   return {
     error: "Insufficient credits",
@@ -78,7 +78,7 @@ export function getCreditErrorPayload({ action, user }) {
  * consumeCreditsForAction call: blocks a 0-credit user from using them at all,
  * without double-charging on top of the pipeline's own debit/refund.
  */
-export async function hasSufficientCreditsForAction({ userId, action }) {
+export async function hasSufficientCreditsForAction({ userId, action, costOverride }) {
   const config = getActionOrThrow(action);
   await dbConnect();
 
@@ -92,7 +92,9 @@ export async function hasSufficientCreditsForAction({ userId, action }) {
 
   const isFreePlan = (user.plan || "free") === "free";
 
-  if (isFreePlan && config.freeBucket) {
+  // Dynamic-cost actions (costOverride set) always spend paid credits — the
+  // free-quota buckets only make sense for actions with a flat catalog cost.
+  if (isFreePlan && config.freeBucket && costOverride == null) {
     const field = getFreeBucketField(config.freeBucket);
     const limit = FREE_QUOTA_LIMITS[config.freeBucket];
     const used = (field && user[field]) || 0;
@@ -101,7 +103,7 @@ export async function hasSufficientCreditsForAction({ userId, action }) {
     }
   }
 
-  const cost = config.cost || 0;
+  const cost = costOverride ?? config.cost ?? 0;
   if (cost <= 0 || (user.credits || 0) >= cost) {
     return { ok: true, status: 200, user };
   }
@@ -109,12 +111,12 @@ export async function hasSufficientCreditsForAction({ userId, action }) {
   return {
     ok: false,
     status: 402,
-    payload: getCreditErrorPayload({ action, user }),
+    payload: getCreditErrorPayload({ action, user, costOverride }),
     user,
   };
 }
 
-export async function consumeCreditsForAction({ userId, action, metadata = {} }) {
+export async function consumeCreditsForAction({ userId, action, metadata = {}, costOverride }) {
   const config = getActionOrThrow(action);
   await dbConnect();
 
@@ -132,7 +134,9 @@ export async function consumeCreditsForAction({ userId, action, metadata = {} })
 
   const isFreePlan = (user.plan || "free") === "free";
 
-  if (isFreePlan && config.freeBucket) {
+  // Dynamic-cost actions (costOverride set) always spend paid credits — the
+  // free-quota buckets only make sense for actions with a flat catalog cost.
+  if (isFreePlan && config.freeBucket && costOverride == null) {
     const field = getFreeBucketField(config.freeBucket);
     const limit = FREE_QUOTA_LIMITS[config.freeBucket];
     const used = user[field] || 0;
@@ -183,7 +187,7 @@ export async function consumeCreditsForAction({ userId, action, metadata = {} })
     }
   }
 
-  const cost = config.cost || 0;
+  const cost = costOverride ?? config.cost ?? 0;
 
   if (cost <= 0) {
     return {
@@ -218,7 +222,7 @@ export async function consumeCreditsForAction({ userId, action, metadata = {} })
     return {
       ok: false,
       status: 402,
-      payload: getCreditErrorPayload({ action, user: latestUser }),
+      payload: getCreditErrorPayload({ action, user: latestUser, costOverride }),
       user: latestUser,
     };
   }

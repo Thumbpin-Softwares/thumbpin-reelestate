@@ -26,7 +26,62 @@ export const CREDIT_ACTIONS = {
 
   avatar_group_training: { cost: 25, freeBucket: null, label: "Custom Avatar Training" },
   digital_twin_training: { cost: 25, freeBucket: null, label: "Digital Twin Training" },
+
+  // cost is a placeholder — captions are priced dynamically per job via
+  // computeCaptionCreditCost() and passed in as a costOverride.
+  captions_generation: { cost: 0, freeBucket: null, label: "Caption Generation" },
 };
+
+// VEED subtitles ("captions_generation") pricing — usage-based instead of a
+// flat catalog cost. Real infra cost formula from the VEED/fal pricing:
+//   $0.10 / minute of input video
+//   × 2 if the render resolution is above 1080p
+//   × 2 if the preset is a "dynamic" (animated) caption style
+//   + a flat $0.20 / minute surcharge if translation_language is set
+//   minimum charge: 1 minute
+// Selling price = raw infra cost × 10 (margin), converted to credits at the
+// $1 = 480 credits peg. Always rounds up so a job is never undercharged.
+export const CAPTION_PRICING = {
+  perMinuteUsd: 0.10,
+  highResMultiplier: 2,
+  dynamicStyleMultiplier: 2,
+  translationSurchargePerMinuteUsd: 0.20,
+  minimumMinutes: 1,
+  marginMultiplier: 10,
+  usdToCredits: 480,
+};
+
+export function computeCaptionCreditCost({
+  durationSeconds,
+  isDynamicPreset = false,
+  isHighRes = false,
+  hasTranslation = false,
+}) {
+  const {
+    perMinuteUsd,
+    highResMultiplier,
+    dynamicStyleMultiplier,
+    translationSurchargePerMinuteUsd,
+    minimumMinutes,
+    marginMultiplier,
+    usdToCredits,
+  } = CAPTION_PRICING;
+
+  const minutes = Math.max(minimumMinutes, Math.ceil((durationSeconds || 0) / 60));
+
+  let multiplier = 1;
+  if (isHighRes) multiplier *= highResMultiplier;
+  if (isDynamicPreset) multiplier *= dynamicStyleMultiplier;
+
+  const rawCostUsd =
+    perMinuteUsd * minutes * multiplier +
+    (hasTranslation ? translationSurchargePerMinuteUsd * minutes : 0);
+
+  const sellingPriceUsd = rawCostUsd * marginMultiplier;
+  const credits = Math.max(1, Math.ceil(sellingPriceUsd * usdToCredits));
+
+  return { minutes, rawCostUsd, sellingPriceUsd, credits };
+}
 
 /**
  * Client-side prediction of whether a user profile (from /api/user/profile,
