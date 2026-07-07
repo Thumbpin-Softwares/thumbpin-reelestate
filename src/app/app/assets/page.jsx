@@ -528,6 +528,16 @@ export default function AssetLibraryPage() {
     setDeleting(null);
   }
 
+  // Wraps any asset — single image or multi-photo presenter — as a
+  // "collection" so it can render through CollectionCard uniformly.
+  function toCollection(asset) {
+    if (asset.type === "presenter") {
+      const urls = asset.metadata?.urls || [asset.url];
+      return { id: asset.id, name: asset.name, images: urls.map((url) => ({ url })) };
+    }
+    return { id: asset.id, name: asset.name, images: [{ url: asset.url || asset.image_url }] };
+  }
+
   function AssetCard({ asset, showDelete = false }) {
     const isSelected = selectedAsset?.id === asset.id;
 
@@ -644,13 +654,25 @@ export default function AssetLibraryPage() {
           </TabsList>
 
           <TabsContent value="all" className="mt-6">
-            <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {assets
                 .filter((a) => a.type !== "video" && a.type !== "clip")
                 .filter((a) => a.name.toLowerCase().includes(search.toLowerCase()))
-                .map((asset) => (
-                  <AssetCard key={asset.id} asset={asset} showDelete={asset.is_custom} />
-                ))}
+                .map((asset) => {
+                  const collection = toCollection(asset);
+                  return (
+                    <CollectionCard
+                      key={asset.id}
+                      name={asset.name}
+                      images={collection.images}
+                      editable={asset.is_custom}
+                      onRename={(newName) => renameAsset(asset.id, newName)}
+                      onDelete={() => handleDelete(asset.id)}
+                      deleting={deleting === asset.id}
+                      onView={() => { setPreviewCollection(collection); setPreviewIndex(0); }}
+                    />
+                  );
+                })}
             </div>
           </TabsContent>
 

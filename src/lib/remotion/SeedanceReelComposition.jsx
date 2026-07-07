@@ -168,8 +168,7 @@ function ReelContent({
             <AbsoluteFill>
               <VideoComponent
                 src={avatarVideoUrl}
-                objectFit="cover"
-                style={{ width: "100%", height: "100%" }}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
               />
             </AbsoluteFill>
           </FadeContent>
@@ -193,8 +192,7 @@ function ReelContent({
                     src={clip.url}
                     playbackRate={clip.rate}
                     muted
-                    objectFit="cover"
-                    style={{ width: "100%", height: "100%" }}
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
                   />
                 </AbsoluteFill>
               </FadeContent>
@@ -210,8 +208,7 @@ function ReelContent({
             <AbsoluteFill>
               <VideoComponent
                 src={ctaVideoUrl}
-                objectFit="cover"
-                style={{ width: "100%", height: "100%" }}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
               />
             </AbsoluteFill>
           </FadeContent>

@@ -3,13 +3,18 @@
 import { useState } from "react";
 import { Check, ChevronLeft, Eye, Loader2, Sparkles, X } from "lucide-react";
 import { CAPTION_PRESETS } from "@/lib/remotion/caption-presets";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
-// Preset preview images live at /captions/presets/<id>.jpg — drop the real
-// exports in there; until then this falls back to a plain label tile.
-function presetImageUrl(preset) {
-  return `/captions/presets/${preset.id}.jpg`;
+// Preset preview clips are hosted on Cloudflare R2 — falls back to a plain
+// label tile if a given preset's mp4 hasn't been uploaded yet.
+function presetVideoUrl(preset) {
+  return `https://content.thumbpin.in/captions/${preset.id}.mp4`;
 }
+
+// Static grid thumbnails sit at this timestamp instead of frame 0 — most
+// presets open on the same plain background before captions kick in, so 0s
+// looks identical across every tile.
+const THUMBNAIL_FRAME_TIME = 2.5;
 
 const LANGUAGES = [
   { code: "", label: "Auto-detect" },
@@ -229,17 +234,26 @@ export function CaptionsPanel({ captionState, onGenerate, onReset, onDraftChange
                 openPreset(p);
               }
             }}
+            onMouseEnter={(e) => { e.currentTarget.querySelector("video")?.play(); }}
+            onMouseLeave={(e) => {
+              const v = e.currentTarget.querySelector("video");
+              if (v) { v.pause(); v.currentTime = THUMBNAIL_FRAME_TIME; }
+            }}
             className={`group relative rounded-lg border p-1.5 text-[11px] font-medium text-center transition-colors cursor-pointer ${
               appliedPreset === p.id
                 ? "border-neutral-900 bg-neutral-900 text-white"
                 : "border-border/50 text-muted-foreground hover:text-foreground hover:bg-muted/40"
             }`}
           >
-            <div className="relative aspect-video w-full rounded-md overflow-hidden bg-neutral-100 mb-1.5">
-              <img
-                src={presetImageUrl(p)}
-                alt={p.label}
+            <div className="relative aspect-9/16 w-full rounded-md overflow-hidden bg-neutral-100 mb-1.5">
+              <video
+                src={presetVideoUrl(p)}
                 className="w-full h-full object-cover"
+                loop
+                muted
+                playsInline
+                preload="metadata"
+                onLoadedMetadata={(e) => { e.currentTarget.currentTime = THUMBNAIL_FRAME_TIME; }}
                 onError={(e) => { e.currentTarget.style.display = "none"; }}
               />
               <button
@@ -268,14 +282,20 @@ export function CaptionsPanel({ captionState, onGenerate, onReset, onDraftChange
       </div>
 
       <Dialog open={!!previewPreset} onOpenChange={(open) => !open && setPreviewPreset(null)}>
-        <DialogContent className="max-w-sm p-0 overflow-hidden gap-0">
+        <DialogContent
+          showCloseButton={false}
+          className="w-[240px] max-w-[240px] p-0 overflow-hidden gap-0"
+        >
           {previewPreset && (
             <>
-              <div className="relative aspect-video w-full bg-neutral-100">
-                <img
-                  src={presetImageUrl(previewPreset)}
-                  alt={previewPreset.label}
-                  className="w-full h-full object-cover"
+              <div className="relative w-full bg-black" style={{ aspectRatio: "9 / 16" }}>
+                <video
+                  src={presetVideoUrl(previewPreset)}
+                  className="w-full h-full object-contain"
+                  autoPlay
+                  loop
+                  playsInline
+                  preload="metadata"
                   onError={(e) => { e.currentTarget.style.display = "none"; }}
                 />
                 <button
@@ -286,7 +306,7 @@ export function CaptionsPanel({ captionState, onGenerate, onReset, onDraftChange
                 </button>
               </div>
               <div className="p-3">
-                <p className="text-sm font-semibold">{previewPreset.label}</p>
+                <DialogTitle className="text-sm font-semibold">{previewPreset.label}</DialogTitle>
               </div>
             </>
           )}
