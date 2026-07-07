@@ -5,10 +5,13 @@ import {
   Eye,
   Loader2,
   Pencil,
+  Trash2,
   Video,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { EDITABLE_SOURCES, buildCompositionFromAsset } from "@/lib/editable-sources";
 
 function useVideos() {
@@ -40,13 +43,15 @@ function useVideos() {
     load(1);
   }
 
-  return { videos, pagination, fetching, load };
+  return { videos, setVideos, pagination, fetching, load };
 }
 
 export function VideoPicker({ onSelect, hideHeader = false, excludeIds = [] }) {
-  const { videos: allVideos, pagination, fetching, load } = useVideos();
+  const { videos: allVideos, setVideos, pagination, fetching, load } = useVideos();
   const [previewVideo, setPreviewVideo] = useState(null);
   const [selectingId, setSelectingId] = useState(null);
+  const [pendingDelete, setPendingDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const videos = allVideos && excludeIds.length > 0
     ? allVideos.filter((v) => !excludeIds.includes(v.id))
@@ -67,6 +72,25 @@ export function VideoPicker({ onSelect, hideHeader = false, excludeIds = [] }) {
   function handleDownload(url, name) {
     const proxyUrl = `/api/download?url=${encodeURIComponent(url)}&name=${encodeURIComponent(name || "video.mp4")}`;
     window.location.href = proxyUrl;
+  }
+
+  async function handleDeleteConfirm() {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/assets?id=${pendingDelete.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to delete reel");
+      }
+      setVideos((prev) => (prev || []).filter((v) => v.id !== pendingDelete.id));
+      toast.success("Reel deleted");
+      setPendingDelete(null);
+    } catch (err) {
+      toast.error("Delete failed", { description: err.message });
+    } finally {
+      setDeleting(false);
+    }
   }
 
   const loading = videos === null;
@@ -160,6 +184,12 @@ export function VideoPicker({ onSelect, hideHeader = false, excludeIds = [] }) {
                       </div>
                     </button>
                   )}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setPendingDelete(video); }}
+                    className="absolute top-2 left-2 z-10 h-8 w-8 rounded-full bg-white/90 backdrop-blur flex items-center justify-center shadow-md opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity hover:bg-white"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                  </button>
                 </div>
 
                 {/* Info */}
@@ -230,6 +260,27 @@ export function VideoPicker({ onSelect, hideHeader = false, excludeIds = [] }) {
           </div>
         </div>
       )}
+
+      {/* Delete confirmation */}
+      <Dialog open={!!pendingDelete} onOpenChange={(open) => !open && !deleting && setPendingDelete(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete this reel?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            This permanently deletes &quot;{pendingDelete?.name || "this reel"}&quot; from your videos. This can&apos;t be undone.
+          </p>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="ghost" disabled={deleting} onClick={() => setPendingDelete(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" disabled={deleting} onClick={handleDeleteConfirm} className="gap-2">
+              {deleting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              Delete
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

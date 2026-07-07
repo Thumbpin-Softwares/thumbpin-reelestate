@@ -333,15 +333,15 @@ export function StepUpload({
                   No RE Agents found. Upload your own presenter.
                 </div>
               ) : selectedCollectionAvatarData ? (
-                <div className="relative rounded-3xl overflow-hidden border-2 border-[#c7f038]">
+                <div className="relative mx-auto max-w-45 aspect-2/3 rounded-3xl overflow-hidden border-2 border-[#c7f038]">
                   {selectedCollectionAvatarData.coverImage || selectedCollectionAvatarData.images?.[0]?.url ? (
                     <img
                       src={selectedCollectionAvatarData.coverImage || selectedCollectionAvatarData.images?.[0]?.url}
                       alt={selectedCollectionAvatarData.name}
-                      className="w-full h-64 object-cover"
+                      className="w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="w-full h-64 bg-muted/30 flex items-center justify-center">
+                    <div className="w-full h-full bg-muted/30 flex items-center justify-center">
                       <User2 className="w-8 h-8 text-muted-foreground" />
                     </div>
                   )}
