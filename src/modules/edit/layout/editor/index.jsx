@@ -695,7 +695,7 @@ export function Editor({ compositionProps, onExit }) {
         </div>
 
         {/* Right panel */}
-        <div className="w-72 shrink-0 border-l border-border/50 bg-white flex flex-col overflow-hidden">
+        <div className="w-88 shrink-0 border-l border-border/50 bg-white flex flex-col overflow-hidden">
           {activePanel ? (
             <>
               <div className="flex items-center gap-2 px-3 py-3 border-b border-border/40 shrink-0">
