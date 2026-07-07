@@ -41,7 +41,7 @@ export async function POST(request) {
       send({ type: "status", message: "Preparing composition…" });
       const composition = await selectComposition({
         serveUrl,
-        id: "SeedanceReel",
+        id: "ActionReel",
         inputProps,
       });
 

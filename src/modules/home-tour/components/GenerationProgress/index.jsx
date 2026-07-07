@@ -6,6 +6,24 @@ import { Loader2, CheckCircle2, AlertCircle, RotateCcw, Download } from "lucide-
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { compressImage } from "@/utils/compress-image";
+import { clampBrollClips } from "@/lib/remotion/duration";
+
+/** Probe audio duration via browser <audio> element (header only, no full download). */
+async function getAudioDuration(url) {
+  return new Promise((resolve) => {
+    if (!url) return resolve(0);
+    const audio = new Audio();
+    audio.addEventListener("loadedmetadata", () => {
+      const dur = isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0;
+      audio.src = "";
+      resolve(dur);
+    });
+    audio.addEventListener("error", () => resolve(0));
+    audio.crossOrigin = "anonymous";
+    audio.preload = "metadata";
+    audio.src = url;
+  });
+}
 
 /** Probe video duration via browser <video> element (header only, no full download). */
 async function getVideoDuration(url) {
@@ -58,11 +76,13 @@ const JOB_STATUS_TO_LOCAL = {
 // spending Seedance/ElevenLabs credits or waiting on a real render.
 const MOCK_DATA = {
   part1: "Welcome to this stunning luxury villa, perfectly nestled in the hills.",
-  part2: "As you step inside, natural light floods the open-concept living space, leading out to a private infinity pool overlooking the valley. Ready to make this yours? Book a private tour today.",
+  part2: "As you step inside, natural light floods the open-concept living space, leading out to a private infinity pool overlooking the valley.",
+  part3Cta: "Ready to make this yours? Book a private tour today.",
   part1AudioUrl: "/mock/part1-audio.mp3",
   part2AudioUrl: "/mock/part2-audio.mp3",
-  part1VideoUrl: "/mock/part1-video.mp4",
-  part2VideoUrl: "/mock/part2-video.mp4",
+  avatarVideoUrl: "/mock/avatar-video.mp4",
+  walkthroughVideoUrl: "/mock/walkthrough-video.mp4",
+  ctaVideoUrl: "/mock/cta-video.mp4",
   finalVideoUrl: "/mock/final-reel.mp4",
 };
 
@@ -77,15 +97,16 @@ const MOCK_STAGE_ORDER = [
 ];
 
 /**
- * GenerationProgress for the "Car Exit" Seedance Reel pipeline — 2-part
- * master-template architecture (same shape as action-reel/comedy-reel: two
- * ~15s hard-cut Seedance clips, each with its own baked dialogue audio),
- * rendered via the shared "ActionReel" Remotion composition.
+ * GenerationProgress drives the same Seedance 3-part pipeline for any route
+ * that wants its own independent API/job-tracking — pass apiBasePath/editPath
+ * (and the sessionStorage keys) to point it at that route's own endpoints
+ * instead of the seedance-reel defaults.
  *
- * home-tour used to share this exact component when this pipeline was still
- * 3-part (avatar intro + broll walkthrough + CTA) — it now has its own fork
- * at modules/home-tour/components/GenerationProgress, since its backend
- * routes still speak that 3-part shape.
+ * Forked verbatim from seedance-reel/components/GenerationProgress when that
+ * pipeline moved to the 2-part action-reel-style architecture — home-tour's
+ * own generate-pipeline/render-remotion routes are still the original 3-part
+ * (avatar intro + broll walkthrough + CTA) shape, so it needs its own copy of
+ * this component rather than sharing one that assumes 2 parts.
  */
 export function GenerationProgress({
   generationParams,
@@ -112,7 +133,6 @@ export function GenerationProgress({
     quality      = "auto",
     locationImages = [],
     avatarUrls   = [],
-    customVoiceFile = null,
   } = generationParams || {};
 
   const [status, setStatus]               = useState(STATUS.IDLE);
@@ -121,12 +141,14 @@ export function GenerationProgress({
   // Script split state
   const [part1, setPart1]       = useState("");
   const [part2, setPart2]       = useState("");
+  const [part3Cta, setPart3Cta] = useState("");
 
   // Asset URLs from SSE
-  const [part1AudioUrl, setPart1AudioUrl] = useState(null);
-  const [part2AudioUrl, setPart2AudioUrl] = useState(null);
-  const [part1VideoUrl, setPart1VideoUrl] = useState(null);
-  const [part2VideoUrl, setPart2VideoUrl] = useState(null);
+  const [part1AudioUrl, setPart1AudioUrl]         = useState(null);
+  const [part2AudioUrl, setPart2AudioUrl]         = useState(null);
+  const [avatarVideoUrl, setAvatarVideoUrl]       = useState(null);
+  const [walkthroughVideoUrl, setWalkthroughVideoUrl] = useState(null);
+  const [ctaVideoUrl, setCtaVideoUrl]             = useState(null);
 
   const [renderPercent, setRenderPercent] = useState(0);
   const [finalVideoUrl, setFinalVideoUrl] = useState(null);
@@ -135,15 +157,12 @@ export function GenerationProgress({
   const aborted = useRef(false);
   const abortController = useRef(null);
   const lastRenderProps = useRef(null);
-  // Set once the stream reaches a real terminal event ("video_ready" or
-  // "error") — lets startPipeline tell a clean finish apart from the
-  // connection just dropping mid-generation (proxy/function timeout etc.).
-  const reachedTerminalEvent = useRef(false);
 
   /** Populate the screen with fixture data for the requested stage — no network calls. */
   const runMockPreview = (stage) => {
     setPart1(MOCK_DATA.part1);
     setPart2(MOCK_DATA.part2);
+    setPart3Cta(MOCK_DATA.part3Cta);
 
     const idx = MOCK_STAGE_ORDER.indexOf(stage);
 
@@ -152,8 +171,9 @@ export function GenerationProgress({
       setPart2AudioUrl(MOCK_DATA.part2AudioUrl);
     }
     if (idx >= MOCK_STAGE_ORDER.indexOf(STATUS.SEEDANCE)) {
-      setPart1VideoUrl(MOCK_DATA.part1VideoUrl);
-      setPart2VideoUrl(MOCK_DATA.part2VideoUrl);
+      setAvatarVideoUrl(MOCK_DATA.avatarVideoUrl);
+      setWalkthroughVideoUrl(MOCK_DATA.walkthroughVideoUrl);
+      setCtaVideoUrl(MOCK_DATA.ctaVideoUrl);
     }
     if (idx >= MOCK_STAGE_ORDER.indexOf(STATUS.DONE)) {
       setFinalVideoUrl(MOCK_DATA.finalVideoUrl);
@@ -212,14 +232,16 @@ export function GenerationProgress({
         const { job } = await res.json();
         if (job.part1) setPart1(job.part1);
         if (job.part2) setPart2(job.part2);
+        if (job.part3Cta) setPart3Cta(job.part3Cta);
         if (job.part1AudioUrl) setPart1AudioUrl(job.part1AudioUrl);
         if (job.part2AudioUrl) setPart2AudioUrl(job.part2AudioUrl);
-        if (job.part1VideoUrl) setPart1VideoUrl(job.part1VideoUrl);
-        if (job.part2VideoUrl) setPart2VideoUrl(job.part2VideoUrl);
+        if (job.avatarVideoUrl) setAvatarVideoUrl(job.avatarVideoUrl);
+        if (job.walkthroughVideoUrl) setWalkthroughVideoUrl(job.walkthroughVideoUrl);
+        if (job.ctaVideoUrl) setCtaVideoUrl(job.ctaVideoUrl);
 
         if (job.status === "done") {
           try { sessionStorage.removeItem(jobIdKey); } catch (_) {}
-          await prepareComposition(job.part1VideoUrl, job.part2VideoUrl);
+          await prepareComposition(job.avatarVideoUrl, job.walkthroughVideoUrl, job.ctaVideoUrl, job.part2AudioUrl);
           return;
         }
         if (job.status === "error") {
@@ -243,13 +265,12 @@ export function GenerationProgress({
   const startPipeline = async () => {
     setStatus(STATUS.IDLE);
     setError(null);
-    setPart1(""); setPart2("");
+    setPart1(""); setPart2(""); setPart3Cta("");
     setPart1AudioUrl(null); setPart2AudioUrl(null);
-    setPart1VideoUrl(null); setPart2VideoUrl(null);
+    setAvatarVideoUrl(null); setWalkthroughVideoUrl(null); setCtaVideoUrl(null);
 
     const jobId = crypto.randomUUID();
     try { sessionStorage.setItem(jobIdKey, jobId); } catch (_) {}
-    reachedTerminalEvent.current = false;
 
     const controller = new AbortController();
     abortController.current = controller;
@@ -263,12 +284,11 @@ export function GenerationProgress({
       formData.append("tone", tone);
       formData.append("quality", quality);
       if (voiceSettings) formData.append("voiceSettings", JSON.stringify(voiceSettings));
-      if (customVoiceFile) formData.append("customVoiceFile", customVoiceFile);
 
       avatarUrls.slice(0, 3).forEach((url, i) => formData.append(`avatarUrl_${i}`, url));
 
       await Promise.all(
-        locationImages.slice(0, 4).map(async (img, i) => {
+        locationImages.slice(0, 10).map(async (img, i) => {
           if (!img.file) return;
           try {
             const compressed = await compressImage(img.file);
@@ -308,15 +328,6 @@ export function GenerationProgress({
           }
         }
       }
-
-      // Stream closed without ever reaching "video_ready" or "error" — the
-      // connection dropped (e.g. a serverless function timeout) mid-generation
-      // rather than the pipeline finishing cleanly.
-      if (!aborted.current && !reachedTerminalEvent.current) {
-        console.error("[GenerationProgress] Stream ended without a terminal event");
-        setStatus(STATUS.ERROR);
-        setError("Lost connection to the server mid-generation. Refresh this page — it'll try to resume the job in progress.");
-      }
     } catch (err) {
       if (err.name === "AbortError" || aborted.current) return;
       console.error("[GenerationProgress] Error:", err);
@@ -337,6 +348,7 @@ export function GenerationProgress({
       case "script_split":
         setPart1(event.part1 || "");
         setPart2(event.part2 || "");
+        setPart3Cta(event.part3_cta || "");
         setStatus(STATUS.SPLITTING);
         break;
 
@@ -351,18 +363,26 @@ export function GenerationProgress({
         break;
 
       case "seedance_prompt_ready":
+        setStatus(STATUS.SEEDANCE);
+        break;
+
       case "seedance_generating":
         setStatus(STATUS.SEEDANCE);
         break;
 
-      case "part1_video_done":
-        setPart1VideoUrl(event.part1VideoUrl);
-        toast.success("Part 1 (car exit intro) video ready!");
+      case "seedance_done":
+        setAvatarVideoUrl(event.avatarVideoUrl);
+        toast.success("Intro avatar video ready!");
         break;
 
-      case "part2_video_done":
-        setPart2VideoUrl(event.part2VideoUrl);
-        toast.success("Part 2 (highlights + CTA) video ready!");
+      case "walkthrough_done":
+        setWalkthroughVideoUrl(event.walkthroughVideoUrl);
+        toast.success("Property walkthrough ready!");
+        break;
+
+      case "seedance_cta_done":
+        setCtaVideoUrl(event.ctaVideoUrl);
+        toast.success("CTA avatar video ready!");
         break;
 
       case "seedance_error":
@@ -373,12 +393,15 @@ export function GenerationProgress({
         break;
 
       case "video_ready":
-        reachedTerminalEvent.current = true;
-        prepareComposition(event.part1VideoUrl, event.part2VideoUrl);
+        prepareComposition(
+          event.avatarVideoUrl,
+          event.walkthroughVideoUrl,
+          event.ctaVideoUrl,
+          event.part2AudioUrl
+        );
         break;
 
       case "error":
-        reachedTerminalEvent.current = true;
         try { sessionStorage.removeItem(jobIdKey); } catch (_) {}
         setStatus(STATUS.ERROR);
         setError(event.message || "Pipeline failed");
@@ -390,10 +413,17 @@ export function GenerationProgress({
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** Both Seedance clips already carry baked, lip-synced audio. Probe their
-   * durations and build the ActionReel composition props for rendering. */
-  const prepareComposition = async (p1Url, p2Url) => {
-    if (!p1Url && !p2Url) {
+  /**
+   * After all 3 Seedance videos are ready, probe their durations and
+   * build the Remotion composition props for immediate preview.
+   *
+   * brollClips shape: Array<{ url, videoDuration, segmentDuration }>
+   *   segmentDuration = how long to display the clip (= Part 2 audio duration for 1 clip)
+   *   playbackRate is computed inside the composition: min(1, videoDuration / segmentDuration)
+   *   so a 12s clip filling a 25s segment plays at 0.48× speed (luxury slow-motion)
+   */
+  const prepareComposition = async (avUrl, wtUrl, ctaUrl, p2Audio) => {
+    if (![avUrl, wtUrl, ctaUrl].some(Boolean)) {
       setStatus(STATUS.ERROR);
       setError("No videos were generated. Check server logs.");
       return;
@@ -402,21 +432,41 @@ export function GenerationProgress({
     setStatus(STATUS.COMBINING);
 
     try {
-      const [part1Duration, part2Duration] = await Promise.all([
-        getVideoDuration(p1Url),
-        getVideoDuration(p2Url),
+      const [avatarDur, walkthroughVideoDur, ctaDur, part2AudioDur] = await Promise.all([
+        getVideoDuration(avUrl),
+        getVideoDuration(wtUrl),
+        getVideoDuration(ctaUrl),
+        getAudioDuration(p2Audio),
       ]);
+
+      const avatarDuration = avatarDur > 0 ? avatarDur : 15;
+      const ctaDuration    = ctaDur > 0 ? ctaDur : 10;
+
+      // segmentDuration = full Part 2 audio length — the clip will be slowed to fill it
+      const videoDuration   = walkthroughVideoDur > 0 ? walkthroughVideoDur : 12;
+      const segmentDuration = part2AudioDur > 0 ? part2AudioDur : videoDuration;
+
+      const rawBrollClips = wtUrl
+        ? [{ url: wtUrl, videoDuration, segmentDuration }]
+        : [];
+
+      // Keep the merged reel at 60s max — the Part 2 voiceover length is the
+      // only elastic part, so it's the one that gets compressed if needed.
+      const brollClips = clampBrollClips({ avatarDuration, brollClips: rawBrollClips, ctaDuration });
 
       const props = {
         source,
-        part1VideoUrl: p1Url || "",
-        part2VideoUrl: p2Url || "",
-        part1Duration: part1Duration > 0 ? part1Duration : 15,
-        part2Duration: part2Duration > 0 ? part2Duration : 15,
+        avatarVideoUrl: avUrl  || "",
+        brollClips,
+        ctaVideoUrl:    ctaUrl || "",
+        part2AudioUrl:  p2Audio || "",
+        avatarDuration,
+        ctaDuration,
+        ctaText: part3Cta || "",
       };
 
       // Still saved so "Open in editor" (or a future edit) can pick up right
-      // where the 2 raw clips left off, even though we no longer auto-redirect.
+      // where the 3 raw clips left off, even though we no longer auto-redirect.
       sessionStorage.setItem(compositionKey, JSON.stringify(props));
       try { sessionStorage.removeItem(jobIdKey); } catch (_) {}
       try { sessionStorage.removeItem(resumeKey); } catch (_) {}
@@ -429,7 +479,7 @@ export function GenerationProgress({
     }
   };
 
-  /** Render the 2 clips into one downloadable mp4 via the project's Remotion render endpoint. */
+  /** Render the 3 clips into one downloadable mp4 via the project's Remotion render endpoint. */
   const renderFinalVideo = async (props) => {
     lastRenderProps.current = props;
     setStatus(STATUS.RENDERING);
@@ -496,7 +546,7 @@ export function GenerationProgress({
   };
 
   /** If the failure happened during the final render, retry just that step
-   * (the 2 raw clips already exist) instead of re-running the whole pipeline. */
+   * (the 3 raw clips already exist) instead of re-running the whole pipeline. */
   const handleRetry = () => {
     if (lastRenderProps.current) {
       renderFinalVideo(lastRenderProps.current);

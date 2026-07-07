@@ -5,12 +5,12 @@
 // compositionType selects which Remotion component/duration-calc the Editor
 // (modules/edit/layout/editor) uses for preview + render props:
 //   "seedance"    — avatarVideoUrl + brollClips + ctaVideoUrl + part2AudioUrl
-//                   (SeedanceReelComposition) — seedance-reel/news-anchor/home-tour
+//                   (SeedanceReelComposition) — news-anchor/home-tour
 //   "action-reel" — part1VideoUrl + part2VideoUrl, two flat baked-audio clips
-//                   (ActionReelComposition) — action-reel/comedy-reel
+//                   (ActionReelComposition) — action-reel/comedy-reel/seedance-reel
 export const EDITABLE_SOURCES = {
   "seedance-reel": {
-    compositionType: "seedance",
+    compositionType: "action-reel",
     renderEndpoint: "/api/seedance-reel/render-remotion",
     generatorPath: "/app/seedance-reel",
     downloadFilename: "seedance-reel.mp4",

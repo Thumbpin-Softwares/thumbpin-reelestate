@@ -82,11 +82,14 @@ export function StepScript({ onBack, onGenerate }) {
     setVoiceSettings({ ...(ELEVENLABS_VOICE_SETTINGS[voiceId] || ELEVENLABS_VOICE_SETTINGS[ELEVENLABS_VOICES[0].id]) });
   };
 
-  // Custom voice (record or upload) — captured locally for now, cloning wired up later.
+  // Custom voice (record or upload) — when present, this file is uploaded and
+  // sent directly to Seedance as the reference audio for both parts, instead
+  // of the prebuilt voice above (see GenerationProgress/generate-pipeline).
   const [customVoiceTab, setCustomVoiceTab] = useState("record");
   const [isRecording, setIsRecording] = useState(false);
   const [customVoiceUrl, setCustomVoiceUrl] = useState(null);
   const [customVoiceName, setCustomVoiceName] = useState(null);
+  const [customVoiceFile, setCustomVoiceFile] = useState(null);
   const mediaRecorderRef = useRef(null);
   const recordedChunksRef = useRef([]);
   const fileInputRef = useRef(null);
@@ -95,6 +98,7 @@ export function StepScript({ onBack, onGenerate }) {
     if (customVoiceUrl) URL.revokeObjectURL(customVoiceUrl);
     setCustomVoiceUrl(null);
     setCustomVoiceName(null);
+    setCustomVoiceFile(null);
   };
 
   const startRecording = async () => {
@@ -110,6 +114,7 @@ export function StepScript({ onBack, onGenerate }) {
         clearCustomVoice();
         setCustomVoiceUrl(URL.createObjectURL(blob));
         setCustomVoiceName("Recorded voice");
+        setCustomVoiceFile(blob);
         stream.getTracks().forEach((t) => t.stop());
       };
       mediaRecorderRef.current = recorder;
@@ -131,6 +136,7 @@ export function StepScript({ onBack, onGenerate }) {
     clearCustomVoice();
     setCustomVoiceUrl(URL.createObjectURL(file));
     setCustomVoiceName(file.name);
+    setCustomVoiceFile(file);
   };
 
   const [manualScript, setManualScript] = useState(draft?.manualScript || "");
@@ -242,7 +248,7 @@ export function StepScript({ onBack, onGenerate }) {
 
   const handleGenerate = () => {
     if (!isScriptReady) return;
-    onGenerate({ script: activeScript.trim(), voiceId: elevenLabsVoice, language, tone, voiceSettings });
+    onGenerate({ script: activeScript.trim(), voiceId: elevenLabsVoice, language, tone, voiceSettings, customVoiceFile });
   };
 
   return (
@@ -466,6 +472,9 @@ export function StepScript({ onBack, onGenerate }) {
 
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-neutral-500">Add Your Own</label>
+              <p className="text-[10px] text-neutral-400 -mt-1">
+                If you record or upload a voice, it&apos;s used instead of the prebuilt voice above.
+              </p>
 
               <div className="rounded-xl border border-neutral-200 bg-white p-3 space-y-3">
                 <div className="relative inline-flex rounded-full bg-neutral-100 p-1 text-xs">

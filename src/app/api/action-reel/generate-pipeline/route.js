@@ -97,7 +97,7 @@ async function callSeedanceAndUpload(seedanceInput, userId, keyName) {
 // ── Fixed master templates — reproduced as-is except for the quoted dialogue ─
 const MASTER_TEMPLATE_A = `A hyper-realistic, vertical (9:16) UGC-style action real estate indian accent vlog. Natural, dynamic lighting. It looks like a high-budget smartphone video. All spoken dialogue is delivered in a natural, indian accent conversational indian accent — casual everyday rhythm and pacing, like a real person talking to a friend, not overly enunciated or textbook-perfect.
 
-[0:00 - 0:05] The video opens with an action-packed, fast-paced shot. A sleek black luxury helicopter hovers just above the ground. The female agent, Anvi (using #image7 for her facial features and #image5 for her black outfit), dramatically slides down a thick rope from the helicopter door. The moment her feet hit the ground, she immediately grabs the camera selfie-style. With her hair blowing wildly from the helicopter blades, she looks directly into the lens with intense high energy and says: "Kya aap bhi usi purani balcony se shehar ki bheed dekh kar bore ho gaye hain? Hello, main hoon Anvi..."
+[0:00 - 0:05] The video opens with an action-packed, fast-paced shot. A sleek black luxury helicopter hovers just above the ground. The female agent, (using #image7 for her facial features and #image5 for her black outfit), dramatically slides down a thick rope from the helicopter door. The moment her feet hit the ground, she immediately grabs the camera selfie-style. With her hair blowing wildly from the helicopter blades, she looks directly into the lens with intense high energy and says: "Kya aap bhi usi purani balcony se shehar ki bheed dekh kar bore ho gaye hain? Hello, main hoon Anvi..."
 
 [0:05 - 0:08] Hard cut. The camera suddenly snaps to a fast, sweeping drone-style shot of a massive modern luxury villa exterior, matching exactly with #image1.
 
@@ -118,8 +118,8 @@ const MASTER_TEMPLATE_B = `A hyper-realistic, vertical (9:16) UGC-style high-ene
 [0:10 - 0:15] Hard cut. Back to the female agent, Anvi (using #image7 for her facial features and #image5 for her black outfit). She is standing confidently inside the luxury living room. Looking directly into the lens, she enthusiastically points her finger down toward the CTA link, and then playfully tosses a shiny set of house keys directly toward the camera lens. She says: "Toh intezaar kaisa? Neeche diye gaye link par abhi click karein aur apni VIP tour book karein!" She completely stops speaking at exactly 13 seconds, leaving the final 2 seconds showing her confident smile as the keys fly toward the viewer, ending the video naturally.`;
 
 const TEMPLATE_MARKERS = {
-  A: ["#image1", "#image2", "#image5", "#image7", "Anvi", "helicopter", "Hard cut"],
-  B: ["#image1", "#image2", "#image3", "#image4", "#image5", "#image7", "Anvi", "keys", "Hard cut"],
+  A: ["#image1", "#image2", "#image5", "#image7", "helicopter", "Hard cut"],
+  B: ["#image1", "#image2", "#image3", "#image4", "#image5", "#image7", "keys", "Hard cut"],
 };
 
 function buildReproducePrompt({ masterTemplate, dialogue, partLabel }) {

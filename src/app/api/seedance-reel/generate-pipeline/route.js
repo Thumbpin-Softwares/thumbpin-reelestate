@@ -6,7 +6,7 @@ import { authOptions } from "@/lib/auth-config";
 import Asset from "@/models/Asset";
 import SeedanceJob from "@/models/SeedanceJob";
 import dbConnect from "@/lib/mongodb";
-import { uploadToR2, buildUserKey } from "@/lib/r2-upload";
+import { uploadToR2, buildUserKey, extFromMime } from "@/lib/r2-upload";
 import { R2_PUBLIC_URL } from "@/lib/r2";
 import {
   consumeCreditsForAction,
@@ -22,22 +22,47 @@ if (process.env.FAL_KEY) {
 /**
  * POST /api/seedance-reel/generate-pipeline
  *
- * 3-part real estate reel pipeline:
- *   Part 1 (~15s): Avatar presenter — Seedance intro (generate_audio: true)
- *   Part 2 (~12s): Architectural walkthrough — Seedance walkthrough (generate_audio: false)
- *                  with ElevenLabs Part 2 voiceover overlaid by client
- *   Part 3 (~10s): Avatar CTA — Seedance CTA (generate_audio: true)
+ * 2-part luxury "Car Exit" real estate reel — same architecture as
+ * action-reel/comedy-reel (fixed ~30s, 2 master-template-driven Seedance
+ * clips, hard cut, no separate broll/crossfade layer), reusing the shared
+ * "ActionReel" Remotion composition:
+ *   Part 1 (~15s): Car-exit intro — presenter steps out of a luxury car,
+ *                  hard cuts to 2 property shots, back to presenter finishing
+ *                  the hook. Seedance-baked lip-synced dialogue.
+ *   Part 2 (~15s): Highlights + CTA — 4 quick property beats, hard cut to
+ *                  presenter delivering the CTA with a keys toss.
  *
- * TTS for all 3 parts generated in parallel, then all 3 Seedance calls run in parallel.
- * Client assembles: combineVideos([walkthrough], {fullAudioUrl: part2}) → concatWithAudio([intro, wt, cta])
+ * Both Seedance prompts are produced by asking the LLM to REPRODUCE one of
+ * the two MASTER TEMPLATES below exactly (see action-reel's route for the
+ * full rationale) — only the quoted dialogue changes.
+ *
+ * Kept from the previous 3-part version: the "real_estate_video" credit
+ * action, adjustable per-request voiceSettings (stability/style/etc — unlike
+ * action-reel/comedy-reel's fixed per-voice defaults), and the "quality"
+ * (Seedance resolution) choice from StepFinalize.
  */
 
 async function callLLM(prompt) {
   if (!process.env.FAL_KEY) throw new Error("FAL_KEY not configured");
-  const result = await fal.subscribe("fal-ai/any-llm", {
-    input: { model: "anthropic/claude-3-5-haiku", prompt, max_tokens: 2048 },
-  });
-  return (result?.data?.output ?? result?.output ?? "").toString().trim();
+  try {
+    const result = await fal.subscribe("openrouter/router", {
+      input: { model: "anthropic/claude-sonnet-4.6", prompt, max_tokens: 2048 },
+      logs: false,
+    });
+    if (result?.data?.error) throw new Error(result.data.error);
+    const output = (result?.data?.output ?? result?.output ?? "").toString().trim();
+    if (output) return output;
+    throw new Error("openrouter/router returned empty output");
+  } catch (err) {
+    console.warn(
+      "[SeedanceReel] openrouter/router call failed, falling back to fal-ai/any-llm:",
+      err.message,
+    );
+    const fallback = await fal.subscribe("fal-ai/any-llm", {
+      input: { model: "anthropic/claude-3-5-haiku", prompt, max_tokens: 2048 },
+    });
+    return (fallback?.data?.output ?? fallback?.output ?? "").toString().trim();
+  }
 }
 
 async function generateElevenLabsTTS(text, voiceId, voiceSettings) {
@@ -84,6 +109,126 @@ async function callSeedanceAndUpload(seedanceInput, userId, keyName) {
   return uploadToR2(videoBuf, key, "video/mp4");
 }
 
+// ── Fixed master templates — reproduced as-is except for the quoted dialogue ─
+const MASTER_TEMPLATE_A = `A hyper-realistic, vertical (9:16) UGC-style luxury real estate vlog. Natural, dynamic lighting. It looks like a high-budget smartphone video. All spoken dialogue is delivered in a natural, conversational Hindi accent — casual everyday rhythm and pacing, like a real person talking to a friend, not overly enunciated or textbook-perfect.
+
+[0:00 - 0:05] The video opens with a sleek luxury car pulling up to a stop. The female agent, Anvi (using #image7 for her facial features and #image5 for her black outfit), steps out of the car with effortless elegance and begins walking confidently toward the camera. She holds the camera selfie-style and looks directly into the lens with warm, inviting energy and says: "Kya aapne kabhi socha hai ki aapka agla ghar bilkul filmy ho sakta hai? Hello, main hoon Anvi..."
+
+[0:05 - 0:08] Hard cut. The camera suddenly snaps to a sweeping establishing shot of a massive modern luxury villa exterior, matching exactly with #image1.
+
+[0:08 - 0:11] Hard cut. A smooth, elegant panning shot of a striking interior space with premium finishes, exactly matching #image2.
+
+[0:11 - 0:15] Hard cut. Back to the agent Anvi (#image7 and #image5), now standing at the villa's entrance with the luxury car still visible behind her. She smiles confidently, holding the camera selfie-style, and finishes her sentence: "...aapki real estate expert, aur aaj main aapko dikhane waali hoon aapka naya dream home!" She stops speaking at exactly 13 seconds and spends the final 2 seconds simply holding a bright, confident smile at the camera, ending the video naturally.`;
+
+const MASTER_TEMPLATE_B = `A hyper-realistic, vertical (9:16) UGC-style high-energy luxury real estate vlog. Dynamic, fast-paced cinematic editing. Natural interior lighting. All spoken dialogue is delivered in a natural, conversational Hindi accent — casual everyday rhythm and pacing, like a real person talking to a friend, not overly enunciated or textbook-perfect.
+
+[0:00 - 0:03] The video opens with a fast, sweeping shot moving towards the modern luxury villa exterior, matching exactly with #image1. The voiceover starts: "Zara sochiye... itna khoobsurat ghar..."
+
+[0:03 - 0:06] Hard cut. A rapid, sweeping low-angle pan across a stunning, high-ceiling luxury living space, matching #image3. The voiceover continues: "...premium living space..."
+
+[0:06 - 0:08] Hard cut. A smooth, gliding tracking shot moving through a warm-toned interior area, matching #image4. The voiceover continues: "...shandaar designer decor..."
+
+[0:08 - 0:10] Hard cut. A quick snap-pan landing perfectly on an elegant space showcasing premium finishes, matching #image2. The voiceover says: "...aur ek perfect vibe. Hai na kamaal?"
+
+[0:10 - 0:15] Hard cut. Back to the female agent, Anvi (using #image7 for her facial features and #image5 for her black outfit). She is standing confidently beside the luxury car outside the property. Looking directly into the lens, she enthusiastically points her finger down toward the CTA link, and then playfully tosses a set of car keys directly toward the camera lens. She says: "Toh intezaar kaisa? Neeche diye gaye link par abhi click karein aur apna dream home book karein!" She completely stops speaking at exactly 13 seconds, leaving the final 2 seconds showing her confident smile as the keys fly toward the viewer, ending the video naturally.`;
+
+const TEMPLATE_MARKERS = {
+  A: ["#image1", "#image2", "#image5", "#image7", "luxury car", "Hard cut"],
+  B: ["#image1", "#image2", "#image3", "#image4", "#image5", "#image7", "keys", "Hard cut"],
+};
+
+function buildReproducePrompt({ masterTemplate, dialogue, partLabel }) {
+  return `Reproduce the following video-generation prompt EXACTLY, with ONE change: replace all of the example spoken dialogue (the text inside quotation marks) with this actual dialogue, which must be spoken in full and unchanged: "${dialogue}"
+
+You decide exactly where to split this dialogue across the quoted lines — it does not have to break at the same word as the example. You may also nudge the timestamp ranges in brackets (e.g. "[0:00 - 0:05]") so the pacing fits the new dialogue naturally — they must still start at 0:00, stay in the same order, and sum to 15 seconds total.
+
+Do NOT change anything else: keep every camera movement, action description, character description, image reference (#image1, #image2, etc.), and "Hard cut." exactly as written below. Do not invent dialogue beyond the actual dialogue given above.
+
+TEMPLATE TO REPRODUCE (${partLabel}):
+"""
+${masterTemplate}
+"""
+
+Return ONLY the finished prompt text — no markdown fences, no preamble, no explanation.`;
+}
+
+function isValidReproduction(text, markers) {
+  if (!text || text.length < 200) return false;
+  if (!/\[0:0/.test(text)) return false;
+  return markers.every((m) => text.includes(m));
+}
+
+// ── Deterministic fallback — only used if the LLM reproduction fails validation ─
+function splitWordsIntoChunks(text, n) {
+  const words = text.split(/\s+/).filter(Boolean);
+  const chunkSize = Math.max(1, Math.ceil(words.length / n));
+  const chunks = [];
+  for (let i = 0; i < n; i++) {
+    chunks.push(words.slice(i * chunkSize, (i + 1) * chunkSize).join(" "));
+  }
+  for (let i = 0; i < chunks.length; i++) {
+    if (!chunks[i]) chunks[i] = chunks.slice(0, i).reverse().find(Boolean) || words.join(" ");
+  }
+  return chunks;
+}
+
+function fillTemplateAFallback(dialogue) {
+  const [beat1, beat2] = splitWordsIntoChunks(dialogue, 2);
+  return MASTER_TEMPLATE_A
+    .replace(
+      `"Kya aapne kabhi socha hai ki aapka agla ghar bilkul filmy ho sakta hai? Hello, main hoon Anvi..."`,
+      `"${beat1}..."`,
+    )
+    .replace(
+      `"...aapki real estate expert, aur aaj main aapko dikhane waali hoon aapka naya dream home!"`,
+      `"...${beat2}"`,
+    );
+}
+
+function fillTemplateBFallback(dialogue) {
+  const sentences = dialogue.split(/(?<=[.?!])\s+/).filter(Boolean);
+  const cta = sentences.length > 1 ? sentences.pop() : "";
+  const highlights = sentences.join(" ") || dialogue;
+  const stripEnd = (s) => s.replace(/[.?!]+$/, "");
+  const [beat1, beat2, beat3, beat4] = splitWordsIntoChunks(highlights, 4).map(stripEnd);
+  return MASTER_TEMPLATE_B
+    .replace(`"Zara sochiye... itna khoobsurat ghar..."`, `"${beat1}..."`)
+    .replace(`"...premium living space..."`, `"...${beat2}..."`)
+    .replace(`"...shandaar designer decor..."`, `"...${beat3}..."`)
+    .replace(`"...aur ek perfect vibe. Hai na kamaal?"`, `"...${beat4}"`)
+    .replace(
+      `"Toh intezaar kaisa? Neeche diye gaye link par abhi click karein aur apna dream home book karein!"`,
+      `"${cta || beat4}"`,
+    );
+}
+
+async function reproduceTemplate({ template, markers, dialogue, partLabel, fallbackFn }) {
+  try {
+    const raw = await callLLM(
+      buildReproducePrompt({ masterTemplate: template, dialogue, partLabel }),
+    );
+    const cleaned = raw
+      .replace(/^```[a-z]*\n?/i, "")
+      .replace(/\n?```$/i, "")
+      .replace(/^(here'?s the prompt:?|prompt:)\s*/i, "")
+      .trim();
+    if (isValidReproduction(cleaned, markers)) return cleaned;
+    console.warn(
+      `[SeedanceReel] ${partLabel} reproduction failed validation, using fallback template.`,
+    );
+  } catch (err) {
+    console.warn(`[SeedanceReel] ${partLabel} reproduction LLM call failed:`, err.message);
+  }
+  return fallbackFn(dialogue);
+}
+
+const DEFAULT_VOICE_SETTINGS = { stability: 0.5, similarity_boost: 0.75, style: 0.3, speed: 1.0 };
+
+function resolutionForQuality(quality) {
+  if (quality === "1080p" || quality === "720p") return quality;
+  return "720p"; // "auto" and anything unrecognized
+}
+
 export async function POST(request) {
   let userId = null;
   let debit = null;
@@ -108,10 +253,12 @@ export async function POST(request) {
     ).toString();
     const language = (formData.get("language") || "english").toString();
     const jobId = (formData.get("jobId") || "").toString().trim();
-    let voiceSettings = null;
+    const quality = (formData.get("quality") || "auto").toString();
+    const resolution = resolutionForQuality(quality);
+    let voiceSettings = DEFAULT_VOICE_SETTINGS;
     try {
       const raw = formData.get("voiceSettings");
-      if (raw) voiceSettings = JSON.parse(raw.toString());
+      if (raw) voiceSettings = { ...DEFAULT_VOICE_SETTINGS, ...JSON.parse(raw.toString()) };
     } catch (_) {}
 
     if (!script || script.length < 30) {
@@ -124,8 +271,6 @@ export async function POST(request) {
       return NextResponse.json({ error: "jobId is required" }, { status: 400 });
     }
 
-    // Idempotency guard: refuse a duplicate POST for a jobId that's already
-    // running/finished — prevents a stray double-fire from double-billing credits.
     await dbConnect();
     const existingJob = await SeedanceJob.findOne({ jobId }).lean();
     if (existingJob) {
@@ -152,15 +297,30 @@ export async function POST(request) {
       avatarUrls,
     );
 
-    // Collect location image files (up to 10)
+    // Collect location image files — the master templates only ever
+    // reference #image1-4, so only the first 4 matter regardless of how
+    // many StepUpload lets the user attach.
     const locationBufs = [];
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 4; i++) {
       const f = formData.get(`locationImage_${i}`);
       if (f && typeof f !== "string") {
         try {
           locationBufs.push(Buffer.from(await f.arrayBuffer()));
         } catch (_) {}
       }
+    }
+
+    // User's own recorded/uploaded voice, if provided — bypasses ElevenLabs
+    // TTS entirely and goes straight to Seedance as the audio_urls reference
+    // for both parts (see Stage 2 below).
+    let customVoiceBuf = null;
+    let customVoiceMimeType = null;
+    const customVoiceFile = formData.get("customVoiceFile");
+    if (customVoiceFile && typeof customVoiceFile !== "string") {
+      try {
+        customVoiceBuf = Buffer.from(await customVoiceFile.arrayBuffer());
+        customVoiceMimeType = customVoiceFile.type || "audio/webm";
+      } catch (_) {}
     }
 
     if (avatarUrls.length === 0 && locationBufs.length === 0) {
@@ -170,7 +330,6 @@ export async function POST(request) {
       );
     }
 
-    // Debit credits before generation
     const creditResult = await consumeCreditsForAction({
       userId,
       action: "real_estate_video",
@@ -183,8 +342,6 @@ export async function POST(request) {
     }
     debit = creditResult.debit;
 
-    // Create the persistent job record now that credits are debited — this is
-    // the source of truth a refreshed tab can reattach to instead of re-POSTing.
     await SeedanceJob.create({ jobId, userId, status: "running" });
 
     // Upload location images to R2 (9:16 crop for Seedance)
@@ -215,8 +372,23 @@ export async function POST(request) {
 
     if (locationBufs.length > 0 && locationR2Urls.filter(Boolean).length === 0) {
       console.error(
-        `[SeedanceReel] All ${locationBufs.length} location image upload(s) failed — walkthrough will have no image reference.`,
+        `[SeedanceReel] All ${locationBufs.length} location image upload(s) failed.`,
       );
+    }
+
+    // Upload the user's own voice recording/upload, if provided.
+    let customVoiceUrl = null;
+    if (customVoiceBuf) {
+      try {
+        const ext = extFromMime(customVoiceMimeType);
+        const key = buildUserKey(userId, "audio", ext, "sreel-custom-voice");
+        customVoiceUrl = await uploadToR2(customVoiceBuf, key, customVoiceMimeType);
+      } catch (e) {
+        console.warn(
+          "[SeedanceReel] Custom voice upload failed, falling back to TTS:",
+          e.message,
+        );
+      }
     }
 
     const encoder = new TextEncoder();
@@ -230,9 +402,6 @@ export async function POST(request) {
           } catch (_) {}
         }
 
-        // Persists progress to Mongo so a refreshed/abandoned tab can resume
-        // by polling GET /api/seedance-reel/jobs/:jobId instead of re-POSTing
-        // (which would double-bill credits and double-fire fal generations).
         async function persistJob(patch) {
           try {
             await SeedanceJob.updateOne({ jobId }, { $set: patch });
@@ -244,28 +413,25 @@ export async function POST(request) {
         const pingInterval = setInterval(() => send({ type: "ping" }), 3000);
 
         try {
-          // ── Stage 1: 3-Part Script Split via LLM ──────────────────────────
+          // ── Stage 1: 2-Part Script Split via LLM ──────────────────────────
           send({
             type: "script_splitting",
-            message: "Splitting script into 3 parts…",
+            message: "Splitting script into 2 parts…",
           });
 
-          const splitPrompt = `You are a video script editor. Split this real estate ad script into exactly THREE parts for a vertical reel video.
+          const splitPrompt = `You are a video script editor. Split this real estate ad script into exactly TWO parts for a fast-paced, high-energy vertical reel video.
 
 RULES:
-- Part 1 (AVATAR INTRO ≤35 words): Opening hook. The presenter speaks directly to camera with energy and personality. Must end at a natural sentence boundary.
-- Part 2 (WALKTHROUGH NARRATION ≤80 words): Property highlights. This plays as voiceover behind a smooth architectural walkthrough. Describes rooms, features, lifestyle.
-- Part 3 CTA (≤20 words): Punchy, humorous, memorable call-to-action delivered directly to camera. Make it witty and irresistible.
+- Part 1 (HOOK ≤40 words): Opening hook. High energy, attention-grabbing, presenter speaks directly to camera. Must end at a natural sentence boundary.
+- Part 2 (HIGHLIGHTS + CTA ≤45 words): Property highlights followed by whatever closing/call-to-action line already exists in the script. Do not invent a new CTA — keep the one in the script.
 - Do NOT change, add, or remove any words — split at natural sentence boundaries only.
-
-- Return ONLY valid JSON, no markdown: {"part1": "...", "part2": "...", "part3_cta": "..."}
+- Return ONLY valid JSON, no markdown: {"part1": "...", "part2": "..."}
 
 SCRIPT:
 ${script}`;
 
           let part1 = "";
           let part2 = "";
-          let part3_cta = "";
 
           try {
             const splitRaw = await callLLM(splitPrompt);
@@ -276,10 +442,9 @@ ${script}`;
               .match(/\{[\s\S]*\}/);
             if (jsonMatch) {
               const parsed = JSON.parse(jsonMatch[0]);
-              if (parsed.part1 && parsed.part2 && parsed.part3_cta) {
+              if (parsed.part1 && parsed.part2) {
                 part1 = parsed.part1.trim();
                 part2 = parsed.part2.trim();
-                part3_cta = parsed.part3_cta.trim();
               }
             }
           } catch (splitErr) {
@@ -289,40 +454,21 @@ ${script}`;
             );
           }
 
-          // Fallback: word-count split
-          if (!part1 || !part2 || !part3_cta) {
+          if (!part1 || !part2) {
             const words = script.split(/\s+/);
-            const total = words.length;
-            const p1End = Math.min(35, Math.floor(total * 0.3));
-            const p3Start = Math.max(
-              p1End + 1,
-              total - Math.min(20, Math.floor(total * 0.2)),
-            );
-            part1 = words.slice(0, p1End).join(" ");
-            part2 = words.slice(p1End, p3Start).join(" ");
-            part3_cta = words.slice(p3Start).join(" ");
+            const mid = Math.ceil(words.length / 2);
+            part1 = words.slice(0, mid).join(" ");
+            part2 = words.slice(mid).join(" ");
           }
 
           const part1Words = part1.split(/\s+/).filter(Boolean).length;
           const part2Words = part2.split(/\s+/).filter(Boolean).length;
-          const part3Words = part3_cta.split(/\s+/).filter(Boolean).length;
-
-          // Dynamic durations
-          const seedanceDuration = String(
-            Math.min(20, Math.max(10, Math.ceil(part1Words / 2.5) + 3)),
-          );
-          const walkthroughDuration = "12";
-          const ctaDuration = "10";
-          console.log(
-            `[SeedanceReel] Durations — intro:${seedanceDuration}s wt:${walkthroughDuration}s cta:${ctaDuration}s`,
-          );
 
           // ── Language adaptation: bidirectional script conversion ───────────
           let part1_tts = part1,
-            part2_tts = part2,
-            part3_tts = part3_cta;
+            part2_tts = part2;
           let part1_roman = part1,
-            part3_roman = part3_cta;
+            part2_roman = part2;
 
           const langNameMap = {
             english: "English",
@@ -344,14 +490,8 @@ ${script}`;
           const NATIVE_SCRIPT_RE = /[ऀ-ൿ؀-ۿ]/;
           const part1HasNativeScript = NATIVE_SCRIPT_RE.test(part1);
 
-          // IMPORTANT: every rule below must keep ALL English words/phrases in Roman —
-          // not just proper nouns/numbers. These scripts are written Hinglish-style
-          // (heavy code-switching), and an incomplete rule lets the LLM phonetically
-          // Devanagari-ize plain English words, which the TTS model then mispronounces
-          // as garbled Hindi — producing choppy, unnatural-sounding narration.
           const nativeScriptRule = {
-            hindi:
-              "Convert every Hindi/Urdu word to Devanagari script.",
+            hindi: "Convert every Hindi/Urdu word to Devanagari script.",
             hinglish:
               "Convert every Hindi/Urdu word to Devanagari script. English words stay in Roman exactly as written.",
             marathi:
@@ -376,28 +516,24 @@ ${script}`;
 
           if (language !== "english") {
             if (!part1HasNativeScript && nativeScriptRule[language]) {
-              // Roman → native script: convert all 3 parts in one LLM call
               send({
                 type: "script_adapting",
-                message: `Converting all parts to ${langName} for TTS…`,
+                message: `Converting both parts to ${langName} for TTS…`,
               });
               try {
                 const adaptPrompt = `You are a script localisation tool. The following ${langName} text is in Roman transliteration.
 
-TASK: Convert ALL THREE parts to proper native script for text-to-speech.
+TASK: Convert BOTH parts to proper native script for text-to-speech.
 RULE: ${nativeScriptRule[language]}
 IMPORTANT: Do NOT translate. Do NOT change any words. Only change the writing system.
 Return ONLY valid JSON (no markdown):
-{"part1": "...", "part2": "...", "part3_cta": "..."}
+{"part1": "...", "part2": "..."}
 
 PART 1:
 ${part1}
 
 PART 2:
-${part2}
-
-PART 3 CTA:
-${part3_cta}`;
+${part2}`;
                 const adaptRaw = await callLLM(adaptPrompt);
                 const match = adaptRaw
                   .replace(/^```[a-z]*\n?/i, "")
@@ -406,21 +542,15 @@ ${part3_cta}`;
                   .match(/\{[\s\S]*\}/);
                 if (match) {
                   const parsed = JSON.parse(match[0]);
-                  // All-or-nothing: if any one part fails to convert, applying the
-                  // others alone would leave that one part in raw Roman text while
-                  // its siblings switch to native script — TTS then reads them as
-                  // different languages, producing inconsistent per-part delivery.
                   const allValid =
                     parsed.part1?.trim().length > 5 &&
-                    parsed.part2?.trim().length > 5 &&
-                    parsed.part3_cta?.trim().length > 5;
+                    parsed.part2?.trim().length > 5;
                   if (allValid) {
                     part1_tts = parsed.part1.trim();
                     part2_tts = parsed.part2.trim();
-                    part3_tts = parsed.part3_cta.trim();
                   } else {
                     console.warn(
-                      "[SeedanceReel] Roman→native conversion incomplete — keeping all parts in Roman for consistency:",
+                      "[SeedanceReel] Roman→native conversion incomplete — keeping both parts in Roman for consistency:",
                       parsed,
                     );
                   }
@@ -432,21 +562,20 @@ ${part3_cta}`;
                 );
               }
             } else if (part1HasNativeScript) {
-              // Already native script → transliterate part1 + part3_cta to Roman for Seedance prompts
               send({
                 type: "script_adapting",
-                message: `Transliterating intro + CTA to Roman for Seedance prompts…`,
+                message: `Transliterating both parts to Roman for Seedance prompts…`,
               });
               try {
                 const romanizePrompt = `Transliterate the following ${langName} texts from native script to Romanized Latin letters. Keep English brand names and numbers unchanged.
 Return ONLY valid JSON (no markdown):
-{"part1_roman": "...", "part3_roman": "..."}
+{"part1_roman": "...", "part2_roman": "..."}
 
-TEXT 1 (intro):
+TEXT 1:
 ${part1}
 
-TEXT 2 (CTA):
-${part3_cta}`;
+TEXT 2:
+${part2}`;
                 const romanRaw = await callLLM(romanizePrompt);
                 const match = romanRaw
                   .replace(/^```[a-z]*\n?/i, "")
@@ -457,8 +586,8 @@ ${part3_cta}`;
                   const parsed = JSON.parse(match[0]);
                   if (parsed.part1_roman?.trim().length > 5)
                     part1_roman = parsed.part1_roman.trim();
-                  if (parsed.part3_roman?.trim().length > 5)
-                    part3_roman = parsed.part3_roman.trim();
+                  if (parsed.part2_roman?.trim().length > 5)
+                    part2_roman = parsed.part2_roman.trim();
                 }
               } catch (romanErr) {
                 console.warn(
@@ -469,299 +598,184 @@ ${part3_cta}`;
             }
           }
 
-          send({
-            type: "script_split",
-            part1,
-            part2,
-            part3_cta,
-            part1Words,
-            part2Words,
-            part3Words,
-          });
-          await persistJob({
-            status: "splitting",
-            part1,
-            part2,
-            part3Cta: part3_cta,
-          });
+          send({ type: "script_split", part1, part2, part1Words, part2Words });
+          await persistJob({ status: "splitting", part1, part2 });
 
-          // ── Stage 2: Generate all 3 TTS in parallel ───────────────────────
-          send({
-            type: "voice_generating",
-            message: "Generating voiceovers for all 3 parts in parallel…",
-          });
+          // ── Stage 2: Voice — the user's own recording (if provided) goes
+          // straight to Seedance as the reference audio for BOTH parts,
+          // bypassing ElevenLabs TTS entirely; the selected prebuilt voice
+          // is ignored in that case. Otherwise, generate both TTS parts. ───
+          let part1AudioUrl = null;
+          let part2AudioUrl = null;
 
-          const [p1TtsResult, p2TtsResult, p3TtsResult] =
-            await Promise.allSettled([
-              generateAndUploadTTS(
-                part1_tts,
-                voiceId,
-                userId,
-                "sreel-part1-voice",
-                voiceSettings,
-              ),
-              generateAndUploadTTS(
-                part2_tts,
-                voiceId,
-                userId,
-                "sreel-part2-voice",
-                voiceSettings,
-              ),
-              generateAndUploadTTS(
-                part3_tts,
-                voiceId,
-                userId,
-                "sreel-part3-voice",
-                voiceSettings,
-              ),
+          if (customVoiceUrl) {
+            send({
+              type: "voice_generating",
+              message: "Using your uploaded voice as the reference audio…",
+            });
+            part1AudioUrl = customVoiceUrl;
+            part2AudioUrl = customVoiceUrl;
+          } else {
+            send({
+              type: "voice_generating",
+              message: "Generating voiceovers for both parts in parallel…",
+            });
+
+            const [p1TtsResult, p2TtsResult] = await Promise.allSettled([
+              generateAndUploadTTS(part1_tts, voiceId, userId, "sreel-part1-voice", voiceSettings),
+              generateAndUploadTTS(part2_tts, voiceId, userId, "sreel-part2-voice", voiceSettings),
             ]);
 
-          let part1AudioUrl = null,
-            part2AudioUrl = null,
-            part3AudioUrl = null;
-          if (p1TtsResult.status === "fulfilled") {
-            part1AudioUrl = p1TtsResult.value;
-          } else
-            console.error(
-              "[SeedanceReel] Part 1 TTS failed:",
-              p1TtsResult.reason?.message,
+            if (p1TtsResult.status === "fulfilled") {
+              part1AudioUrl = p1TtsResult.value;
+            } else
+              console.error(
+                "[SeedanceReel] Part 1 TTS failed:",
+                p1TtsResult.reason?.message,
+              );
+            if (p2TtsResult.status === "fulfilled") {
+              part2AudioUrl = p2TtsResult.value;
+            } else
+              console.error(
+                "[SeedanceReel] Part 2 TTS failed:",
+                p2TtsResult.reason?.message,
+              );
+          }
+
+          send({ type: "voice_all_ready", part1AudioUrl, part2AudioUrl });
+          await persistJob({ status: "voices", part1AudioUrl, part2AudioUrl });
+
+          // ── Stage 3: Reproduce both master templates with the real dialogue ─
+          const validLocationUrls = locationR2Urls.filter(Boolean);
+          if (validLocationUrls.length < 4 || avatarUrls.slice(0, 3).length < 3) {
+            console.warn(
+              `[SeedanceReel] Templates assume #image1-4 (location) + #image5/#image7 (avatar); ` +
+              `got ${validLocationUrls.length} location + ${avatarUrls.slice(0, 3).length} avatar image(s). ` +
+              `Seedance will ignore #imageN references with no matching image.`,
             );
-          if (p2TtsResult.status === "fulfilled") {
-            part2AudioUrl = p2TtsResult.value;
-          } else
-            console.error(
-              "[SeedanceReel] Part 2 TTS failed:",
-              p2TtsResult.reason?.message,
-            );
-          if (p3TtsResult.status === "fulfilled") {
-            part3AudioUrl = p3TtsResult.value;
-          } else
-            console.error(
-              "[SeedanceReel] Part 3 TTS failed:",
-              p3TtsResult.reason?.message,
-            );
+          }
 
-          send({
-            type: "voice_all_ready",
-            part1AudioUrl,
-            part2AudioUrl,
-            part3AudioUrl,
-          });
-          await persistJob({
-            status: "voices",
-            part1AudioUrl,
-            part2AudioUrl,
-            part3AudioUrl,
-          });
-
-          // ── Stage 3: Build 3 Seedance prompts ─────────────────────────────
-          const numAvatarImages = avatarUrls.length;
-          // Up to 10 property photos can be uploaded, but Seedance's
-          // reference-to-video call only accepts a handful of reference
-          // images reliably — cap what's actually sent here.
-          const validLocationUrls = locationR2Urls.filter(Boolean).slice(0, 4);
-          const numLocImgs = validLocationUrls.length;
-
-          // ── Prompt A: Intro avatar (car → walk → dialogue, same proven template) ──
-          const faceIdentityRef =
-            numAvatarImages >= 3
-              ? `#Image2 and #Image3`
-              : numAvatarImages >= 2
-                ? `#Image1 and #Image2`
-                : `#Image1`;
-          const locationImageRefs = validLocationUrls
-            .map((_, i) => `#Image${numAvatarImages + 1 + i}`)
-            .join(", ");
-          const locationPhrase = locationImageRefs
-            ? `into the outdoor entrance area shown in ${locationImageRefs}`
-            : "toward the outdoor entrance";
-
-            const introPrompt =
-            `Simple, sleek UGC smartphone vlog footage. #Image1 shows her exiting a luxury car and walking toward the camera while speaking directly to the lens. ` +
-            `Her face matches the exact identity of ${faceIdentityRef}. ` +
-            `She speaks the following dialogue: "${part1_roman}". ` +
-            `Her lip movements sync perfectly to the audio in #Audio1. ` +
-            `Natural daylight, handheld camera, realistic raw video aesthetic.`;
-
-          // ── Prompt B: Architectural walkthrough (location images only, no avatar) ──
-          let walkthroughPrompt = `A seamless, continuous 12-second architectural walkthrough video with zero hard cuts. `;
-          if (numLocImgs >= 1)
-            walkthroughPrompt += `The camera begins at the exterior facade and environment shown in #Image1, slowly pushing forward toward the main entrance. `;
-          if (numLocImgs >= 2)
-            walkthroughPrompt += `The camera fluidly morphs through the threshold to reveal the interior space depicted in #Image2, panning gently to highlight the ambient features and decor. `;
-          if (numLocImgs >= 3)
-            walkthroughPrompt += `Maintaining smooth stabilized handheld momentum, the camera pushes through an archway into the next adjoining space shown in #Image3, tracking smoothly across the room. `;
-          if (numLocImgs >= 4)
-            walkthroughPrompt += `The camera glides forward, transitioning effortlessly into the environment shown in #Image4, accentuating the unique spatial layout and design elements. `;
-          walkthroughPrompt += `The entire 12-second progression is one fluid, unbroken sequence — hyper-realistic textures, consistent interior lighting transitions, soft shadows, and clean 4K architectural rendering quality.`;
-          if (part2AudioUrl)
-            walkthroughPrompt += ` Camera pacing and transitions are dynamically synchronized with the rhythm of #Audio1.`;
-
-          // ── Prompt C: CTA avatar (confident, charming, hooky closing) ──────
-          const ctaBgRef =
-            numLocImgs > 0
-              ? ` against the stunning property backdrop in #Image${numAvatarImages + 1}`
-              : "";
-          const ctaPrompt =
-            `Sleek, punchy UGC smartphone vlog footage. #Image1 turns back toward the camera with a charismatic, wide grin${ctaBgRef}. ` +
-            `Her face matches the exact identity and confident energy of ${faceIdentityRef}. ` +
-            `She leans slightly toward the camera lens with sparkling eyes and delivers the closing line with irresistible charm: "${part3_roman}". ` +
-            `Her lip movements and natural expressions match perfectly to the syllables and cadence of #Audio1. ` +
-            `She finishes with a bright, unforgettable smile directly into the lens — leaving no doubt about what to do next. ` +
-            `Warm, soft property bokeh background, handheld micro-movement, natural skin texture. Confident, witty, memorable.`;
+          const [part1Prompt, part2Prompt] = await Promise.all([
+            reproduceTemplate({
+              template: MASTER_TEMPLATE_A,
+              markers: TEMPLATE_MARKERS.A,
+              dialogue: part1_roman,
+              partLabel: "Part 1 (car exit intro)",
+              fallbackFn: fillTemplateAFallback,
+            }),
+            reproduceTemplate({
+              template: MASTER_TEMPLATE_B,
+              markers: TEMPLATE_MARKERS.B,
+              dialogue: part2_roman,
+              partLabel: "Part 2 (highlights + CTA)",
+              fallbackFn: fillTemplateBFallback,
+            }),
+          ]);
 
           send({
             type: "seedance_prompt_ready",
-            introPrompt,
-            walkthroughPrompt,
-            ctaPrompt,
-            message: "All 3 Seedance prompts ready.",
+            part1Prompt,
+            part2Prompt,
+            message: "Both Seedance prompts ready.",
           });
 
-          // ── Stage 4: All 3 Seedance calls in parallel ─────────────────────
+          // ── Stage 4: Both Seedance calls in parallel ──────────────────────
           send({
             type: "seedance_generating",
-            message:
-              "Generating 3 videos in parallel via Seedance 2.0 (takes ~3–7 min)…",
+            message: "Generating 2 videos in parallel via Seedance 2.0 (takes ~3–7 min)…",
           });
           await persistJob({ status: "seedance" });
 
-          // Intro: avatar images + all location images; 720p; baked audio
-          const introImageUrls = [
-            ...avatarUrls.slice(0, 3),
-            ...validLocationUrls,
-          ];
-          // fal rejects audio_urls unless image_urls/video_urls is also present —
-          // nest audio inside the same guard so a clip never gets sent audio-only.
-          const introInput = {
-            prompt: introPrompt,
+          // Location images FIRST, then avatar images — matches the templates'
+          // fixed #image1-4 (location) / #image5,#image7 (avatar) convention.
+          const imageUrls = [...validLocationUrls, ...avatarUrls.slice(0, 3)];
+
+          const part1Input = {
+            prompt: part1Prompt,
             aspect_ratio: "9:16",
-            duration: seedanceDuration,
-            resolution: "720p",
+            duration: "15",
+            resolution,
             generate_audio: true,
-            ...(introImageUrls.length > 0 && {
-              image_urls: introImageUrls,
+            ...(imageUrls.length > 0 && {
+              image_urls: imageUrls,
               ...(part1AudioUrl && { audio_urls: [part1AudioUrl] }),
             }),
           };
 
-          // Walkthrough: location images only; 480p; no baked audio (Part 2 TTS overlaid by client)
-          const walkthroughInput = {
-            prompt: walkthroughPrompt,
+          const part2Input = {
+            prompt: part2Prompt,
             aspect_ratio: "9:16",
-            duration: walkthroughDuration,
-            resolution: "480p",
-            generate_audio: false,
-            ...(validLocationUrls.length > 0 && {
-              image_urls: validLocationUrls,
-              ...(part2AudioUrl && { audio_urls: [part2AudioUrl] }), // pacing reference only
-            }),
-          };
-
-          // CTA: avatar images + up to 2 location images for backdrop context; 720p; baked audio
-          const ctaImageUrls = [
-            ...avatarUrls.slice(0, 3),
-            ...validLocationUrls.slice(0, 2),
-          ];
-          const ctaInput = {
-            prompt: ctaPrompt,
-            aspect_ratio: "9:16",
-            duration: ctaDuration,
-            resolution: "720p",
+            duration: "15",
+            resolution,
             generate_audio: true,
-            ...(ctaImageUrls.length > 0 && {
-              image_urls: ctaImageUrls,
-              ...(part3AudioUrl && { audio_urls: [part3AudioUrl] }),
+            ...(imageUrls.length > 0 && {
+              image_urls: imageUrls,
+              ...(part2AudioUrl && { audio_urls: [part2AudioUrl] }),
             }),
           };
 
           console.log(
-            `[SeedanceReel] Intro image_urls (${introInput.image_urls?.length ?? 0}):`,
-            introInput.image_urls,
-          );
-          console.log(
-            `[SeedanceReel] Walkthrough image_urls (${walkthroughInput.image_urls?.length ?? 0}):`,
-            walkthroughInput.image_urls,
+            `[SeedanceReel] image_urls (${imageUrls.length}, location-first):`,
+            imageUrls,
           );
 
-          let avatarVideoUrl = null;
-          let walkthroughVideoUrl = null;
-          let ctaVideoUrl = null;
+          let part1VideoUrl = null;
+          let part2VideoUrl = null;
 
-          // Fire all 3 simultaneously; send SSE events as each one resolves
           await Promise.allSettled([
-            callSeedanceAndUpload(introInput, userId, "sreel-avatar")
+            callSeedanceAndUpload(part1Input, userId, "sreel-part1")
               .then((url) => {
-                avatarVideoUrl = url;
-                console.log("[SeedanceReel] Intro avatar uploaded:", url);
+                part1VideoUrl = url;
+                console.log("[SeedanceReel] Part 1 video uploaded:", url);
                 send({
-                  type: "seedance_done",
-                  avatarVideoUrl: url,
-                  message: "Intro avatar video ready!",
+                  type: "part1_video_done",
+                  part1VideoUrl: url,
+                  message: "Part 1 (car exit intro) video ready!",
                 });
-                persistJob({ avatarVideoUrl: url });
+                persistJob({ part1VideoUrl: url });
               })
               .catch((err) => {
-                console.error(
-                  "[SeedanceReel] Intro Seedance failed:",
-                  err.message,
-                );
+                console.error("[SeedanceReel] Part 1 Seedance failed:", err.message);
                 send({
                   type: "seedance_error",
-                  message: `Intro video failed: ${err.message}`,
+                  message: `Part 1 video failed: ${err.message}`,
                 });
               }),
 
-            callSeedanceAndUpload(walkthroughInput, userId, "sreel-walkthrough")
+            callSeedanceAndUpload(part2Input, userId, "sreel-part2")
               .then((url) => {
-                walkthroughVideoUrl = url;
-                console.log("[SeedanceReel] Walkthrough uploaded:", url);
+                part2VideoUrl = url;
+                console.log("[SeedanceReel] Part 2 video uploaded:", url);
                 send({
-                  type: "walkthrough_done",
-                  walkthroughVideoUrl: url,
-                  message: "Architectural walkthrough ready!",
+                  type: "part2_video_done",
+                  part2VideoUrl: url,
+                  message: "Part 2 (highlights + CTA) video ready!",
                 });
-                persistJob({ walkthroughVideoUrl: url });
+                persistJob({ part2VideoUrl: url });
               })
               .catch((err) => {
-                console.error(
-                  "[SeedanceReel] Walkthrough Seedance failed:",
-                  err.message,
-                );
+                console.error("[SeedanceReel] Part 2 Seedance failed:", err.message);
                 send({
                   type: "seedance_error",
-                  message: `Walkthrough failed: ${err.message}`,
-                });
-              }),
-
-            callSeedanceAndUpload(ctaInput, userId, "sreel-cta")
-              .then((url) => {
-                ctaVideoUrl = url;
-                console.log("[SeedanceReel] CTA avatar uploaded:", url);
-                send({
-                  type: "seedance_cta_done",
-                  ctaVideoUrl: url,
-                  message: "CTA avatar video ready!",
-                });
-                persistJob({ ctaVideoUrl: url });
-              })
-              .catch((err) => {
-                console.error(
-                  "[SeedanceReel] CTA Seedance failed:",
-                  err.message,
-                );
-                send({
-                  type: "seedance_error",
-                  message: `CTA video failed: ${err.message}`,
+                  message: `Part 2 video failed: ${err.message}`,
                 });
               }),
           ]);
 
+          // Both allSettled branches only warn+send on failure so one part
+          // failing doesn't take down the other — but if NEITHER succeeded,
+          // this must surface as a real pipeline failure (refund + error
+          // event), not silently persist as "done" with two null videos.
+          if (!part1VideoUrl && !part2VideoUrl) {
+            throw new Error(
+              "Both Seedance video generations failed — see server logs for details.",
+            );
+          }
+
           // ── Stage 5: Save asset + finalize ────────────────────────────────
           send({ type: "uploading", message: "Saving to your Asset Library…" });
 
-          const primaryUrl =
-            avatarVideoUrl || walkthroughVideoUrl || ctaVideoUrl;
+          const primaryUrl = part1VideoUrl || part2VideoUrl;
           if (primaryUrl) {
             try {
               await dbConnect();
@@ -772,12 +786,10 @@ ${part3_cta}`;
                 type: "clip",
                 metadata: {
                   source: "seedance-reel",
-                  avatarVideoUrl,
-                  walkthroughVideoUrl,
-                  ctaVideoUrl,
+                  part1VideoUrl,
+                  part2VideoUrl,
                   part1AudioUrl,
                   part2AudioUrl,
-                  part3AudioUrl,
                   language,
                 },
               });
@@ -786,24 +798,13 @@ ${part3_cta}`;
             }
           }
 
-          const totalDuration = 37; // ~15 + 12 + 10; client knows real duration after assembly
-
           send({
             type: "video_ready",
-            avatarVideoUrl,
-            walkthroughVideoUrl,
-            ctaVideoUrl,
-            part2AudioUrl,
-            totalDuration,
-            message: "All assets ready! Assembling final reel…",
+            part1VideoUrl,
+            part2VideoUrl,
+            message: "Both videos ready! Rendering final reel…",
           });
-          await persistJob({
-            status: "done",
-            avatarVideoUrl,
-            walkthroughVideoUrl,
-            ctaVideoUrl,
-            part2AudioUrl,
-          });
+          await persistJob({ status: "done", part1VideoUrl, part2VideoUrl });
 
           send({ type: "done" });
           clearInterval(pingInterval);

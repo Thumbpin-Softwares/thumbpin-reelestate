@@ -132,7 +132,7 @@ function SeedanceReelContent() {
 
   // Finalize's own "Generate" button is what actually kicks off the pipeline.
   const handleGenerate = () => {
-    const { voiceId, language, voiceSettings } = scriptParams || {};
+    const { voiceId, language, voiceSettings, customVoiceFile } = scriptParams || {};
     const script = finalizeScript?.trim() || scriptParams?.script;
     const avatarUrls = avatarHook.selectedAvatars
       .slice(0, 3)
@@ -147,6 +147,7 @@ function SeedanceReelContent() {
       quality,
       locationImages,
       avatarUrls,
+      customVoiceFile,
     });
     goToStep(3);
 

@@ -5,7 +5,7 @@ import { Loader2 } from "lucide-react";
 import { useAvatars } from "@/modules/ai-walkthrough/hooks/useAvatars";
 import { StepUpload } from "@/modules/seedance-reel/components/StepUpload";
 import { StepScript } from "@/modules/seedance-reel/components/StepScript";
-import { GenerationProgress } from "@/modules/seedance-reel/components/GenerationProgress";
+import { GenerationProgress } from "@/modules/home-tour/components/GenerationProgress";
 import { StepIndicator } from "@/modules/pipeline/components/StepIndicator";
 
 const RESUME_KEY = "home_tour_resume";
