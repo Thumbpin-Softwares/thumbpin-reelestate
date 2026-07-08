@@ -49,7 +49,7 @@ export default function SignupPage() {
         router.push("/auth/login");
       } else {
         toast.success("Welcome! Your account is ready 🎉");
-        router.push("/app");
+        router.push("/dashboard");
       }
     } catch (err) {
       toast.error("Something went wrong. Please try again.");
@@ -59,7 +59,7 @@ export default function SignupPage() {
   }
 
   async function handleGoogleSignup() {
-    await signIn("google", { callbackUrl: "/app" });
+    await signIn("google", { callbackUrl: "/dashboard" });
   }
 
   return (

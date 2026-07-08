@@ -50,9 +50,9 @@ const ChevronDown = () => (
 /**
  * StepScript — Step 1 for the Comedy Reel pipeline.
  *
- * Layout matches action-reel/seedance-reel's StepScript (script left,
+ * Layout matches action-reel/luxury-car-exit's StepScript (script left,
  * Language/Voice/Tone/"Add Your Own" sidebar right). "Add Your Own"
- * (record/upload) mirrors seedance-reel's implementation: captured locally
+ * (record/upload) mirrors luxury-car-exit's implementation: captured locally
  * for preview only — not yet wired into generation.
  */
 export function StepScript({ onBack, onGenerate }) {

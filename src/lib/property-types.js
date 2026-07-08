@@ -1,5 +1,5 @@
 // Shared property-type taxonomy for the AI "Write Script" forms across all
-// reel pipelines (comedy-reel, seedance-reel, action-reel). Replaces the old
+// reel pipelines (comedy-reel, luxury-car-exit, action-reel). Replaces the old
 // free-text "Type" input with a structured selector so the generated script
 // can adapt its angle — ownership vs rental vs stay, residential vs commercial
 // vs land — to the kind of property being marketed.

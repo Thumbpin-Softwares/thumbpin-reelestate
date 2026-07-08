@@ -29,12 +29,12 @@ import HelpMenu from "@/modules/dashboard/components/help-menu";
 import InviteButton from "@/modules/dashboard/components/invite-button";
 
 const navItems = [
-  { label: "Get Started", href: "/app", icon: Plus },
-  { label: "Library", href: "/app/assets", icon: FolderOpen },
-  { label: "Edit", href: "/app/edit", icon: Pencil },
-  { label: "Help Center", href: "/app/help", icon: BookOpen },
+  { label: "Get Started", href: "/dashboard", icon: Plus },
+  { label: "Library", href: "/dashboard/assets", icon: FolderOpen },
+  { label: "Edit", href: "/dashboard/edit", icon: Pencil },
+  { label: "Help Center", href: "/dashboard/help", icon: BookOpen },
   { label: "Chat with us", href: "mailto:support@thumbpin.ai", icon: MessageCircle },
-  { label: "What's New", href: "/app/whats-new", icon: Megaphone },
+  { label: "What's New", href: "/dashboard/whats-new", icon: Megaphone },
 ];
 
 export default function UserNav() {
@@ -88,7 +88,7 @@ export default function UserNav() {
           <SheetHeader className="px-4 pt-4">
             <SheetTitle asChild>
               <Link
-                href="/app"
+                href="/dashboard"
                 onClick={() => setMobileMenuOpen(false)}
                 className="flex items-center gap-2"
               >
@@ -123,7 +123,7 @@ export default function UserNav() {
 
           <div className="mt-auto px-3 pb-4 pt-3 border-t border-neutral-200 flex flex-col gap-1">
             <Link
-              href="/app/profile"
+              href="/dashboard/profile"
               onClick={() => setMobileMenuOpen(false)}
               className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-neutral-700 hover:bg-neutral-100"
             >

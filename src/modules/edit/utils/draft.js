@@ -3,7 +3,7 @@ const DRAFTS_KEY = "edit_drafts_v1";
 /** Multiple saved edits (one per video) live here, keyed by draftKeyFor(...),
  *  in localStorage — unlike the single active composition in sessionStorage
  *  (see COMPOSITION_STORAGE_KEY), these need to survive closing the tab so
- *  they can show up as resumable draft cards on the /app/edit dashboard. */
+ *  they can show up as resumable draft cards on the /dashboard/edit dashboard. */
 function readStore() {
   try {
     const raw = localStorage.getItem(DRAFTS_KEY);

@@ -121,7 +121,7 @@ export default function AdminLayout({ children }) {
         {/* Divider + Return to app */}
         <div className="p-4 space-y-2 border-t border-gray-100">
           <Link
-            href="/app"
+            href="/dashboard"
             className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-all"
           >
             <LayoutGrid className="w-4 h-4" />

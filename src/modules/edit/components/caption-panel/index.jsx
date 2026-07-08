@@ -300,6 +300,7 @@ export function CaptionsPanel({ captionState, onGenerate, onReset, onDraftChange
                   className="w-full h-full object-contain"
                   autoPlay
                   loop
+                  muted
                   playsInline
                   preload="metadata"
                   onError={(e) => { e.currentTarget.style.display = "none"; }}

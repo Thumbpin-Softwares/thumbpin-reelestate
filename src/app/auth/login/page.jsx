@@ -30,12 +30,12 @@ export default function LoginPage() {
     if (result?.error) {
       toast.error("Invalid email or password");
     } else {
-      router.push("/app");
+      router.push("/dashboard");
     }
   }
 
   async function handleGoogleLogin() {
-    await signIn("google", { callbackUrl: "/app" });
+    await signIn("google", { callbackUrl: "/dashboard" });
   }
 
   return (

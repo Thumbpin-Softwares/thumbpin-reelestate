@@ -91,25 +91,46 @@ export function useAssets(typeFilter = null) {
     fetchData();
   }, [fetchData]);
 
+  /**
+   * Uploads straight from the browser to R2 via a presigned URL instead of
+   * routing the file through this app's serverless function — Vercel caps
+   * function request bodies at 4.5MB, which a real photo/avatar upload can
+   * easily exceed and previously surfaced as a raw "Content Too Large" 413.
+   */
   async function uploadAsset(file, name, type = "general", category = "general") {
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("name", name);
-      formData.append("type", type);
-      formData.append("category", category);
-
-      const uploadRes = await fetch("/api/assets/upload", {
+      const urlRes = await fetch("/api/assets/upload-url", {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contentType: file.type, fileSize: file.size, category }),
       });
+      const urlData = await urlRes.json();
+      if (!urlRes.ok) throw new Error(urlData.error);
 
-      const uploadData = await uploadRes.json();
-      if (!uploadRes.ok) throw new Error(uploadData.error);
+      const putRes = await fetch(urlData.uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      if (!putRes.ok) throw new Error("Upload to storage failed");
+
+      const confirmRes = await fetch("/api/assets/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          key: urlData.key,
+          url: urlData.publicUrl,
+          name,
+          type,
+          originalName: file.name || "",
+        }),
+      });
+      const confirmData = await confirmRes.json();
+      if (!confirmRes.ok) throw new Error(confirmData.error);
 
       await fetchData();
-      return { success: true, asset: uploadData.asset };
+      return { success: true, asset: confirmData.asset };
     } catch (error) {
       return { success: false, error: error.message };
     } finally {

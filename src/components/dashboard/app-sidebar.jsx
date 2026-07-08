@@ -36,22 +36,22 @@ import { CreditsBadge } from "./credits-badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const mainNav = [
-  { title: "Dashboard", href: "/app", icon: Home },
-  { title: "Text to Video", href: "/app/text-to-video", icon: Video },
-  { title: "Real Estate", href: "/app/ai-walkthrough", icon: PersonStanding },
-  { title: "UGC Script", href: "/app/ugc-creator", icon: PenTool },
-  { title: "Product Video", href: "/app/product-to-video", icon: ShoppingBag },
-  { title: "Site View", href: "/app/site-view", icon: MapPin },
-  { title: "Seedance Reel", href: "/app/seedance-reel", icon: Clapperboard },
-  { title: "News Anchor", href: "/app/news-anchor", icon: Newspaper },
-  { title: "Home Tour", href: "/app/home-tour", icon: Building2 },
+  { title: "Dashboard", href: "/dashboard", icon: Home },
+  { title: "Text to Video", href: "/dashboard/text-to-video", icon: Video },
+  { title: "Real Estate", href: "/dashboard/ai-walkthrough", icon: PersonStanding },
+  { title: "UGC Script", href: "/dashboard/ugc-creator", icon: PenTool },
+  { title: "Product Video", href: "/dashboard/product-to-video", icon: ShoppingBag },
+  { title: "Site View", href: "/dashboard/site-view", icon: MapPin },
+  { title: "Luxury Car Exit", href: "/dashboard/luxury-car-exit", icon: Clapperboard },
+  { title: "News Anchor", href: "/dashboard/news-anchor", icon: Newspaper },
+  { title: "Home Tour", href: "/dashboard/home-tour", icon: Building2 },
 ];
 
 const libraryNav = [
-  { title: "Asset Library", href: "/app/assets", icon: FolderOpen },
-  { title: "Edit", href: "/app/edit", icon: Pencil },
-  { title: "Credits", href: "/app/credits", icon: CreditCard },
-  { title: "Profile", href: "/app/profile", icon: User },
+  { title: "Asset Library", href: "/dashboard/assets", icon: FolderOpen },
+  { title: "Edit", href: "/dashboard/edit", icon: Pencil },
+  { title: "Credits", href: "/dashboard/credits", icon: CreditCard },
+  { title: "Profile", href: "/dashboard/profile", icon: User },
 ];
 
 export function AppSidebar() {

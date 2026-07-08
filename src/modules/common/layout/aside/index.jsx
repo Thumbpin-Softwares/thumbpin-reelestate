@@ -16,14 +16,14 @@ import {
 const STORAGE_KEY = "aside_collapsed";
 
 const navItems = [
-  { label: "Get Started", href: "/app", icon: Plus },
-  { label: "Library", href: "/app/assets", icon: FolderOpen },
-  { label: "Edit", href: "/app/edit", icon: Pencil },
-  { label: "Help Center", href: "/app/help", icon: BookOpen },
+  { label: "Get Started", href: "/dashboard", icon: Plus },
+  { label: "Library", href: "/dashboard/assets", icon: FolderOpen },
+  { label: "Edit", href: "/dashboard/edit", icon: Pencil },
+  { label: "Help Center", href: "/dashboard/help", icon: BookOpen },
   { label: "Chat with us", href: "mailto:support@thumbpin.ai", icon: MessageCircle },
 ];
 
-const whatsNewItem = { label: "What's New", href: "/app/whats-new", icon: Megaphone };
+const whatsNewItem = { label: "What's New", href: "/dashboard/whats-new", icon: Megaphone };
 
 export default function Aside() {
   const pathname = usePathname();
@@ -56,7 +56,7 @@ export default function Aside() {
       }`}
     >
       <div className={`flex items-center gap-2 pb-6 ${collapsed ? "justify-center px-0" : "justify-between px-3"}`}>
-        <Link href="/app" className="flex items-center gap-2 group min-w-0">
+        <Link href="/" className="flex items-center gap-2 group min-w-0">
           <div className="bg-black flex items-center justify-center p-2 rounded-full shrink-0">
             <RectangleGoggles className="w-4 h-4" fill="#c7f038" />
           </div>

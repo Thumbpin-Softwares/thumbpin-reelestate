@@ -21,7 +21,7 @@ export function UpgradeBanner() {
           <p className="text-xs text-white/80 mt-1">
             You have {credits} credits left. Upgrade to Pro for 500 credits/month.
           </p>
-          <Link href="/app/credits">
+          <Link href="/dashboard/credits">
             <Button
               size="sm"
               variant="secondary"

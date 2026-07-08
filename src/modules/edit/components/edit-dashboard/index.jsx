@@ -27,7 +27,7 @@ function timeAgo(ts) {
   return `${days}d ago`;
 }
 
-// Shown at /app/edit whenever no composition is currently open. Both
+// Shown at /dashboard/edit whenever no composition is currently open. Both
 // "continue an existing draft" and "start editing a new clip" live on this
 // one page — no separate screen to navigate to.
 export function EditDashboard({ onOpen }) {

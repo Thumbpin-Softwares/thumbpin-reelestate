@@ -22,7 +22,7 @@ if (process.env.FAL_KEY) {
 /**
  * POST /api/news-anchor/generate-pipeline
  *
- * 3-part real estate reel pipeline (cloned from seedance-reel):
+ * 3-part real estate reel pipeline (cloned from luxury-car-exit):
  *   Part 1 (~15s): Avatar presenter — Seedance intro (generate_audio: true)
  *   Part 2 (~12s): Architectural walkthrough — Seedance walkthrough (generate_audio: false)
  *                  with ElevenLabs Part 2 voiceover overlaid by client

@@ -410,10 +410,10 @@ export function GenerationProgress({ generationParams, onReset }) {
 
   // Everything except the pre-generation approval step and the final result
   // screen goes through the same generating/error loader used by every other
-  // pipeline (seedance-reel, action-reel, home-tour, etc.) — this component
+  // pipeline (luxury-car-exit, action-reel, home-tour, etc.) — this component
   // just has an extra approval step in front of it and a richer done screen
   // (inline preview + per-beat downloads), since the pipeline's own shape
-  // needs those and seedance-reel's doesn't.
+  // needs those and luxury-car-exit's doesn't.
   if (status !== STATUS.AWAITING_APPROVAL && status !== STATUS.DONE) {
     return (
       <GenerationProgressShell

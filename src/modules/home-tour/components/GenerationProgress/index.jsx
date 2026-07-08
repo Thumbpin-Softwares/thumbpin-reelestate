@@ -10,16 +10,16 @@ import { GenerationProgressShell } from "@/modules/common/components/generation-
  * GenerationProgress for the Seedance 3-part pipeline (avatar intro + broll
  * walkthrough + CTA), rendered to a final downloadable mp4 (finalizeMode:
  * "render"). home-tour's own generate-pipeline/render-remotion routes still
- * speak this 3-part shape, unlike seedance-reel/action-reel/comedy-reel's
+ * speak this 3-part shape, unlike luxury-car-exit/action-reel/comedy-reel's
  * newer 2-part "hard cut" shape — so its composition-building differs, but
  * the step-by-step orchestration is shared via useGenerationPipeline.
  */
 export function GenerationProgress({
   generationParams,
   onAbort,
-  apiBasePath = "/api/seedance-reel",
-  source = "seedance-reel",
-  editPath = "/app/edit",
+  apiBasePath = "/api/luxury-car-exit",
+  source = "luxury-car-exit",
+  editPath = "/dashboard/edit",
   jobIdKey = "seedance_job_id",
   compositionKey = "video_composition",
   resumeKey = "seedance_resume",

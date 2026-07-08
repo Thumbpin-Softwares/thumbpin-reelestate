@@ -1,5 +1,5 @@
 // Pipelines whose generated videos can be reopened in the unified Remotion
-// editor at /app/edit. Each entry maps the Asset's metadata.source to the
+// editor at /dashboard/edit. Each entry maps the Asset's metadata.source to the
 // render API and the "back to generator" path for that pipeline.
 //
 // compositionType selects which Remotion component/duration-calc the Editor
@@ -7,42 +7,51 @@
 //   "seedance"    — avatarVideoUrl + brollClips + ctaVideoUrl + part2AudioUrl
 //                   (SeedanceReelComposition) — news-anchor/home-tour
 //   "action-reel" — part1VideoUrl + part2VideoUrl, two flat baked-audio clips
-//                   (ActionReelComposition) — action-reel/comedy-reel/seedance-reel
+//                   (ActionReelComposition) — action-reel/comedy-reel/luxury-car-exit
 export const EDITABLE_SOURCES = {
+  "luxury-car-exit": {
+    compositionType: "action-reel",
+    renderEndpoint: "/api/luxury-car-exit/render-remotion",
+    generatorPath: "/dashboard/luxury-car-exit",
+    downloadFilename: "luxury-car-exit.mp4",
+  },
+  // Back-compat: assets generated before the "seedance-reel" pipeline was
+  // renamed to "luxury-car-exit" still have this old metadata.source value —
+  // keep them editable by pointing at the same (moved) render endpoint.
   "seedance-reel": {
     compositionType: "action-reel",
-    renderEndpoint: "/api/seedance-reel/render-remotion",
-    generatorPath: "/app/seedance-reel",
+    renderEndpoint: "/api/luxury-car-exit/render-remotion",
+    generatorPath: "/dashboard/luxury-car-exit",
     downloadFilename: "seedance-reel.mp4",
   },
   "news-anchor": {
     compositionType: "seedance",
     renderEndpoint: "/api/news-anchor/render-remotion",
-    generatorPath: "/app/news-anchor",
+    generatorPath: "/dashboard/news-anchor",
     downloadFilename: "news-anchor.mp4",
   },
   "home-tour": {
     compositionType: "seedance",
     renderEndpoint: "/api/home-tour/render-remotion",
-    generatorPath: "/app/home-tour",
+    generatorPath: "/dashboard/home-tour",
     downloadFilename: "home-tour.mp4",
   },
   "action-reel": {
     compositionType: "action-reel",
     renderEndpoint: "/api/action-reel/render-remotion",
-    generatorPath: "/app/action-reel",
+    generatorPath: "/dashboard/action-reel",
     downloadFilename: "action-reel.mp4",
   },
   "comedy-reel": {
     compositionType: "action-reel",
     renderEndpoint: "/api/comedy-reel/render-remotion",
-    generatorPath: "/app/comedy-reel",
+    generatorPath: "/dashboard/comedy-reel",
     downloadFilename: "comedy-reel.mp4",
   },
 };
 
 export const COMPOSITION_STORAGE_KEY = "video_composition";
-export const EDIT_PATH = "/app/edit";
+export const EDIT_PATH = "/dashboard/edit";
 
 /** Probe video duration via browser <video> element (header only, no full download). */
 export async function getVideoDuration(url) {

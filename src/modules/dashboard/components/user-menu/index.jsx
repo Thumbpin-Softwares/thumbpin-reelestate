@@ -45,7 +45,7 @@ export default function UserMenu({ user, initials }) {
         <div className="absolute right-0 mt-2 w-56 rounded-lg border border-neutral-200 bg-white shadow-lg py-1 z-50">
           <div className="bg-neutral-200 my-1" />
           <Link
-            href="/app/profile"
+            href="/dashboard/profile"
             onClick={() => setOpen(false)}
             className="flex items-center px-3 py-2 text-sm hover:bg-neutral-100 duration-300 cursor-pointer"
           >
@@ -54,7 +54,7 @@ export default function UserMenu({ user, initials }) {
           </Link>
 
           <Link
-            href="/app/credits"
+            href="/dashboard/credits"
             onClick={() => setOpen(false)}
             className="flex items-center px-3 py-2 text-sm hover:bg-neutral-100 cursor-pointer"
           >
@@ -63,7 +63,7 @@ export default function UserMenu({ user, initials }) {
           </Link>
 
           <Link
-            href="/app/help"
+            href="/dashboard/help"
             onClick={() => setOpen(false)}
             className="flex items-center px-3 py-2 text-sm hover:bg-neutral-100 cursor-pointer"
           >
