@@ -131,18 +131,24 @@ export async function DELETE(request) {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 
-    if (!id) {
-      return NextResponse.json({ error: "Missing asset ID" }, { status: 400 });
-    }
-
     await dbConnect();
-    
-    const asset = await Asset.findOneAndDelete({ _id: id, userId });
-    if (!asset) {
-      return NextResponse.json({ error: "Asset not found or unauthorized" }, { status: 404 });
+
+    if (id) {
+      const asset = await Asset.findOneAndDelete({ _id: id, userId });
+      if (!asset) {
+        return NextResponse.json({ error: "Asset not found or unauthorized" }, { status: 404 });
+      }
+      return NextResponse.json({ success: true });
     }
 
-    return NextResponse.json({ success: true });
+    const { ids } = await request.json().catch(() => ({}));
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return NextResponse.json({ error: "Missing asset ID(s)" }, { status: 400 });
+    }
+
+    const result = await Asset.deleteMany({ _id: { $in: ids }, userId });
+
+    return NextResponse.json({ success: true, deletedCount: result.deletedCount });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

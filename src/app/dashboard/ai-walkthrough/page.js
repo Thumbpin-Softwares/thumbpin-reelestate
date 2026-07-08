@@ -270,7 +270,7 @@ function RealEstateVideoContent() {
 
   const handleReset = () => {
     setPropertyImages([]);
-    avatarHook.setSelectedAvatars([]);
+    avatarHook.clearSelectedAvatars();
     avatarHook.setUploadedAvatarFile(null);
     compositesHook.setComposites([]);
     compositesHook.setSelectedCompositeIndices(new Set());

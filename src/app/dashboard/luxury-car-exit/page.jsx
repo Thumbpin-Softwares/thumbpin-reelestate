@@ -165,7 +165,7 @@ function LuxuryCarExitContent() {
     setStep(0);
     setMaxStep(0);
     setLocationImages([]);
-    avatarHook.setSelectedAvatars([]);
+    avatarHook.clearSelectedAvatars();
     setScriptParams(null);
     setFinalizeScript("");
     setQuality("auto");

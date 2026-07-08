@@ -26,6 +26,8 @@ import {
   ChevronRight,
   Star,
   X,
+  CheckSquare,
+  Trash2,
 } from "lucide-react";
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
@@ -42,6 +44,7 @@ export default function AssetLibraryPage() {
     fetchError,
     uploadAsset,
     deleteAsset,
+    bulkDeleteAssets,
     loadMore,
     refetch,
   } = useAssets();
@@ -56,6 +59,12 @@ export default function AssetLibraryPage() {
   const [assetType, setAssetType] = useState("avatar");
   const [deleting, setDeleting] = useState(null);
   const fileInputRef = useRef(null);
+
+  // Bulk select / delete
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   // Avatar collection upload modal
   const [avatarCollectionOpen, setAvatarCollectionOpen] = useState(false);
@@ -178,6 +187,7 @@ export default function AssetLibraryPage() {
 
     if (result.success) {
       toast.success("Asset uploaded! 🎉");
+      await refetch();
       closeUploadModal();
     } else {
       toast.error("Upload failed", { description: result.error });
@@ -242,6 +252,37 @@ export default function AssetLibraryPage() {
       toast.error("Delete failed", { description: result.error });
     }
     setDeleting(null);
+  }
+
+  function toggleSelectMode() {
+    setSelectMode((prev) => !prev);
+    setSelectedIds(new Set());
+  }
+
+  function toggleSelected(id) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function handleBulkDelete() {
+    setBulkDeleting(true);
+    const ids = Array.from(selectedIds);
+    const result = await bulkDeleteAssets(ids);
+
+    if (result.success) {
+      toast.success(`${ids.length} asset${ids.length !== 1 ? "s" : ""} deleted`);
+    } else {
+      toast.error("Delete failed", { description: result.error });
+    }
+
+    setBulkDeleting(false);
+    setBulkDeleteConfirmOpen(false);
+    setSelectedIds(new Set());
+    setSelectMode(false);
   }
 
   // Wraps any asset — single image or multi-photo presenter — as a
@@ -326,7 +367,34 @@ export default function AssetLibraryPage() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="all" className="mt-6">
+          <TabsContent value="all">
+            <div className="flex items-center justify-end gap-2 mb-4 px-4 flex-wrap">
+              {selectMode && (
+                <>
+                  <span className="text-sm text-muted-foreground">
+                    {selectedIds.size} selected
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="cursor-pointer"
+                    disabled={selectedIds.size === 0}
+                    onClick={() => setBulkDeleteConfirmOpen(true)}
+                  >
+                    <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                    Delete Selected
+                  </Button>
+                </>
+              )}
+              <Button
+                variant="outline"
+                className="cursor-pointer"
+                onClick={toggleSelectMode}
+              >
+                <CheckSquare className="w-4 h-4 mr-2" />
+                {selectMode ? "Cancel" : "Select"}
+              </Button>
+            </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {assets
                 .filter((a) => a.type !== "video" && a.type !== "clip")
@@ -349,6 +417,9 @@ export default function AssetLibraryPage() {
                         setPreviewCollection(collection);
                         setPreviewIndex(0);
                       }}
+                      selectMode={selectMode}
+                      selected={selectedIds.has(asset.id)}
+                      onToggleSelect={() => toggleSelected(asset.id)}
                     />
                   );
                 })}
@@ -403,18 +474,45 @@ export default function AssetLibraryPage() {
           </TabsContent>
 
           <TabsContent value="mine">
-            <div className="flex items-center justify-between gap-2 mb-4 px-4">
+            <div className="flex items-center justify-between gap-2 mb-4 px-4 flex-wrap">
               <div className="text-sm text-neutral-600">
                 {filteredAvatars.length}{" "}
                 {filteredAvatars.length === 1 ? "Avatar" : "Avatars"} Added
               </div>
-              <Button
-                className="cursor-pointer bg-[#c7f038] hover:bg-[#c7f038] text-black"
-                onClick={() => setAvatarCollectionOpen(true)}
-              >
-                <Upload className="w-4 h-4 mr-2" />
-                Add Avatar Collection
-              </Button>
+              <div className="flex items-center gap-2 flex-wrap">
+                {selectMode && (
+                  <>
+                    <span className="text-sm text-muted-foreground">
+                      {selectedIds.size} selected
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="cursor-pointer"
+                      disabled={selectedIds.size === 0}
+                      onClick={() => setBulkDeleteConfirmOpen(true)}
+                    >
+                      <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                      Delete Selected
+                    </Button>
+                  </>
+                )}
+                <Button
+                  variant="outline"
+                  className="cursor-pointer"
+                  onClick={toggleSelectMode}
+                >
+                  <CheckSquare className="w-4 h-4 mr-2" />
+                  {selectMode ? "Cancel" : "Select"}
+                </Button>
+                <Button
+                  className="cursor-pointer bg-[#c7f038] hover:bg-[#c7f038] text-black"
+                  onClick={() => setAvatarCollectionOpen(true)}
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Add Avatar Collection
+                </Button>
+              </div>
             </div>
             {avatars.length === 0 && !search ? (
               <div className="flex flex-col items-center justify-center py-20 space-y-4">
@@ -456,6 +554,9 @@ export default function AssetLibraryPage() {
                           onSelect={() => setSelectedAsset(asset)}
                           onPreview={() => setPreviewAsset(asset)}
                           onDelete={() => handleDelete(asset.id)}
+                          selectMode={selectMode}
+                          selected={selectedIds.has(asset.id)}
+                          onToggleSelect={() => toggleSelected(asset.id)}
                         />
                       );
                     }
@@ -480,6 +581,9 @@ export default function AssetLibraryPage() {
                           setPreviewCollection(collection);
                           setPreviewIndex(0);
                         }}
+                        selectMode={selectMode}
+                        selected={selectedIds.has(asset.id)}
+                        onToggleSelect={() => toggleSelected(asset.id)}
                       />
                     );
                   })}
@@ -503,6 +607,9 @@ export default function AssetLibraryPage() {
                     onSelect={() => setSelectedAsset(asset)}
                     onPreview={() => setPreviewAsset(asset)}
                     onDelete={() => handleDelete(asset.id)}
+                    selectMode={selectMode}
+                    selected={selectedIds.has(asset.id)}
+                    onToggleSelect={() => toggleSelected(asset.id)}
                   />
                 ))}
             </div>
@@ -747,6 +854,46 @@ export default function AssetLibraryPage() {
         onClose={() => setAvatarCollectionOpen(false)}
         onUploaded={() => refetch()}
       />
+
+      {/* Bulk delete confirmation */}
+      <Dialog open={bulkDeleteConfirmOpen} onOpenChange={(open) => !bulkDeleting && setBulkDeleteConfirmOpen(open)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete {selectedIds.size} asset{selectedIds.size !== 1 ? "s" : ""}?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            This will permanently delete the selected asset{selectedIds.size !== 1 ? "s" : ""}. This action can&apos;t be undone.
+          </p>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              variant="outline"
+              className="cursor-pointer"
+              disabled={bulkDeleting}
+              onClick={() => setBulkDeleteConfirmOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              className="cursor-pointer"
+              disabled={bulkDeleting}
+              onClick={handleBulkDelete}
+            >
+              {bulkDeleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
