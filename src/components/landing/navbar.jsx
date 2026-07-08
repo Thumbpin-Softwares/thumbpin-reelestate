@@ -41,7 +41,7 @@ export function Navbar() {
           {/* CTA */}
           <div className="hidden md:flex items-center gap-3">
             {isAuthenticated ? (
-              <Link href="/app">
+              <Link href="/dashboard">
                 <Button size="sm" className="gradient-bg text-white hover:opacity-90 cursor-pointer shadow-lg">
                   <LayoutDashboard className="w-4 h-4 mr-2" />
                   Dashboard
@@ -88,7 +88,7 @@ export function Navbar() {
             </a>
             <div className="flex gap-2 pt-2">
               {isAuthenticated ? (
-                <Link href="/app" className="flex-1">
+                <Link href="/dashboard" className="flex-1">
                   <Button className="w-full gradient-bg text-white cursor-pointer">
                     <LayoutDashboard className="w-4 h-4 mr-2" />
                     Dashboard

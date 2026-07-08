@@ -237,7 +237,7 @@ export function Editor({ compositionProps, onExit }) {
 
   // Autosave the edit — so leaving the editor (or refreshing) never loses
   // overlays/music/cuts/trim/caption progress for this composition, and it
-  // shows up as a resumable card on the /app/edit drafts dashboard.
+  // shows up as a resumable card on the /dashboard/edit drafts dashboard.
   useEffect(() => {
     saveDraft(draftKey, { signature, compositionProps, overlays, music, cutRanges, trim, captionState, activePanel });
   }, [draftKey, signature, compositionProps, overlays, music, cutRanges, trim, captionState, activePanel]);

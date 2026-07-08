@@ -50,8 +50,8 @@ async function renderMediaWithRetry(params, attempts = 2) {
  *   musicVolume, cutRanges, trimInFrame, trimOutFrame.
  *
  * Streams SSE progress events ({ type: "status"|"progress"|"done"|"error" })
- * so it can be driven by the shared /app/edit Editor the same way
- * seedance-reel's render-remotion is.
+ * so it can be driven by the shared /dashboard/edit Editor the same way
+ * luxury-car-exit's render-remotion is.
  */
 export async function POST(request) {
   const { resolveUserFromSession } = await import("@/lib/user-resolver");

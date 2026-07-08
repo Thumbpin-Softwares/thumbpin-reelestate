@@ -83,7 +83,7 @@ export const authOptions = {
     async redirect({ url, baseUrl }) {
       if (url.startsWith("/")) return `${baseUrl}${url}`;
       if (url.startsWith(baseUrl)) return url;
-      return `${baseUrl}/app`;
+      return `${baseUrl}/dashboard`;
     },
   },
   session: {

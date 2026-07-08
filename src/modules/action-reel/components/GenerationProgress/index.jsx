@@ -10,7 +10,7 @@ import { GenerationProgressShell } from "@/modules/common/components/generation-
  * GenerationProgress for the Action Reel pipeline.
  *
  * Once both Seedance clips are ready, renders them into one final downloadable
- * mp4 (finalizeMode: "render") — same as seedance-reel/home-tour — instead of
+ * mp4 (finalizeMode: "render") — same as luxury-car-exit/home-tour — instead of
  * redirecting straight to the editor. The composition is still saved to
  * sessionStorage so "Open in editor" can pick up right where generation left off.
  */

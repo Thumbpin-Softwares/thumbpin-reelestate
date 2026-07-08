@@ -1,6 +1,6 @@
 import { withAuth } from "next-auth/middleware";
 
-// Protect all /app/* routes — unauthenticated users are redirected to /auth/login
+// Protect all /dashboard/* routes — unauthenticated users are redirected to /auth/login
 export default withAuth({
   pages: {
     signIn: "/auth/login",
@@ -8,5 +8,5 @@ export default withAuth({
 });
 
 export const config = {
-  matcher: ["/app/:path*"],
+  matcher: ["/dashboard/:path*"],
 };

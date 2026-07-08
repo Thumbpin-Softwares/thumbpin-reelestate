@@ -17,7 +17,7 @@ const DEFAULT_STAGE_TEXT = {
  * Drives the shared "splitting → voices → video → combining → [rendering] →
  * done" flow that every Seedance-based reel template follows (script split,
  * per-part voiceover, per-part video generation, then either a final render
- * or a hand-off to the /app/edit Remotion editor). Every template's own
+ * or a hand-off to the /dashboard/edit Remotion editor). Every template's own
  * GenerationProgress component only supplies what's actually different
  * between templates — its prompts/fields, part count, and finalize mode —
  * via `config`. The UI itself is <GenerationProgressShell {...state} />,
@@ -52,7 +52,7 @@ export function useGenerationPipeline(config) {
     jobIdKey,
     resumeKey,
     compositionKey,
-    editPath = "/app/edit",
+    editPath = "/dashboard/edit",
     finalizeMode = "redirect",
     buildFormData,
     stageForEvent,
@@ -258,7 +258,7 @@ export function useGenerationPipeline(config) {
 
   /** Build the composition props from the terminal event (or a resumed job
    * snapshot — same field shape), then either render a final mp4 or hand off
-   * to the shared /app/edit Remotion editor, per finalizeMode. */
+   * to the shared /dashboard/edit Remotion editor, per finalizeMode. */
   const finalize = async (eventOrJob) => {
     lastFinalizeInput.current = eventOrJob;
     setStage("combining");

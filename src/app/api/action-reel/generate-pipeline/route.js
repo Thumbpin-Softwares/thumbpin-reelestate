@@ -42,7 +42,7 @@ if (process.env.FAL_KEY) {
  * (location images first), matching the templates' #image1-4 = location /
  * #image5,#image7 = avatar convention.
  *
- * Unlike seedance-reel/home-tour, there is no separate B-roll/voiceover-overlay
+ * Unlike luxury-car-exit/home-tour, there is no separate B-roll/voiceover-overlay
  * layer — both clips already carry their own baked audio, so the final assembly
  * (ActionReelComposition) is just two clips back to back with a hard cut.
  */

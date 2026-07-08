@@ -55,15 +55,15 @@ const ChevronDown = () => (
 /**
  * StepScript — Step 1 for the Action Reel pipeline.
  *
- * Layout matches seedance-reel/StepScript (script left, Language/Voice/
+ * Layout matches luxury-car-exit/StepScript (script left, Language/Voice/
  * "Add Your Own" sidebar right), plus action-reel-specific additions kept
  * from the previous single-row layout:
- * - Tone selector (seedance-reel has none — tone is fixed "luxury" there)
+ * - Tone selector (luxury-car-exit has none — tone is fixed "luxury" there)
  * - A pronunciation-preview button on the script textarea itself, distinct
  *   from the sidebar's per-voice sample preview — this one synthesizes the
  *   user's ACTUAL typed text so they can catch mispronunciations before submitting.
  *
- * "Add Your Own" (record/upload) mirrors seedance-reel's implementation:
+ * "Add Your Own" (record/upload) mirrors luxury-car-exit's implementation:
  * captured locally for preview only — not yet wired into generation.
  */
 export function StepScript({ onBack, onGenerate }) {

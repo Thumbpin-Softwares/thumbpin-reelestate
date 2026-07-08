@@ -16,7 +16,7 @@ export async function POST(request) {
 
   // `action` is opt-in: only callers that pass their pipeline's credit-action
   // key get gated here (action-reel, comedy-reel, veo-long-ad today). Callers
-  // that don't send it (e.g. seedance-reel) keep this route's old behavior.
+  // that don't send it (e.g. luxury-car-exit) keep this route's old behavior.
   if (action) {
     const session = await getServerSession(authOptions);
     if (!session) {

@@ -5,10 +5,10 @@ import { usePathname } from "next/navigation";
 import { Plus, FolderOpen, Pencil, Megaphone } from "lucide-react";
 
 const navItems = [
-  { label: "Get Started", href: "/app", icon: Plus },
-  { label: "Library", href: "/app/assets", icon: FolderOpen },
-  { label: "Edit", href: "/app/edit", icon: Pencil },
-  { label: "What's New", href: "/app/whats-new", icon: Megaphone },
+  { label: "Get Started", href: "/dashboard", icon: Plus },
+  { label: "Library", href: "/dashboard/assets", icon: FolderOpen },
+  { label: "Edit", href: "/dashboard/edit", icon: Pencil },
+  { label: "What's New", href: "/dashboard/whats-new", icon: Megaphone },
 ];
 
 export default function MobileBottomNav() {

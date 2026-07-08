@@ -20,7 +20,7 @@ export function GenerationProgress({
   onAbort,
   apiBasePath = "/api/news-anchor",
   source = "news-anchor",
-  editPath = "/app/edit",
+  editPath = "/dashboard/edit",
   jobIdKey = "news_anchor_job_id",
   compositionKey = "video_composition",
   resumeKey = "news_anchor_resume",

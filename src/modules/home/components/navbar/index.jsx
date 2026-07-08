@@ -66,7 +66,7 @@ export function Navbar() {
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-3">
             {isAuthenticated ? (
-              <Link href="/app">
+              <Link href="/dashboard">
                 <span className="bg-linear-to-b from-black to-neutral-600 text-white py-2 px-4 flex items-center gap-2 rounded-full shadow">
                   <LayoutDashboard className="w-4 h-4" />
                   Dashboard
@@ -91,7 +91,7 @@ export function Navbar() {
           {/* Mobile CTA + Button */}
           <div className="md:hidden flex items-center gap-2">
             {isAuthenticated ? (
-              <Link href="/app" className="">
+              <Link href="/dashboard" className="">
                 <span className="bg-linear-to-b from-black to-neutral-600 text-white text-sm py-2 px-4 flex items-center justify-center rounded-full shadow">
                   Dashboard
                 </span>

@@ -44,7 +44,7 @@ const ChevronDown = () => (
 /**
  * StepScript — Step 1 for the News Anchor pipeline.
  *
- * Cloned from seedance-reel/StepScript:
+ * Cloned from luxury-car-exit/StepScript:
  * - Keeps: manual paste + AI Q&A form, language selector, voice selector + preview
  * - Removed: tone selector, LLM model selector, beat planning / chunk visualization
  * - Output: { script, voiceId, language } passed directly to GenerationProgress

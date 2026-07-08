@@ -79,7 +79,7 @@ export default function Payment() {
           Great videos start with a plan
         </h1>
         <span className="text-sm sm:text-base text-neutral-600 flex flex-wrap items-center justify-center gap-1">
-          <Link className="underline" href="/app">
+          <Link className="underline" href="/dashboard">
             Start for free,
           </Link>
           upgrade to get powerful features.

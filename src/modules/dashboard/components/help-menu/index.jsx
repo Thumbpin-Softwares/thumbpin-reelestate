@@ -38,7 +38,7 @@ export default function HelpMenu() {
       {open && (
         <div className="absolute right-0 mt-2 w-56 rounded-lg border border-neutral-200 bg-white shadow-lg py-1 z-50">
           <Link
-            href="/app/help"
+            href="/dashboard/help"
             onClick={() => setOpen(false)}
             className="flex items-center px-3 py-2 text-sm hover:bg-neutral-100 cursor-pointer"
           >

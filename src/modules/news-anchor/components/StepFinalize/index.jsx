@@ -23,7 +23,7 @@ import { ELEVENLABS_VOICES } from "@/lib/elevenlabs-config";
 /**
  * StepFinalize — Step 2 for the News Anchor pipeline.
  *
- * Cloned from seedance-reel/StepFinalize: a review screen between Script and
+ * Cloned from luxury-car-exit/StepFinalize: a review screen between Script and
  * the actual generation. Shows everything collected in Step 0 (photos + avatar
  * shots) and Step 1 (script + voice), lets the user hear the chosen script in
  * the chosen voice, then kicks off generation only once they confirm.
