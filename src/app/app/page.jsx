@@ -23,7 +23,7 @@ const REAL_ESTATE_TEMPLATES = [
   {
     title: "Frustrated Anchor",
     href: "/app/comedy-reel",
-    video: "https://content.thumbpin.in/web-assets/hometour-final-1782134969657-1782134969657-3ac17d57.mp4",
+    video: "https://content.thumbpin.in/users/69e20794114a93d739a79321/videos/comedy-part1-1782435955101-f239cdf4.mp4",
     tag: "Popular"
   },
   {
