@@ -225,7 +225,7 @@ async function reproduceTemplate({ template, markers, dialogue, partLabel, fallb
 const DEFAULT_VOICE_SETTINGS = { stability: 0.5, similarity_boost: 0.75, style: 0.3, speed: 1.0 };
 
 function resolutionForQuality(quality) {
-  if (quality === "1080p" || quality === "720p") return quality;
+  if (quality === "1080p" || quality === "720p") return "720p";
   return "720p"; // "auto" and anything unrecognized
 }
 
