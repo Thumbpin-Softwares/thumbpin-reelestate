@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
-import { Eye, Trash2, Loader2, PenLine } from "lucide-react";
+import { Eye, Trash2, Loader2, PenLine, Check } from "lucide-react";
 
 // Same design as the "Choose Your Presenter" step in the pipeline: a cover
 // thumbnail with a "View" pill that only appears on hover (always visible on
@@ -19,6 +19,9 @@ export function CollectionCard({
   onDelete,
   deleting = false,
   onView,
+  selectMode = false,
+  selected = false,
+  onToggleSelect,
 }) {
   const [editing, setEditing] = useState(false);
   const [nameValue, setNameValue] = useState(name);
@@ -48,7 +51,12 @@ export function CollectionCard({
   }
 
   return (
-    <div className="group relative rounded-2xl overflow-hidden bg-card shadow-sm hover:shadow-md transition-all">
+    <div
+      className={`group relative rounded-2xl overflow-hidden bg-card shadow-sm hover:shadow-md transition-all ${
+        selectMode && editable ? "cursor-pointer" : ""
+      } ${selected ? "ring-2 ring-[#c7f038] ring-offset-2" : ""}`}
+      onClick={() => { if (selectMode && editable) onToggleSelect?.(); }}
+    >
       <div className="relative aspect-9/16 overflow-hidden">
         <Image
           src={cover}
@@ -67,18 +75,30 @@ export function CollectionCard({
         </div>
       )}
 
-      <div className="absolute inset-0 z-0 flex items-center justify-center bg-black/40 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onView(); }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white text-black text-xs font-medium shadow-lg hover:bg-[#c7f038] transition-colors"
+      {selectMode && editable && (
+        <div
+          className={`absolute top-2 right-2 z-30 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
+            selected ? "bg-[#c7f038] border-[#c7f038]" : "bg-black/40 border-white/70"
+          }`}
         >
-          <Eye className="w-3.5 h-3.5" />
-          View
-        </button>
-      </div>
+          {selected && <Check className="w-3.5 h-3.5 text-black" />}
+        </div>
+      )}
 
-      {editable && (
+      {!selectMode && (
+        <div className="absolute inset-0 z-0 flex items-center justify-center bg-black/40 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onView(); }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white text-black text-xs font-medium shadow-lg hover:bg-[#c7f038] transition-colors"
+          >
+            <Eye className="w-3.5 h-3.5" />
+            View
+          </button>
+        </div>
+      )}
+
+      {editable && !selectMode && (
         <div className="absolute top-2 right-2 z-20 flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
           <button
             onClick={(e) => { e.stopPropagation(); setEditing(true); }}

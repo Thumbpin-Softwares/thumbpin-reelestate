@@ -149,6 +149,22 @@ export function useAssets(typeFilter = null) {
     }
   }
 
+  async function bulkDeleteAssets(ids) {
+    try {
+      const res = await fetch("/api/assets", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Delete failed");
+      await fetchData();
+      return { success: true, deletedCount: data.deletedCount };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
   return {
     assets,
     avatars: assets.filter((a) => a.type === "avatar" || a.type === "presenter"),
@@ -166,6 +182,7 @@ export function useAssets(typeFilter = null) {
     fetchError,
     uploadAsset,
     deleteAsset,
+    bulkDeleteAssets,
     loadMore,
     refetch: fetchData,
   };
