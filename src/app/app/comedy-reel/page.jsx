@@ -7,7 +7,7 @@ import { StepUpload } from "@/modules/seedance-reel/components/StepUpload";
 import { StepScript } from "@/modules/comedy-reel/components/StepScript";
 import { GenerationProgress } from "@/modules/comedy-reel/components/GenerationProgress";
 
-const STEPS = ["Upload & Presenter", "Script", "Generate"];
+const STEPS = ["Upload & Presenter", "Script", "Finalize"];
 const RESUME_KEY = "comedy_reel_resume";
 
 function StepIndicator({ currentStep = 0 }) {
@@ -146,7 +146,7 @@ function ComedyReelContent() {
         {step === 2 && generationParams && (
           <GenerationProgress
             generationParams={generationParams}
-            onReset={handleReset}
+            onAbort={handleReset}
             apiBasePath="/api/comedy-reel"
             source="comedy-reel"
             jobIdKey="comedy_reel_job_id"

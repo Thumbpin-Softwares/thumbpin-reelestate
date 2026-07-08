@@ -110,7 +110,7 @@ function HomeTourContent() {
           {step === 2 && generationParams && (
             <GenerationProgress
               generationParams={generationParams}
-              onReset={handleReset}
+              onAbort={handleReset}
               apiBasePath="/api/home-tour"
               source="home-tour"
               jobIdKey="home_tour_job_id"

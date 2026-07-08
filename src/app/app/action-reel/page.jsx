@@ -7,7 +7,7 @@ import { StepUpload } from "@/modules/seedance-reel/components/StepUpload";
 import { StepScript } from "@/modules/action-reel/components/StepScript";
 import { GenerationProgress } from "@/modules/action-reel/components/GenerationProgress";
 
-const STEPS = ["Add Assets", "Script", "Generate"];
+const STEPS = ["Add Assets", "Script", "Finalize"];
 const RESUME_KEY = "action_reel_resume";
 
 function StepIndicator({ currentStep = 0 }) {
@@ -145,7 +145,7 @@ function ActionReelContent() {
           {step === 2 && generationParams && (
             <GenerationProgress
               generationParams={generationParams}
-              onReset={handleReset}
+              onAbort={handleReset}
               apiBasePath="/api/action-reel"
               source="action-reel"
               jobIdKey="action_reel_job_id"
