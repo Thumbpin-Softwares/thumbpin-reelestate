@@ -34,6 +34,11 @@ const DEFAULT_STAGE_TEXT = {
  *   toastForEvent(event) → { type: "success"|"warning"|"error", message, options? } or null
  *   isTerminalSuccess(event) → boolean, defaults to event.type === "video_ready"
  *   isTerminalError(event) → boolean, defaults to event.type === "error"
+ *   isFatalError(event) → boolean, defaults to false. When true, the whole
+ *     pipeline is unrecoverable (e.g. every parallel clip failed) — instead of
+ *     showing a dead-end error screen, this behaves like the user hit Abort:
+ *     a toast fires and onAbort() is called so the caller can send them back
+ *     to the script step to adjust inputs and retry.
  *   buildComposition(eventOrJob) → async, returns composition props (throw to fail)
  *   jobStatusToStage: { [job.status]: stage } — for resume polling
  *   stageTextOverrides: { [stage]: text } — merged over DEFAULT_STAGE_TEXT
@@ -54,6 +59,7 @@ export function useGenerationPipeline(config) {
     toastForEvent,
     isTerminalSuccess = (event) => event.type === "video_ready",
     isTerminalError = (event) => event.type === "error",
+    isFatalError = () => false,
     buildComposition,
     jobStatusToStage = {},
     stageTextOverrides = {},
@@ -214,6 +220,21 @@ export function useGenerationPipeline(config) {
   };
 
   const handleEvent = useCallback((event) => {
+    if (isFatalError(event)) {
+      // Unrecoverable — every parallel clip failed. Abort rather than show a
+      // dead-end error screen, so the caller can send the user back to the
+      // script step to adjust inputs and retry.
+      reachedTerminalEvent.current = true;
+      try { sessionStorage.removeItem(jobIdKey); } catch (_) {}
+      toast.error("Video generation failed", {
+        description: event.message || "Generation failed — please check your inputs and try again.",
+        duration: 8000,
+      });
+      aborted.current = true;
+      try { abortController.current?.abort(); } catch (_) {}
+      onAbort?.();
+      return;
+    }
     if (isTerminalSuccess(event)) {
       reachedTerminalEvent.current = true;
       finalize(event);

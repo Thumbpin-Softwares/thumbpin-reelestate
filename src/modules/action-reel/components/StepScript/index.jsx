@@ -23,6 +23,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { LANGUAGES } from "@/utils/constants";
 import { ELEVENLABS_VOICES } from "@/lib/elevenlabs-config";
 import { SARVAM_VOICES } from "@/lib/sarvam-config";
+import { PROPERTY_TYPE_GROUPS, getPropertyType, DEFAULT_PROPERTY_TYPE } from "@/lib/property-types";
 import { useUser } from "@/hooks/use-user";
 import { canAffordAction } from "@/lib/credit-costs";
 
@@ -138,7 +139,7 @@ export function StepScript({ onBack, onGenerate }) {
   const [qaAnswers, setQaAnswers] = useState({
     propertyName: "",
     location: "",
-    type: "",
+    propertyType: DEFAULT_PROPERTY_TYPE,
     size: "",
     price: "",
     usps: "",
@@ -153,6 +154,10 @@ export function StepScript({ onBack, onGenerate }) {
   const activeScript = mode === "manual" ? manualScript : aiGeneratedScript;
   const wordCount = activeScript.trim().split(/\s+/).filter(Boolean).length;
   const isScriptReady = wordCount >= MIN_SCRIPT_WORDS && wordCount <= MAX_SCRIPT_WORDS;
+
+  // Resolved property-type config drives the Size/Price field wording and the
+  // { type, transaction } sent to the script writer.
+  const selectedType = getPropertyType(qaAnswers.propertyType) || getPropertyType(DEFAULT_PROPERTY_TYPE);
 
   const handlePreviewVoice = async () => {
     if (previewingVoice) return;
@@ -237,7 +242,8 @@ export function StepScript({ onBack, onGenerate }) {
         body: JSON.stringify({
           propertyName: qaAnswers.propertyName,
           location: qaAnswers.location,
-          type: qaAnswers.type,
+          type: selectedType.label,
+          transaction: selectedType.transaction,
           size: qaAnswers.size,
           price: qaAnswers.price,
           usps: qaAnswers.usps.split("\n").map((s) => s.trim()).filter(Boolean),
@@ -364,19 +370,40 @@ export function StepScript({ onBack, onGenerate }) {
                   {[
                     { key: "propertyName", label: "Property Name *", placeholder: "e.g. M3M Opus" },
                     { key: "location", label: "Location *", placeholder: "e.g. Sector 67, Gurugram" },
-                    { key: "type", label: "Type", placeholder: "e.g. 3 BHK Luxury Apartment" },
-                    { key: "size", label: "Size", placeholder: "e.g. 2400–3200 sq ft" },
-                    { key: "price", label: "Price", placeholder: "e.g. ₹7 Cr onwards" },
+                    { key: "propertyType", label: "Property Type", select: true },
+                    { key: "size", label: selectedType.sizeLabel, placeholder: selectedType.sizePlaceholder },
+                    { key: "price", label: selectedType.priceLabel, placeholder: selectedType.pricePlaceholder },
                     { key: "cta", label: "Call-to-Action", placeholder: "e.g. Book a site visit today!" },
-                  ].map(({ key, label, placeholder }) => (
-                    <div key={key} className="space-y-1.5">
-                      <label className="text-xs font-medium">{label}</label>
-                      <input
-                        value={qaAnswers[key]}
-                        onChange={(e) => setQaAnswers((prev) => ({ ...prev, [key]: e.target.value }))}
-                        placeholder={placeholder}
-                        className="w-full text-sm border border-border/60 rounded-xl bg-background px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
-                      />
+                  ].map((f) => (
+                    <div key={f.key} className="space-y-1.5">
+                      <label className="text-xs font-medium">{f.label}</label>
+                      {f.select ? (
+                        <div className="relative">
+                          <select
+                            value={qaAnswers.propertyType}
+                            onChange={(e) => setQaAnswers((prev) => ({ ...prev, propertyType: e.target.value }))}
+                            className="w-full appearance-none text-sm border border-border/60 rounded-xl bg-background px-3 py-2 pr-9 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          >
+                            {PROPERTY_TYPE_GROUPS.map((g) => (
+                              <optgroup key={g.label} label={g.label}>
+                                {g.types.map((t) => (
+                                  <option key={t.id} value={t.id}>{t.label}</option>
+                                ))}
+                              </optgroup>
+                            ))}
+                          </select>
+                          <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                            <ChevronDown />
+                          </div>
+                        </div>
+                      ) : (
+                        <input
+                          value={qaAnswers[f.key]}
+                          onChange={(e) => setQaAnswers((prev) => ({ ...prev, [f.key]: e.target.value }))}
+                          placeholder={f.placeholder}
+                          className="w-full text-sm border border-border/60 rounded-xl bg-background px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        />
+                      )}
                     </div>
                   ))}
                 </div>

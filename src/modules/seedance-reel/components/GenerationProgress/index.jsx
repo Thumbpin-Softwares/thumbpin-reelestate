@@ -103,6 +103,8 @@ export function GenerationProgress({
       }
     },
 
+    isFatalError: (event) => event.type === "fatal_error",
+
     toastForEvent: (event) => {
       switch (event.type) {
         case "part1_video_done":

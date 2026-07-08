@@ -12,11 +12,11 @@ if (process.env.FAL_KEY) {
 const MAX_PREVIEW_CHARS = 600;
 
 /**
- * POST /api/comedy-reel/preview-script
+ * POST /api/seedance-reel/preview-script
  *
  * Previews the user's ACTUAL typed script text — fully ephemeral, no R2
  * upload, no DB writes — but DOES require the user to be able to afford a
- * Comedy Reel generation (read-only check, no deduction here) so a 0-credit
+ * Seedance Reel generation (read-only check, no deduction here) so a 0-credit
  * user can't burn real ElevenLabs/Sarvam TTS calls on previews they could
  * never actually render.
  */
@@ -34,7 +34,7 @@ export async function POST(request) {
 
   const affordability = await hasSufficientCreditsForAction({
     userId: user._id.toString(),
-    action: "action_reel_video",
+    action: "real_estate_video",
   });
   if (!affordability.ok) {
     return NextResponse.json(affordability.payload, { status: affordability.status });
@@ -66,7 +66,7 @@ export async function POST(request) {
       },
     });
   } catch (err) {
-    console.error("[ComedyReel] preview-script failed:", err.message);
+    console.error("[SeedanceReel] preview-script failed:", err.message);
     return NextResponse.json({ error: err.message || "Preview failed" }, { status: 500 });
   }
 }

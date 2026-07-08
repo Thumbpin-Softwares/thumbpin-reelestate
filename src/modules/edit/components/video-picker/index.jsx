@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Player } from "@remotion/player";
 import {
   Eye,
   Loader2,
@@ -13,6 +14,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { EDITABLE_SOURCES, buildCompositionFromAsset } from "@/lib/editable-sources";
+import { ActionReelComposition, calcActionReelDurationInFrames } from "@/lib/remotion/ActionReelComposition";
+import { SeedanceReelComposition, calcSeedanceReelDurationInFrames } from "@/lib/remotion/SeedanceReelComposition";
 
 function useVideos() {
   const [videos, setVideos] = useState(null); // null = loading
@@ -49,6 +52,11 @@ function useVideos() {
 export function VideoPicker({ onSelect, hideHeader = false, excludeIds = [] }) {
   const { videos: allVideos, setVideos, pagination, fetching, load } = useVideos();
   const [previewVideo, setPreviewVideo] = useState(null);
+  // Multi-clip sources (asset.url is only the FIRST clip — the merged reel
+  // isn't rendered until the editor's Export) get reconstructed and played as
+  // a real Remotion composition here, instead of just the raw asset.url.
+  const [previewComposition, setPreviewComposition] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [selectingId, setSelectingId] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -66,6 +74,40 @@ export function VideoPicker({ onSelect, hideHeader = false, excludeIds = [] }) {
       onSelect(compositionProps);
     } finally {
       setSelectingId(null);
+    }
+  }
+
+  function closePreview() {
+    setPreviewVideo(null);
+    setPreviewComposition(null);
+  }
+
+  async function openPreview(video) {
+    setPreviewVideo(video);
+    setPreviewComposition(null);
+    const sourceConfig = EDITABLE_SOURCES[video.metadata?.source];
+    if (!sourceConfig) return; // single-clip asset — asset.url already is the whole video
+
+    setPreviewLoading(true);
+    try {
+      const props = await buildCompositionFromAsset(video);
+      if (!props) return;
+      const isActionReelType = sourceConfig.compositionType === "action-reel";
+      const durationInFrames = isActionReelType
+        ? calcActionReelDurationInFrames({
+            part1Duration: props.part1Duration,
+            part2Duration: props.part2Duration,
+          })
+        : calcSeedanceReelDurationInFrames({
+            avatarDuration: props.avatarDuration,
+            brollClips:     props.brollClips,
+            ctaDuration:    props.ctaDuration,
+          });
+      setPreviewComposition({ isActionReelType, props, durationInFrames });
+    } catch (err) {
+      console.error("[VideoPicker] Failed to build preview composition:", err);
+    } finally {
+      setPreviewLoading(false);
     }
   }
 
@@ -167,7 +209,7 @@ export function VideoPicker({ onSelect, hideHeader = false, excludeIds = [] }) {
                       </button>
                       {video.url && (
                         <button
-                          onClick={(e) => { e.stopPropagation(); setPreviewVideo(video); }}
+                          onClick={(e) => { e.stopPropagation(); openPreview(video); }}
                           className="absolute top-2 right-2 h-8 w-8 rounded-full bg-white/90 backdrop-blur flex items-center justify-center shadow-md opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                         >
                           <Eye className="w-3.5 h-3.5 text-black" />
@@ -238,18 +280,44 @@ export function VideoPicker({ onSelect, hideHeader = false, excludeIds = [] }) {
 
       {/* Preview modal */}
       {!!previewVideo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs" onClick={() => setPreviewVideo(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs" onClick={closePreview}>
           <div className="bg-white rounded-xl overflow-hidden w-xs mx-4" onClick={(e) => e.stopPropagation()}>
             <div className="px-4 pb-2 pt-4 flex items-center justify-between border-b border-neutral-100">
               <p className="text-sm font-semibold truncate pr-4">{previewVideo.name || "Preview"}</p>
-              <button onClick={() => setPreviewVideo(null)} className="text-neutral-400 hover:text-black text-lg leading-none">✕</button>
+              <button onClick={closePreview} className="text-neutral-400 hover:text-black text-lg leading-none">✕</button>
             </div>
             <div className="px-4 pb-4">
               {previewVideo.url && (
                 <div className="relative">
-                  <video src={previewVideo.url} controls autoPlay className="w-full rounded-md bg-black max-h-[75vh] object-contain" />
+                  {previewLoading ? (
+                    <div className="w-full aspect-9/16 max-h-[75vh] flex items-center justify-center bg-black rounded-md">
+                      <Loader2 className="w-6 h-6 text-white animate-spin" />
+                    </div>
+                  ) : previewComposition ? (
+                    // Full multi-clip reel, reconstructed from metadata — asset.url
+                    // alone is only the first clip, so a plain <video> here would
+                    // silently cut the preview off after part 1.
+                    <div className="w-full max-h-[75vh] mx-auto rounded-md overflow-hidden bg-black" style={{ aspectRatio: "9/16" }}>
+                      <Player
+                        component={previewComposition.isActionReelType ? ActionReelComposition : SeedanceReelComposition}
+                        inputProps={previewComposition.props}
+                        durationInFrames={previewComposition.durationInFrames}
+                        compositionWidth={1080}
+                        compositionHeight={1920}
+                        fps={30}
+                        style={{ width: "100%", height: "100%" }}
+                        controls
+                        autoPlay
+                        loop
+                        clickToPlay
+                      />
+                    </div>
+                  ) : (
+                    <video src={previewVideo.url} controls autoPlay className="w-full rounded-md bg-black max-h-[75vh] object-contain" />
+                  )}
                   <button
                     onClick={() => handleDownload(previewVideo.url, previewVideo.name)}
+                    title={previewComposition ? "Download part 1 only — export the full reel from the editor" : "Download"}
                     className="absolute top-2 right-2 h-8 w-8 rounded-full bg-white/90 backdrop-blur flex items-center justify-center shadow-md hover:bg-white transition-colors"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>

@@ -7,11 +7,15 @@ import { hasSufficientCreditsForAction } from "@/lib/credit-system";
 /**
  * POST /api/veo-long-ad/generate-script
  *
- * Takes property Q&A answers and generates a full long-form property ad script
- * (200–350 words) in the style of a professional real-estate influencer.
+ * Takes property Q&A answers and generates a short ~30-second property ad script
+ * (about 60–75 words) in the style of a professional real-estate influencer —
+ * sized to fit the reels' two ~15s parts (see generate-pipeline split caps:
+ * Part 1 HOOK ≤40 words, Part 2 HIGHLIGHTS+CTA ≤45 words).
  *
  * Input (JSON):
- *   propertyName, location, type, size, price, usps[], cta, language, tone
+ *   propertyName, location, type, transaction, size, price, usps[], cta, language, tone
+ *   - transaction: "sale" | "rent" | "stay" (defaults to "sale" for back-compat);
+ *     tailors the angle/price-wording of the generated script.
  *
  * Output (JSON):
  *   { success: true, script: string, wordCount: number }
@@ -134,6 +138,7 @@ export async function POST(request) {
       propertyName = "",
       location = "",
       type = "",
+      transaction = "sale",
       size = "",
       price = "",
       usps = [],
@@ -175,8 +180,18 @@ export async function POST(request) {
       aspirational: "dream-home feeling, lifestyle upgrade, identity-based",
     };
 
+    // Listing type shapes the whole angle of the copy — ownership vs tenancy vs
+    // a short stay — and how the given figure is described. Sent by the reel
+    // forms as `transaction`; older callers omit it and default to "sale".
+    const transactionMap = {
+      sale: "FOR SALE — frame around ownership, investment value, long-term appreciation, and the pride of owning it. The figure given is the sale PRICE.",
+      rent: "FOR RENT (monthly) — frame around move-in-ready living, location convenience, lifestyle and lease value for a tenant; do NOT talk about buying/owning/appreciation. The figure given is the MONTHLY RENT — always describe it as rent per month.",
+      stay: "SHORT STAY / BOOKING (hotel room, homestay or Airbnb) — frame around the guest experience, comfort, amenities and nearby attractions; do NOT talk about buying or long-term renting. The figure given is the TARIFF PER NIGHT — describe it as the nightly tariff.",
+    };
+
     const langInstruction = languageMap[language] || languageMap.english;
     const toneInstruction = toneMap[tone] || toneMap.luxury;
+    const transactionInstruction = transactionMap[transaction] || transactionMap.sale;
     const uspsList = Array.isArray(usps) && usps.length > 0
       ? usps.map((u, i) => `${i + 1}. ${u}`).join("\n")
       : "Premium location, modern design, world-class amenities";
@@ -195,35 +210,34 @@ PROPERTY DETAILS:
 - Location: ${location}
 - Type: ${type || "Luxury Residential"}
 - Size/Configuration: ${size || "Premium layouts"}
-- Price: ${price || "Premium pricing"}
+- Price / Rent / Tariff (as per listing type): ${price || "Premium pricing"}
 - Key USPs / Features:
 ${uspsList}
 - Call-to-Action: ${cta}
 
 LANGUAGE: English (Indian real-estate influencer style)
 TONE: ${toneInstruction}
+LISTING TYPE: ${transactionInstruction}
+
+IMPORTANT — TAILOR TO THE PROPERTY TYPE ("${type || "Luxury Residential"}") AND LISTING TYPE ABOVE: a plot/land ad sells location, investment and appreciation (no rooms/BHK/amenities talk); a shop or commercial space sells footfall, visibility and ROI; a farmhouse sells space, greenery and a weekend-getaway feel; a banquet hall sells capacity and events; a hotel or homestay sells the stay experience and easy booking. Never force apartment-style luxury framing onto a type it doesn't fit.
 
 SCRIPT REQUIREMENTS:
-1. Length: 200–350 words (must be speakable in 60–90 seconds at natural pace)
-2. Structure: Hook → Property intro → Location/connectivity → Key features → Amenities → Price/value → Urgency → CTA
+1. Length: 60–75 words TOTAL — this is a fast 30-SECOND reel, NOT a long ad. The whole script must be comfortably speakable in about 30 seconds at a natural pace. Never exceed 75 words. Every word must earn its place — cut anything that isn't a hook, a top selling point, or the CTA.
+2. Structure: a punchy HOOK, then just 2–3 standout highlights (include the exact figure if one was given), then one strong closing CTA line. The pipeline splits the script into Part 1 (hook, ~15s) and Part 2 (highlights + CTA, ~15s), so keep the two halves roughly balanced and each easily speakable in 15 seconds.
 3. Write in SPOKEN language — short punchy sentences, not formal prose
 4. Include natural pauses implied through sentence breaks
 5. Make it feel like a confident real-estate creator speaking to camera, not an AI
 6. Use ellipsis (…) naturally for dramatic pauses where appropriate
 7. DO NOT include stage directions, timestamps, or any formatting — pure spoken text only
 8. End with a clear, compelling call-to-action
-9. PRICE IS NON-NEGOTIABLE: if a price was given (${price || "none given"}), state that exact figure verbatim wherever the price is mentioned. Do NOT invent, round, discount, or substitute any other number. If no price was given, do not mention any specific price or discount figure at all.
+9. THE FIGURE IS NON-NEGOTIABLE: if a figure was given (${price || "none given"}), state that exact figure verbatim wherever it is mentioned, described according to the LISTING TYPE above (sale price / monthly rent / per-night tariff). Do NOT invent, round, discount, or substitute any other number. If none was given, do not mention any specific price, rent, or tariff figure at all.
 
-EXAMPLE STYLE (M3M Opus ad — reference ONLY for pacing, energy, and structure; ignore any numbers in it):
-"When Gurgaon talks about ultra-exclusive living, M3M Opus sets a new benchmark…
+EXAMPLE STYLE & LENGTH (a ~30-second M3M Opus ad — match this LENGTH, pacing and energy; ignore any numbers in it):
+"When Gurgaon talks about ultra-luxury living… M3M Opus sets a new benchmark. A standalone, low-density tower — Singaporean-style boutique luxury, right on Golf Course Extension Road. Four-side open layouts with sweeping 270-degree views of the skyline and the Aravalli Hills. Homes priced at seven crore onwards. But hurry — inventory is limited. Book your private site visit today… just tap the link below."
 
-Serving as the final, exclusive phase within the established M3M Merlin township, this standalone tower delivers low-density, Singaporean-style boutique luxury.
+(This example is a luxury apartment FOR SALE and is deliberately short — about 30 seconds, ~65 words. Match its LENGTH and energy, but adapt the actual angle to THIS property's type and listing type.)
 
-With 4-corner, 3-side open layouts, 270-degree views — every residence overlooks the city skyline and the Aravalli Hills…
-
-Hurry! Inventory is limited. For a site visit, click the button below."
-
-Write the script now, using the exact price given. Return ONLY the spoken script text with no headers, no labels, no formatting.`;
+Write the script now, using the exact figure given. Return ONLY the spoken script text with no headers, no labels, no formatting.`;
 
     const rawScript = await callFalWithRetry(
       prompt,
