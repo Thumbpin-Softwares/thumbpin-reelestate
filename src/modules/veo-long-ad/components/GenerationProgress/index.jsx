@@ -2,26 +2,19 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  Loader2,
   CheckCircle2,
-  AlertCircle,
-  Clock,
-  Clapperboard,
   Download,
   RotateCcw,
   ExternalLink,
   Play,
   Pause,
   FileEdit,
-  Mic,
-  Video,
-  User,
-  Layers,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { compressImage, compressBlob } from "@/utils/compress-image";
 import { combineVideos, uploadCombinedVideo } from "@/lib/video-combiner";
+import { GenerationProgressShell } from "@/modules/common/components/generation-progress-shell";
 
 const STATUS = {
   IDLE: "idle",
@@ -33,14 +26,6 @@ const STATUS = {
   UPLOADING: "uploading",
   DONE: "done",
   ERROR: "error",
-};
-
-const BEAT_COLORS = {
-  HOOK: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  AVATAR_SEGMENT: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  PROPERTY_VISUAL: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
-  FEATURE_BURST: "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400",
-  CTA: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400",
 };
 
 /**
@@ -410,31 +395,36 @@ export function GenerationProgress({ generationParams, onReset }) {
     document.body.removeChild(a);
   };
 
-  // ── Beat status helpers ───────────────────────────────────────────────────
-  const getBeatStatus = (idx) => {
-    if (completedChunks.includes(idx)) return "done";
-    if (idx === currentChunkIdx) return "active";
-    return "waiting";
-  };
-
-  const progressPercent = totalChunks > 0
-    ? Math.round((completedChunks.length / totalChunks) * 100)
-    : 0;
-
   // ── Status label ─────────────────────────────────────────────────────────
   const statusLabel = () => {
     if (status === STATUS.AWAITING_APPROVAL) return `Review beat plan — auto-approving in ${approvalCountdown}s`;
-    if (status === STATUS.VOICE_GENERATING) return "Generating ElevenLabs voice…";
-    if (status === STATUS.GENERATING_BASE) return `Generating beat ${currentChunkIdx + 1}/${totalChunks}…`;
-    if (status === STATUS.EXTENDING) return `Generating beat ${currentChunkIdx + 1}/${totalChunks}…`;
-    if (status === STATUS.COMBINING) return "Assembling clips…";
+    if (status === STATUS.VOICE_GENERATING) return "Generating voice…";
+    if (status === STATUS.GENERATING_BASE) return `Generating video (beat ${currentChunkIdx + 1}/${totalChunks})…`;
+    if (status === STATUS.EXTENDING) return `Generating video (beat ${currentChunkIdx + 1}/${totalChunks})…`;
+    if (status === STATUS.COMBINING) return combineProgress || "Merging everything…";
     if (status === STATUS.UPLOADING) return "Saving to Asset Library…";
     if (status === STATUS.DONE) return "Done!";
     if (status === STATUS.ERROR) return "Error";
     return "Starting…";
   };
 
-  const isGenerating = [STATUS.VOICE_GENERATING, STATUS.GENERATING_BASE, STATUS.EXTENDING, STATUS.UPLOADING, STATUS.COMBINING].includes(status);
+  // Everything except the pre-generation approval step and the final result
+  // screen goes through the same generating/error loader used by every other
+  // pipeline (seedance-reel, action-reel, home-tour, etc.) — this component
+  // just has an extra approval step in front of it and a richer done screen
+  // (inline preview + per-beat downloads), since the pipeline's own shape
+  // needs those and seedance-reel's doesn't.
+  if (status !== STATUS.AWAITING_APPROVAL && status !== STATUS.DONE) {
+    return (
+      <GenerationProgressShell
+        phase={status === STATUS.ERROR ? "error" : "loading"}
+        stageText={statusLabel()}
+        error={error}
+        onRetry={() => { hasStarted.current = false; startPipeline(); }}
+        onAbort={onReset}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -443,20 +433,12 @@ export function GenerationProgress({ generationParams, onReset }) {
         <h2 className="text-2xl font-bold font-heading tracking-tight">
           {status === STATUS.DONE
             ? "🎬 Your Hybrid Reel is Ready!"
-            : status === STATUS.AWAITING_APPROVAL
-            ? "Review Your Beat Plan"
-            : status === STATUS.COMBINING
-            ? "Assembling Clips…"
-            : "Generating Hybrid Reel"}
+            : "Review Your Beat Plan"}
         </h2>
         <p className="text-sm text-muted-foreground">
           {status === STATUS.DONE
             ? `${totalDuration}s reel — saved to your Asset Library`
-            : status === STATUS.AWAITING_APPROVAL
-            ? "Edit narration or Veo prompts below. Auto-approves in a few seconds."
-            : status === STATUS.COMBINING
-            ? combineProgress || "Combining clips with FFmpeg…"
-            : `${totalChunks} beats · Ken Burns + ElevenLabs TTS · avatar acts = black screen`}
+            : "Edit narration or Veo prompts below. Auto-approves in a few seconds."}
         </p>
       </div>
 
@@ -523,136 +505,6 @@ export function GenerationProgress({ generationParams, onReset }) {
             <CheckCircle2 className="w-4 h-4" />
             Approve & Generate Video
           </Button>
-        </div>
-      )}
-
-      {/* ── Progress bar ─────────────────────────────────────────────────── */}
-      {status !== STATUS.DONE && status !== STATUS.ERROR && status !== STATUS.AWAITING_APPROVAL && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground font-medium">{statusLabel()}</span>
-            <span className="font-semibold text-primary">{progressPercent}%</span>
-          </div>
-          <div className="h-2.5 rounded-full bg-muted/40 overflow-hidden">
-            <div
-              className="h-full rounded-full bg-linear-to-r from-primary to-violet-500 transition-all duration-700 ease-out"
-              style={{ width: `${Math.max(progressPercent, isGenerating ? 4 : 0)}%` }}
-            />
-          </div>
-          <p className="text-[11px] text-muted-foreground">{message}</p>
-        </div>
-      )}
-
-      {/* ── Beat rail ────────────────────────────────────────────────────── */}
-      {totalChunks > 0 && status !== STATUS.AWAITING_APPROVAL && (
-        <div className="relative">
-          <div className="flex items-center gap-0 overflow-x-auto pb-2">
-            {beatPlan.map((beat, idx) => {
-              const beatStatus = getBeatStatus(idx);
-              const isAvatar = beat.visual_type === "avatar" || beat.visualType === "avatar";
-              const beatType = beat.type || beat.beatType || "PROPERTY_VISUAL";
-              const colorClass = BEAT_COLORS[beatType] || BEAT_COLORS.PROPERTY_VISUAL;
-
-              return (
-                <div key={idx} className="flex items-center shrink-0">
-                  {idx > 0 && (
-                    <div className={`h-0.5 w-5 sm:w-7 transition-colors duration-500 ${
-                      completedChunks.includes(idx - 1) ? "bg-primary" : "bg-border/40"
-                    }`} />
-                  )}
-                  <div className="flex flex-col items-center gap-1">
-                    <div className={`relative w-9 h-9 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
-                      beatStatus === "done"
-                        ? "border-primary bg-primary shadow-md shadow-primary/30"
-                        : beatStatus === "active"
-                        ? "border-primary bg-primary/10 animate-pulse"
-                        : "border-border/40 bg-muted/20"
-                    }`}>
-                      {beatStatus === "done" ? (
-                        <CheckCircle2 className="w-4 h-4 text-white" />
-                      ) : beatStatus === "active" ? (
-                        <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" />
-                      ) : (
-                        isAvatar
-                          ? <User className={`w-3.5 h-3.5 ${colorClass.split(" ")[1]}`} />
-                          : <Video className={`w-3.5 h-3.5 ${colorClass.split(" ")[1]}`} />
-                      )}
-                    </div>
-                    {beatStatus === "done" && chunkClipUrls[idx] ? (
-                      <a
-                        href={chunkClipUrls[idx]}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title={`Download beat ${idx + 1}`}
-                        className="text-[9px] font-medium text-primary flex items-center gap-0.5 hover:underline"
-                      >
-                        <Download className="w-2.5 h-2.5" />
-                        clip
-                      </a>
-                    ) : (
-                      <span className={`text-[9px] font-medium ${
-                        beatStatus === "done" || beatStatus === "active" ? "text-primary" : "text-muted-foreground"
-                      }`}>
-                        {beatStatus === "done" ? "✓" : beatStatus === "active" ? "…" : `${beat.duration_seconds || beat.estimatedSeconds || 4}s`}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* ── Status message (non-error, non-done, non-approval) ───────────── */}
-      {isGenerating && status !== STATUS.UPLOADING && (
-        <div className="rounded-2xl border border-border/50 bg-muted/20 p-4 flex gap-3">
-          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-            {status === STATUS.VOICE_GENERATING
-              ? <Mic className="w-4 h-4 text-primary" />
-              : status === STATUS.COMBINING
-              ? <Layers className="w-4 h-4 text-primary" />
-              : <Clapperboard className="w-4 h-4 text-primary" />
-            }
-          </div>
-          <div>
-            <p className="text-sm font-medium">
-              {status === STATUS.VOICE_GENERATING && "Generating ElevenLabs voiceover for all narration beats…"}
-              {status === STATUS.GENERATING_BASE && `Beat ${currentChunkIdx + 1}/${totalChunks} generating in parallel…`}
-              {status === STATUS.EXTENDING && `Beat ${currentChunkIdx + 1}/${totalChunks} generating…`}
-              {status === STATUS.COMBINING && (combineProgress || "Combining all clips via FFmpeg…")}
-              {status === STATUS.IDLE && "Starting hybrid pipeline…"}
-            </p>
-            <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1.5">
-              <Clock className="w-3 h-3" />
-              {status === STATUS.COMBINING
-                ? "Running in your browser — keep this tab open."
-                : "All beats generate in parallel. Keep this tab open."}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* ── Error state ──────────────────────────────────────────────────── */}
-      {status === STATUS.ERROR && (
-        <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 flex gap-3">
-          <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-semibold text-destructive">Generation failed</p>
-            <p className="text-xs text-muted-foreground mt-1">{error}</p>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                hasStarted.current = false;
-                startPipeline();
-              }}
-              className="mt-3 gap-2 text-xs"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              Retry
-            </Button>
-          </div>
         </div>
       )}
 

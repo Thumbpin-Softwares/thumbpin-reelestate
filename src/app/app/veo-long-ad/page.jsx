@@ -7,7 +7,7 @@ import { StepUpload } from "@/modules/veo-long-ad/components/StepUpload";
 import { StepScript } from "@/modules/veo-long-ad/components/StepScript";
 import { GenerationProgress } from "@/modules/veo-long-ad/components/GenerationProgress";
 
-const STEPS = ["Upload & Presenter", "Script", "Generate"];
+const STEPS = ["Upload & Presenter", "Script", "Finalize"];
 
 function StepIndicator({ currentStep = 1 }) {
   return (

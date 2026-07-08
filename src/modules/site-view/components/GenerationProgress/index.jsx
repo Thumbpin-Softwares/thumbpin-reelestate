@@ -2,11 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  Loader2,
   CheckCircle2,
-  AlertCircle,
-  Clock,
-  Clapperboard,
   Download,
   RotateCcw,
   ExternalLink,
@@ -17,6 +13,7 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { compressImage, compressBlob } from "@/utils/compress-image";
+import { GenerationProgressShell } from "@/modules/common/components/generation-progress-shell";
 
 const STATUS = {
   IDLE: "idle",
@@ -308,6 +305,24 @@ export function GenerationProgress({ generationParams, onReset }) {
     return "Starting…";
   };
 
+  // Everything except the pre-generation approval step and the final result
+  // screen goes through the same generating/error loader used by every other
+  // pipeline (seedance-reel, action-reel, home-tour, etc.) — this component
+  // just has an extra approval step in front of it and a richer done screen
+  // (inline preview + per-clip downloads), since the pipeline's own shape
+  // needs those and seedance-reel's doesn't.
+  if (status !== STATUS.AWAITING_APPROVAL && status !== STATUS.DONE) {
+    return (
+      <GenerationProgressShell
+        phase={status === STATUS.ERROR ? "error" : "loading"}
+        stageText={statusLabel()}
+        error={error}
+        onRetry={() => { hasStarted.current = false; startPipeline(); }}
+        onAbort={onReset}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -315,16 +330,12 @@ export function GenerationProgress({ generationParams, onReset }) {
         <h2 className="text-2xl font-bold font-heading tracking-tight">
           {status === STATUS.DONE
             ? "🏗️ Your Site-Visit Video is Ready!"
-            : status === STATUS.AWAITING_APPROVAL
-            ? "Review Your Script"
-            : "Generating Site-Visit Video"}
+            : "Review Your Script"}
         </h2>
         <p className="text-sm text-muted-foreground">
           {status === STATUS.DONE
             ? `${totalDuration}s site-tour video — saved to your Asset Library`
-            : status === STATUS.AWAITING_APPROVAL
-            ? "Edit dialogue or camera notes below. Auto-approves in a few seconds."
-            : `${totalChunks} clips chaining with Veo 3.1 · ~${Math.round(totalChunks * 2.5)} min total`}
+            : "Edit dialogue or camera notes below. Auto-approves in a few seconds."}
         </p>
       </div>
 
@@ -389,121 +400,6 @@ export function GenerationProgress({ generationParams, onReset }) {
             <CheckCircle2 className="w-4 h-4" />
             Approve & Generate Video
           </Button>
-        </div>
-      )}
-
-      {/* ── Progress bar ─────────────────────────────────────────────────────── */}
-      {status !== STATUS.DONE && status !== STATUS.ERROR && status !== STATUS.AWAITING_APPROVAL && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground font-medium">{statusLabel()}</span>
-            <span className="font-semibold text-primary">{progressPercent}%</span>
-          </div>
-          <div className="h-2.5 rounded-full bg-muted/40 overflow-hidden">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-primary to-violet-500 transition-all duration-700 ease-out"
-              style={{ width: `${Math.max(progressPercent, status === STATUS.IDLE ? 0 : 4)}%` }}
-            />
-          </div>
-          <p className="text-[11px] text-muted-foreground">{message}</p>
-        </div>
-      )}
-
-      {/* ── Chunk rail ───────────────────────────────────────────────────────── */}
-      {totalChunks > 0 && status !== STATUS.AWAITING_APPROVAL && (
-        <div className="relative">
-          <div className="flex items-center gap-0 overflow-x-auto pb-2">
-            {chunks.map((chunk, idx) => {
-              const chunkStatus = getChunkStatus(idx);
-              return (
-                <div key={idx} className="flex items-center shrink-0">
-                  {idx > 0 && (
-                    <div className={`h-0.5 w-6 sm:w-8 transition-colors duration-500 ${
-                      completedChunks.includes(idx - 1) ? "bg-primary" : "bg-border/40"
-                    }`} />
-                  )}
-                  <div className="flex flex-col items-center gap-1">
-                    <div className={`relative w-9 h-9 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
-                      chunkStatus === "done"
-                        ? "border-primary bg-primary shadow-md shadow-primary/30"
-                        : chunkStatus.startsWith("active")
-                        ? "border-primary bg-primary/10 animate-pulse"
-                        : "border-border/40 bg-muted/20"
-                    }`}>
-                      {chunkStatus === "done" ? (
-                        <CheckCircle2 className="w-4 h-4 text-white" />
-                      ) : chunkStatus.startsWith("active") ? (
-                        <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" />
-                      ) : (
-                        <span className="text-[10px] font-semibold text-muted-foreground">{idx + 1}</span>
-                      )}
-                    </div>
-                    {chunkStatus === "done" && chunkClipUrls[idx] ? (
-                      <a
-                        href={chunkClipUrls[idx]}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title={`Download clip ${idx + 1}`}
-                        className="text-[9px] font-medium text-primary flex items-center gap-0.5 hover:underline"
-                      >
-                        <Download className="w-2.5 h-2.5" />
-                        {idx + 1}
-                      </a>
-                    ) : (
-                      <span className={`text-[9px] font-medium ${
-                        chunkStatus === "done" ? "text-primary" :
-                        chunkStatus.startsWith("active") ? "text-primary" : "text-muted-foreground"
-                      }`}>
-                        {chunkStatus === "done" ? "✓" :
-                         chunkStatus.startsWith("active") ? (idx === 0 ? "Gen" : "Ext") : `${chunk.estimatedSeconds || 8}s`}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* ── Status message ───────────────────────────────────────────────────── */}
-      {status !== STATUS.DONE && status !== STATUS.ERROR && status !== STATUS.AWAITING_APPROVAL && (
-        <div className="rounded-2xl border border-border/50 bg-muted/20 p-4 flex gap-3">
-          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-            <Clapperboard className="w-4 h-4 text-primary" />
-          </div>
-          <div>
-            <p className="text-sm font-medium">
-              {status === STATUS.GENERATING_BASE && "Generating your base clip with Veo 3.1…"}
-              {status === STATUS.EXTENDING && `Extending site-visit video with clip ${currentChunkIdx + 1}…`}
-              {status === STATUS.UPLOADING && "Saving to your Asset Library…"}
-              {status === STATUS.IDLE && "Starting pipeline…"}
-            </p>
-            <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1.5">
-              <Clock className="w-3 h-3" />
-              Each clip takes 2–3 minutes. Please keep this tab open.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* ── Error state ──────────────────────────────────────────────────────── */}
-      {status === STATUS.ERROR && (
-        <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 flex gap-3">
-          <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-semibold text-destructive">Generation failed</p>
-            <p className="text-xs text-muted-foreground mt-1">{error}</p>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => { hasStarted.current = false; startPipeline(); }}
-              className="mt-3 gap-2 text-xs"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              Retry
-            </Button>
-          </div>
         </div>
       )}
 
