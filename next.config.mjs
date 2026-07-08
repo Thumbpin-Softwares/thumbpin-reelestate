@@ -24,6 +24,14 @@ const nextConfig = {
     "esbuild",
   ],
 
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "content.thumbpin.in",
+      },
+    ],
+  },
   turbopack: {},
 };
 
