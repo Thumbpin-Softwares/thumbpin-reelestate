@@ -3,10 +3,10 @@ import { ChevronLeft } from "lucide-react";
 import PageEnd from "@/modules/common/components/page-end";
 
 export const metadata = {
-  title: "How to upload good property images — Help Center",
+  title: "How to write good scripts — Help Center",
 };
 
-export default function UploadPropertyGuideLayout({ children }) {
+export default function ScriptGuideLayout({ children }) {
   return (
     <main className="mx-auto pt-16 px-4">
       <Link
@@ -21,7 +21,7 @@ export default function UploadPropertyGuideLayout({ children }) {
         {children}
       </article>
 
-      <PageEnd currentSlug="upload-property" />
+      <PageEnd currentSlug="script" />
     </main>
   );
 }

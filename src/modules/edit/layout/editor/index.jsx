@@ -23,7 +23,6 @@ import { SeedanceReelComposition, calcSeedanceReelDurationInFrames } from "@/lib
 import { ActionReelComposition, calcActionReelDurationInFrames } from "@/lib/remotion/ActionReelComposition";
 import { calcDurationInFrames, calcActionReelBaseDurationInFrames, clampBrollClips, applyCutRanges, mapVirtualRangeToOriginal } from "@/lib/remotion/duration";
 import { EDITABLE_SOURCES } from "@/lib/editable-sources";
-import { CAPTION_PRESETS } from "@/lib/remotion/caption-presets";
 import { CaptionsPanel } from "@/modules/edit/components/caption-panel";
 import { OverlaysPanel } from "@/modules/edit/components/overlays-panel";
 import { OverlaysCanvasLayer } from "@/modules/edit/components/overlays-canvas-layer";
@@ -807,15 +806,6 @@ export function Editor({ compositionProps, onExit }) {
           frame={frame}
           fps={FPS}
           audioUrl={compositionProps.avatarVideoUrl || compositionProps.part1VideoUrl || null}
-          captions={
-            captionState.status === "done"
-              ? [{
-                  startFrame: 0,
-                  endFrame:   durationInFrames,
-                  label:      CAPTION_PRESETS.find((p) => p.id === captionState.preset)?.label || "Captions",
-                }]
-              : []
-          }
           onSeek={(f) => {
             setFrame(f);
             playerRef.current?.seekTo(f);

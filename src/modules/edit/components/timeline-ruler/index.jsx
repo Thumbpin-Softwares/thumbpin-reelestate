@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Captions, Scissors, SplitSquareHorizontal, Trash2, Undo2 } from "lucide-react";
+import { Scissors, SplitSquareHorizontal, Trash2, Undo2 } from "lucide-react";
 
 function SplitMarker({ frame, durationInFrames, containerRef, minFrame, maxFrame, onMove, onRemove }) {
   const dragRef = useRef(null);
@@ -41,9 +41,8 @@ function SplitMarker({ frame, durationInFrames, containerRef, minFrame, maxFrame
 }
 
 const TOOLBAR_ACTIONS = [
-  { id: "trim",     label: "Trim",     Icon: Scissors },
-  { id: "captions", label: "Captions", Icon: Captions },
-  { id: "cut",      label: "Cut",      Icon: SplitSquareHorizontal },
+  { id: "trim", label: "Trim", Icon: Scissors },
+  { id: "cut",  label: "Cut",  Icon: SplitSquareHorizontal },
 ];
 
 const HANDLE_HIT_PX  = 10;
@@ -55,13 +54,15 @@ function useWaveformPeaks(audioUrl) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!audioUrl) return;
-    let cancelled = false;
-    setLoading(true);
-    setPeaks(null);
+    if (!audioUrl) {
+      return;
+    }
 
-    (async () => {
+    let cancelled = false;
+
+    const load = async () => {
       try {
+        setLoading(true);
         const res = await fetch(audioUrl);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const buf     = await res.arrayBuffer();
@@ -89,7 +90,9 @@ function useWaveformPeaks(audioUrl) {
       } finally {
         if (!cancelled) setLoading(false);
       }
-    })();
+    };
+
+    load();
 
     return () => { cancelled = true; };
   }, [audioUrl]);
@@ -162,20 +165,8 @@ export function Timeline({
   onRestoreLastCut,
   cutCount  = 0,
   audioUrl  = null,
-  captions  = [],
 }) {
   const [activeAction, setActiveAction] = useState("trim");
-  const prevCaptionsCount = useRef(captions.length);
-
-  // Surface the ruler's captions track automatically the moment a caption clip
-  // is added, so the user sees it land without having to click the tab.
-  useEffect(() => {
-    if (captions.length > 0 && prevCaptionsCount.current === 0) {
-      setActiveAction("captions");
-      onToolbarAction?.("captions");
-    }
-    prevCaptionsCount.current = captions.length;
-  }, [captions.length, onToolbarAction]);
 
   const [trimIn,  setTrimIn]  = useState(0);
   const [trimOut, setTrimOut] = useState(durationInFrames);
@@ -319,10 +310,8 @@ export function Timeline({
     draggingTrim.current = null;
   };
 
-  const activeItems = activeAction === "captions" ? captions : [];
-  const showTrack   = activeAction === "captions";
-  const showTrim    = activeAction === "trim";
-  const showCut     = activeAction === "cut";
+  const showTrim = activeAction === "trim";
+  const showCut  = activeAction === "cut";
 
   const selectedSegment = selectedSegmentIdx !== null ? cutSegments[selectedSegmentIdx] : null;
 
@@ -403,7 +392,7 @@ export function Timeline({
 
       {/* Ruler + optional track */}
       <div className="flex">
-        {(showTrack || showTrim || showCut) && (
+        {(showTrim || showCut) && (
           <div className="w-28 shrink-0 border-r border-border/50">
             <div className="h-8 border-b border-border/40 bg-muted/30" />
             <div className="h-20 flex items-center px-3 text-[11px] text-muted-foreground font-medium capitalize">
@@ -523,41 +512,6 @@ export function Timeline({
             </div>
           )}
 
-          {/* Active track row (captions) */}
-          {showTrack && (
-            <div className="relative h-20 bg-white">
-              {activeItems.length === 0 ? (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <button
-                    className="pointer-events-auto flex items-center gap-1 text-[11px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onToolbarAction?.(`add:${activeAction}`);
-                    }}
-                  >
-                    + Add {activeAction}
-                  </button>
-                </div>
-              ) : (
-                activeItems.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="absolute inset-y-1.5 rounded-md bg-[#c7f038] flex items-center px-2"
-                    style={{
-                      left:  `${(item.startFrame / durationInFrames) * 100}%`,
-                      width: `${((item.endFrame - item.startFrame) / durationInFrames) * 100}%`,
-                    }}
-                  >
-                    <span className="text-[10px] font-medium text-neutral-800 truncate">
-                      {item.label ?? item.text ?? ""}
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-
           {/* Trim handles */}
           {showTrim && durationInFrames > 0 && (
             <>
@@ -593,7 +547,7 @@ export function Timeline({
             className="absolute top-0 bottom-0 w-px bg-neutral-900 z-10 pointer-events-none"
             style={{ left: `${playheadPct}%` }}
           >
-            <div className="w-3 h-3 bg-neutral-900 rounded-full -translate-x-[5px] -translate-y-px" />
+            <div className="w-3 h-3 bg-neutral-900 rounded-full -translate-x-1.25 -translate-y-px" />
           </div>
         </div>
       </div>
