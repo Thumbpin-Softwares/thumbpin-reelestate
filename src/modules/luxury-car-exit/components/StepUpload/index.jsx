@@ -281,9 +281,14 @@ export function StepUpload({
             <div className="pl-3 flex items-center gap-3">
               <Info className="h-5 w-5 text-black shrink-0" />
               <p className="text-xs text-neutral-600 leading-relaxed">
-                {orderHint === "location-first"
-                  ? "Upload 2–10 property photos. Property photos are sent to the AI first, then presenter photos — that exact order is referenced inside the generated video prompts."
-                  : "Upload 2–10 property photos. All photos are used as background context for the avatar video."}
+                Upload 2–10 property photos. All photos are used as background
+                context for the avatar video.{" "}
+                <a
+                  href="/dashboard/guide/upload-property"
+                  className="text-primary font-medium underline hover:opacity-80"
+                >
+                  Learn how to upload property photos
+                </a>
               </p>
             </div>
           </div>
@@ -334,9 +339,13 @@ export function StepUpload({
                 </div>
               ) : selectedCollectionAvatarData ? (
                 <div className="relative mx-auto max-w-45 aspect-2/3 rounded-3xl overflow-hidden border-2 border-[#c7f038]">
-                  {selectedCollectionAvatarData.coverImage || selectedCollectionAvatarData.images?.[0]?.url ? (
+                  {selectedCollectionAvatarData.coverImage ||
+                  selectedCollectionAvatarData.images?.[0]?.url ? (
                     <img
-                      src={selectedCollectionAvatarData.coverImage || selectedCollectionAvatarData.images?.[0]?.url}
+                      src={
+                        selectedCollectionAvatarData.coverImage ||
+                        selectedCollectionAvatarData.images?.[0]?.url
+                      }
                       alt={selectedCollectionAvatarData.name}
                       className="w-full h-full object-cover"
                     />
@@ -372,7 +381,9 @@ export function StepUpload({
                     <User2 className="w-5 h-5 text-[#c7f038]" />
                   </div>
                   <p className="text-sm font-medium">No agent selected</p>
-                  <span className="text-xs text-primary font-medium">Browse agents</span>
+                  <span className="text-xs text-primary font-medium">
+                    Browse agents
+                  </span>
                 </button>
               )}
             </div>
@@ -774,7 +785,8 @@ export function StepUpload({
             </div>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            This clears all saved photos, presenter selection, and script data for this reel. This can&apos;t be undone.
+            This clears all saved photos, presenter selection, and script data
+            for this reel. This can&apos;t be undone.
           </p>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="ghost" onClick={() => setShowClearConfirm(false)}>
