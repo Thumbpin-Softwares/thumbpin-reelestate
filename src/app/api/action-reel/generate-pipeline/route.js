@@ -70,23 +70,31 @@ async function callLLM(prompt) {
   }
 }
 
+const DEFAULT_VOICE_SETTINGS = { stability: 0.5, similarity_boost: 0.75, style: 0.3, speed: 1.0 };
+
+function resolutionForQuality(quality) {
+  // Always cap at 720p — pass through silently regardless of what the user picks
+  return "720p";
+}
+
 async function generateAndUploadTTS(text, voiceId, userId, keyPrefix, language) {
   const { buffer, contentType, ext } = await synthesizeVoice({ text, voiceId, language });
   const key = buildUserKey(userId, "audio", ext, keyPrefix);
   return uploadToR2(buffer, key, contentType);
 }
 
-async function callSeedanceAndUpload(seedanceInput, userId, keyName) {
+async function callSeedanceAndUpload(seedanceInput, userId, keyName, signal) {
   const result = await fal.subscribe(
     "bytedance/seedance-2.0/fast/reference-to-video",
     {
       input: seedanceInput,
       logs: false,
+      ...(signal ? { abortSignal: signal } : {}),
     },
   );
   const falVideoUrl = result?.data?.video?.url;
   if (!falVideoUrl) throw new Error("Seedance returned no video URL");
-  const videoRes = await fetch(falVideoUrl);
+  const videoRes = await fetch(falVideoUrl, signal ? { signal } : {});
   if (!videoRes.ok)
     throw new Error(`Failed to fetch Seedance video: ${videoRes.status}`);
   const videoBuf = Buffer.from(await videoRes.arrayBuffer());
@@ -231,6 +239,13 @@ export async function POST(request) {
     ).toString();
     const language = (formData.get("language") || "english").toString();
     const jobId = (formData.get("jobId") || "").toString().trim();
+    const quality = (formData.get("quality") || "auto").toString();
+    const resolution = resolutionForQuality(quality);
+    let voiceSettings = DEFAULT_VOICE_SETTINGS;
+    try {
+      const raw = formData.get("voiceSettings");
+      if (raw) voiceSettings = { ...DEFAULT_VOICE_SETTINGS, ...JSON.parse(raw.toString()) };
+    } catch (_) {}
 
     if (!script || script.length < 30) {
       return NextResponse.json(
@@ -360,6 +375,14 @@ export async function POST(request) {
       }
     }
 
+    // Capture the abort signal from the HTTP request — when the client
+    // disconnects (abort button, navigate away), this fires automatically and
+    // cancels in-flight fal.subscribe calls via the abortSignal option.
+    const pipelineAbort = new AbortController();
+    const pipelineSignal = pipelineAbort.signal;
+    // Forward client disconnect → pipeline abort
+    try { request.signal?.addEventListener("abort", () => pipelineAbort.abort()); } catch (_) {}
+
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
@@ -380,6 +403,12 @@ export async function POST(request) {
         }
 
         const pingInterval = setInterval(() => send({ type: "ping" }), 3000);
+
+        // Abort the stream's ping when the pipeline is cancelled
+        pipelineSignal.addEventListener("abort", () => {
+          clearInterval(pingInterval);
+          try { controller.close(); } catch (_) {}
+        });
 
         try {
           // ── Stage 1: 2-Part Script Split via LLM ──────────────────────────
@@ -663,7 +692,7 @@ ${part2}`;
             prompt: part1Prompt,
             aspect_ratio: "9:16",
             duration: "15",
-            resolution: "720p",
+            resolution,
             generate_audio: true,
             ...(imageUrls.length > 0 && {
               image_urls: imageUrls,
@@ -675,7 +704,7 @@ ${part2}`;
             prompt: part2Prompt,
             aspect_ratio: "9:16",
             duration: "15",
-            resolution: "720p",
+            resolution,
             generate_audio: true,
             ...(imageUrls.length > 0 && {
               image_urls: imageUrls,
@@ -692,7 +721,7 @@ ${part2}`;
           let part2VideoUrl = null;
 
           await Promise.allSettled([
-            callSeedanceAndUpload(part1Input, userId, "areel-part1")
+            callSeedanceAndUpload(part1Input, userId, "areel-part1", pipelineSignal)
               .then((url) => {
                 part1VideoUrl = url;
                 console.log("[ActionReel] Part 1 video uploaded:", url);
@@ -711,7 +740,7 @@ ${part2}`;
                 });
               }),
 
-            callSeedanceAndUpload(part2Input, userId, "areel-part2")
+            callSeedanceAndUpload(part2Input, userId, "areel-part2", pipelineSignal)
               .then((url) => {
                 part2VideoUrl = url;
                 console.log("[ActionReel] Part 2 video uploaded:", url);
@@ -731,11 +760,14 @@ ${part2}`;
               }),
           ]);
 
-          // Both allSettled branches only warn+send on failure so one part
-          // failing doesn't take down the other — but if NEITHER succeeded,
-          // this must surface as a real pipeline failure (refund + error
-          // event), not silently persist as "done" with two null videos.
+          // If NEITHER succeeded, signal the frontend to go back to the script
+          // step (fatal_error) then throw to trigger refund + job status update.
           if (!part1VideoUrl && !part2VideoUrl) {
+            send({
+              type: "fatal_error",
+              message:
+                "Both video generations failed — please check your images and try again.",
+            });
             throw new Error(
               "Both Seedance video generations failed — see server logs for details.",
             );

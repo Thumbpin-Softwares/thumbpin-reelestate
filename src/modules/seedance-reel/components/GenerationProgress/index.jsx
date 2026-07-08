@@ -384,6 +384,20 @@ export function GenerationProgress({
         toast.error("Pipeline error", { description: event.message });
         break;
 
+      case "fatal_error":
+        // Both Seedance generations failed — go back to the Script step so
+        // the user can adjust their images/script and retry.
+        reachedTerminalEvent.current = true;
+        try { sessionStorage.removeItem(jobIdKey); } catch (_) {}
+        toast.error("Video generation failed", {
+          description: event.message || "Both clips failed — please check your images and try again.",
+          duration: 8000,
+        });
+        aborted.current = true;
+        try { abortController.current?.abort(); } catch (_) {}
+        onAbort?.();
+        break;
+
       default:
         break;
     }

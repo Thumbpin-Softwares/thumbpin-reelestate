@@ -14,7 +14,7 @@ import {
 } from "@/lib/credit-system";
 import { fal } from "@fal-ai/client";
 import sharp from "sharp";
-import { ELEVENLABS_VOICE_SETTINGS } from "@/lib/elevenlabs-config";
+import { synthesizeVoice } from "@/lib/voice-tts";
 
 if (process.env.FAL_KEY) {
   fal.config({ credentials: process.env.FAL_KEY });
@@ -59,45 +59,31 @@ async function callLLM(prompt) {
   }
 }
 
-async function generateElevenLabsTTS(text, voiceId) {
-  const vs =
-    ELEVENLABS_VOICE_SETTINGS[voiceId] ??
-    ELEVENLABS_VOICE_SETTINGS["dVTC43Yewy5fAIcmsISI"];
-  const result = await fal.subscribe("fal-ai/elevenlabs/tts/multilingual-v2", {
-    input: {
-      text,
-      voice: voiceId,
-      stability: vs.stability,
-      similarity_boost: vs.similarity_boost,
-      style: vs.style,
-      speed: vs.speed,
-    },
-    logs: false,
-  });
-  const audioUrl = result?.data?.audio_url || result?.data?.audio?.url;
-  if (!audioUrl) throw new Error("ElevenLabs returned no audio URL");
-  const res = await fetch(audioUrl);
-  if (!res.ok) throw new Error(`Failed to download TTS audio: ${res.status}`);
-  return Buffer.from(await res.arrayBuffer());
+const DEFAULT_VOICE_SETTINGS = { stability: 0.5, similarity_boost: 0.75, style: 0.3, speed: 1.0 };
+
+function resolutionForQuality(quality) {
+  // Always cap at 720p — pass through silently regardless of what the user picks
+  return "720p";
 }
 
-async function generateAndUploadTTS(text, voiceId, userId, keyPrefix) {
-  const buf = await generateElevenLabsTTS(text, voiceId);
-  const key = buildUserKey(userId, "audio", "mp3", keyPrefix);
-  return uploadToR2(buf, key, "audio/mpeg");
+async function generateAndUploadTTS(text, voiceId, userId, keyPrefix, language) {
+  const { buffer, contentType, ext } = await synthesizeVoice({ text, voiceId, language });
+  const key = buildUserKey(userId, "audio", ext, keyPrefix);
+  return uploadToR2(buffer, key, contentType);
 }
 
-async function callSeedanceAndUpload(seedanceInput, userId, keyName) {
+async function callSeedanceAndUpload(seedanceInput, userId, keyName, signal) {
   const result = await fal.subscribe(
     "bytedance/seedance-2.0/fast/reference-to-video",
     {
       input: seedanceInput,
       logs: false,
+      ...(signal ? { abortSignal: signal } : {}),
     },
   );
   const falVideoUrl = result?.data?.video?.url;
   if (!falVideoUrl) throw new Error("Seedance returned no video URL");
-  const videoRes = await fetch(falVideoUrl);
+  const videoRes = await fetch(falVideoUrl, signal ? { signal } : {});
   if (!videoRes.ok)
     throw new Error(`Failed to fetch Seedance video: ${videoRes.status}`);
   const videoBuf = Buffer.from(await videoRes.arrayBuffer());
@@ -242,6 +228,13 @@ export async function POST(request) {
     ).toString();
     const language = (formData.get("language") || "english").toString();
     const jobId = (formData.get("jobId") || "").toString().trim();
+    const quality = (formData.get("quality") || "auto").toString();
+    const resolution = resolutionForQuality(quality);
+    let voiceSettings = DEFAULT_VOICE_SETTINGS;
+    try {
+      const raw = formData.get("voiceSettings");
+      if (raw) voiceSettings = { ...DEFAULT_VOICE_SETTINGS, ...JSON.parse(raw.toString()) };
+    } catch (_) {}
 
     if (!script || script.length < 30) {
       return NextResponse.json(
@@ -371,6 +364,14 @@ export async function POST(request) {
       }
     }
 
+    // Capture the abort signal from the HTTP request — when the client
+    // disconnects (abort button, navigate away), this fires automatically and
+    // cancels in-flight fal.subscribe calls via the abortSignal option.
+    const pipelineAbort = new AbortController();
+    const pipelineSignal = pipelineAbort.signal;
+    // Forward client disconnect → pipeline abort
+    try { request.signal?.addEventListener("abort", () => pipelineAbort.abort()); } catch (_) {}
+
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
@@ -391,6 +392,12 @@ export async function POST(request) {
         }
 
         const pingInterval = setInterval(() => send({ type: "ping" }), 3000);
+
+        // Abort the stream's ping when the pipeline is cancelled
+        pipelineSignal.addEventListener("abort", () => {
+          clearInterval(pingInterval);
+          try { controller.close(); } catch (_) {}
+        });
 
         try {
           // ── Stage 1: 2-Part Script Split via LLM ──────────────────────────
@@ -602,8 +609,8 @@ ${part2}`;
             });
 
             const [p1TtsResult, p2TtsResult] = await Promise.allSettled([
-              generateAndUploadTTS(part1_tts, voiceId, userId, "comedy-part1-voice"),
-              generateAndUploadTTS(part2_tts, voiceId, userId, "comedy-part2-voice"),
+              generateAndUploadTTS(part1_tts, voiceId, userId, "comedy-part1-voice", language),
+              generateAndUploadTTS(part2_tts, voiceId, userId, "comedy-part2-voice", language),
             ]);
 
             if (p1TtsResult.status === "fulfilled") {
@@ -674,7 +681,7 @@ ${part2}`;
             prompt: part1Prompt,
             aspect_ratio: "9:16",
             duration: "15",
-            resolution: "720p",
+            resolution,
             generate_audio: true,
             ...(imageUrls.length > 0 && {
               image_urls: imageUrls,
@@ -686,7 +693,7 @@ ${part2}`;
             prompt: part2Prompt,
             aspect_ratio: "9:16",
             duration: "15",
-            resolution: "720p",
+            resolution,
             generate_audio: true,
             ...(imageUrls.length > 0 && {
               image_urls: imageUrls,
@@ -703,7 +710,7 @@ ${part2}`;
           let part2VideoUrl = null;
 
           await Promise.allSettled([
-            callSeedanceAndUpload(part1Input, userId, "comedy-part1")
+            callSeedanceAndUpload(part1Input, userId, "comedy-part1", pipelineSignal)
               .then((url) => {
                 part1VideoUrl = url;
                 console.log("[ComedyReel] Part 1 video uploaded:", url);
@@ -722,7 +729,7 @@ ${part2}`;
                 });
               }),
 
-            callSeedanceAndUpload(part2Input, userId, "comedy-part2")
+            callSeedanceAndUpload(part2Input, userId, "comedy-part2", pipelineSignal)
               .then((url) => {
                 part2VideoUrl = url;
                 console.log("[ComedyReel] Part 2 video uploaded:", url);
@@ -741,6 +748,19 @@ ${part2}`;
                 });
               }),
           ]);
+
+          // If NEITHER succeeded, signal the frontend to go back to the script
+          // step (fatal_error) then throw to trigger refund + job status update.
+          if (!part1VideoUrl && !part2VideoUrl) {
+            send({
+              type: "fatal_error",
+              message:
+                "Both video generations failed — please check your images and try again.",
+            });
+            throw new Error(
+              "Both Seedance video generations failed — see server logs for details.",
+            );
+          }
 
           // ── Stage 5: Save asset + finalize ────────────────────────────────
           send({ type: "uploading", message: "Saving to your Asset Library…" });
