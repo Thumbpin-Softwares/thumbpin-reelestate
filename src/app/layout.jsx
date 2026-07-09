@@ -3,6 +3,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/components/auth-provider";
+import { NetworkStatus } from "@/modules/common/components/network-status";
 import SmoothScroll from "@/modules/common/smooth-scroll";
 
 export const metadata = {
@@ -44,6 +45,7 @@ export default function RootLayout({ children }) {
             </TooltipProvider>
           </AuthProvider>
           <Toaster richColors position="top-right" />
+          <NetworkStatus />
         </SmoothScroll>
       </body>
     </html>
