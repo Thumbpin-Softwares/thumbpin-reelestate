@@ -1,9 +1,15 @@
 "use client";
+import { useEffect } from "react";
 import { CreditCard } from "lucide-react";
 import { useUser } from "@/hooks/use-user";
 
 export function CreditsBadge() {
-  const { credits, loading } = useUser();
+  const { credits, loading, refetch } = useUser();
+
+  useEffect(() => {
+    const id = setInterval(refetch, 5000);
+    return () => clearInterval(id);
+  }, [refetch]);
 
   if (loading) {
     return (
