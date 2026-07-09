@@ -250,7 +250,7 @@ export async function consumeCreditsForAction({ userId, action, metadata = {}, c
   };
 }
 
-export async function refundCreditsForAction({ userId, action, debit, metadata = {} }) {
+export async function refundCreditsForAction({ userId, action, debit, metadata = {}, amount }) {
   if (!debit || debit.mode === "system") {
     return { ok: true, skipped: true };
   }
@@ -289,7 +289,10 @@ export async function refundCreditsForAction({ userId, action, debit, metadata =
   }
 
   if (debit.mode === "paid_credits") {
-    const refundAmount = debit.chargedCredits || getActionOrThrow(action).cost || 0;
+    const fullAmount = debit.chargedCredits || getActionOrThrow(action).cost || 0;
+    const refundAmount = amount != null ? Math.max(0, Math.min(amount, fullAmount)) : fullAmount;
+    if (refundAmount === 0) return { ok: true, skipped: true };
+
     const updated = await User.findByIdAndUpdate(
       userId,
       {
