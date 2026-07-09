@@ -8,6 +8,12 @@
 //                   (SeedanceReelComposition) — news-anchor/home-tour
 //   "action-reel" — part1VideoUrl + part2VideoUrl, two flat baked-audio clips
 //                   (ActionReelComposition) — action-reel/comedy-reel/luxury-car-exit
+//
+// isFlatExport sources are already-rendered/flattened MP4s (a previous export)
+// reopened as a single-clip "action-reel" composition (part1 only, no part2) —
+// lets a user re-trim/re-cut/add music/captions to something they already
+// exported, always starting from a fresh blank edit (never resumes the
+// original session that produced the export — see buildCompositionFromAsset).
 export const EDITABLE_SOURCES = {
   "luxury-car-exit": {
     compositionType: "action-reel",
@@ -47,6 +53,54 @@ export const EDITABLE_SOURCES = {
     renderEndpoint: "/api/comedy-reel/render-remotion",
     generatorPath: "/dashboard/comedy-reel",
     downloadFilename: "comedy-reel.mp4",
+  },
+  // Flattened exports from each pipeline's render-remotion route — reopenable
+  // as a single-clip composition, re-exported through the shared generic
+  // endpoint below (which re-tags the new export as "video-export").
+  "luxury-car-exit-export": {
+    compositionType: "action-reel",
+    isFlatExport: true,
+    renderEndpoint: "/api/exports/render-remotion",
+    generatorPath: "/dashboard/luxury-car-exit",
+    downloadFilename: "luxury-car-exit.mp4",
+  },
+  "action-reel-export": {
+    compositionType: "action-reel",
+    isFlatExport: true,
+    renderEndpoint: "/api/exports/render-remotion",
+    generatorPath: "/dashboard/action-reel",
+    downloadFilename: "action-reel.mp4",
+  },
+  "comedy-reel-export": {
+    compositionType: "action-reel",
+    isFlatExport: true,
+    renderEndpoint: "/api/exports/render-remotion",
+    generatorPath: "/dashboard/comedy-reel",
+    downloadFilename: "comedy-reel.mp4",
+  },
+  "news-anchor-export": {
+    compositionType: "action-reel",
+    isFlatExport: true,
+    renderEndpoint: "/api/exports/render-remotion",
+    generatorPath: "/dashboard/news-anchor",
+    downloadFilename: "news-anchor.mp4",
+  },
+  "home-tour-export": {
+    compositionType: "action-reel",
+    isFlatExport: true,
+    renderEndpoint: "/api/exports/render-remotion",
+    generatorPath: "/dashboard/home-tour",
+    downloadFilename: "home-tour.mp4",
+  },
+  // What re-exporting any of the above (or re-exporting a re-export) gets
+  // tagged as — still editable again the same way, so a user can keep
+  // trimming/re-cutting/re-captioning an export indefinitely.
+  "video-export": {
+    compositionType: "action-reel",
+    isFlatExport: true,
+    renderEndpoint: "/api/exports/render-remotion",
+    generatorPath: null,
+    downloadFilename: "video.mp4",
   },
 };
 
@@ -90,6 +144,19 @@ export async function buildCompositionFromAsset(asset) {
   const source = asset.metadata?.source;
   const sourceConfig = EDITABLE_SOURCES[source];
   if (!sourceConfig) return null;
+
+  if (sourceConfig.isFlatExport) {
+    const part1Dur = await getVideoDuration(asset.url);
+    return {
+      source,
+      assetId: asset.id || "",
+      name: asset.name || "",
+      part1VideoUrl: asset.url || "",
+      part2VideoUrl: "",
+      part1Duration: part1Dur > 0 ? part1Dur : 15,
+      part2Duration: 0,
+    };
+  }
 
   if (sourceConfig.compositionType === "action-reel") {
     const { part1VideoUrl, part2VideoUrl } = asset.metadata;
