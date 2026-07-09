@@ -301,9 +301,8 @@ export function Editor({ compositionProps, onExit }) {
   const handleDownload = async () => {
     if (captionState.videoUrl) {
       const filename = sourceConfig.downloadFilename || "video.mp4";
-      const sep = captionState.videoUrl.includes("?") ? "&" : "?";
       const a = document.createElement("a");
-      a.href = `${captionState.videoUrl}${sep}download=1&filename=${filename}`;
+      a.href = `/api/download?url=${encodeURIComponent(captionState.videoUrl)}&name=${encodeURIComponent(filename)}`;
       a.download = filename;
       document.body.appendChild(a);
       a.click();
@@ -356,9 +355,8 @@ export function Editor({ compositionProps, onExit }) {
       if (!finalUrl) throw new Error("No URL returned from render");
 
       const filename = sourceConfig.downloadFilename || "video.mp4";
-      const sep = finalUrl.includes("?") ? "&" : "?";
       const a = document.createElement("a");
-      a.href = `${finalUrl}${sep}download=1&filename=${filename}`;
+      a.href = `/api/download?url=${encodeURIComponent(finalUrl)}&name=${encodeURIComponent(filename)}`;
       a.download = filename;
       document.body.appendChild(a);
       a.click();
@@ -741,7 +739,7 @@ export function Editor({ compositionProps, onExit }) {
         </div>
 
         {/* Right panel */}
-        <div className="w-88 shrink-0 border-l border-border/50 bg-white flex flex-col overflow-hidden">
+        <div className="w-92 shrink-0 border-l border-border/50 bg-white flex flex-col overflow-hidden">
           {activePanel ? (
             <>
               <div className="flex items-center gap-2 px-3 py-3 border-b border-border/40 shrink-0">
@@ -796,7 +794,7 @@ export function Editor({ compositionProps, onExit }) {
           ) : (
             <>
               <div className="px-4 py-3 border-b border-border/40 shrink-0">
-                <span className="text-sm font-semibold">Edit</span>
+                <span className="text-sm text-black">Editor{"\'"}s Panel</span>
               </div>
               <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
                 {[
@@ -809,8 +807,8 @@ export function Editor({ compositionProps, onExit }) {
                     onClick={() => setActivePanel(id)}
                     className="flex items-center gap-3 px-3 py-3 rounded-xl border border-border/50 hover:bg-muted/40 hover:border-border transition-colors text-left w-full"
                   >
-                    <div className="w-8 h-8 rounded-lg bg-neutral-100 flex items-center justify-center shrink-0">
-                      <Icon className="w-4 h-4 text-neutral-600" />
+                    <div className="w-8 h-8 rounded-lg bg-black flex items-center justify-center shrink-0">
+                      <Icon className="w-4 h-4 text-[#c7f038]" />
                     </div>
                     <div>
                       <p className="text-xs font-semibold">{label}</p>

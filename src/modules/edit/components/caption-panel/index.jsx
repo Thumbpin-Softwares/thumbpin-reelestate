@@ -1,10 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Check, ChevronLeft, Eye, Loader2, Sparkles, X } from "lucide-react";
+import { Check, ChevronLeft, Loader2, Sparkles } from "lucide-react";
 import { CAPTION_PRESETS } from "@/lib/remotion/caption-presets";
 import { computeCaptionCreditCost } from "@/lib/credit-costs";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 // Preset preview clips are hosted on Cloudflare R2 — falls back to a plain
 // label tile if a given preset's mp4 hasn't been uploaded yet.
@@ -76,7 +75,6 @@ export function CaptionsPanel({ captionState, onGenerate, onReset, onDraftChange
   const [language, setLanguage] = useState("");
   const [translateTo, setTranslateTo] = useState("en-US");
   const [position, setPosition] = useState("bottom");
-  const [previewPreset, setPreviewPreset] = useState(null);
 
   const busy = captionState?.status === "rendering" || captionState?.status === "captioning";
   const appliedPreset = captionState?.status === "done" ? captionState.preset : null;
@@ -239,33 +237,23 @@ export function CaptionsPanel({ captionState, onGenerate, onReset, onDraftChange
             }}
             className={`group relative rounded-lg border p-1.5 text-[11px] font-medium text-center transition-colors cursor-pointer ${
               appliedPreset === p.id
-                ? "border-neutral-900 bg-neutral-900 text-white"
-                : "border-border/50 text-muted-foreground hover:text-foreground hover:bg-muted/40"
+                ? "border-[#c7f038] bg-[#c7f038] text-black"
+                : "border-white text-black hover:bg-[#eff9cb] hover:border-[#c7f038]"
             }`}
           >
             <div className="relative aspect-9/16 w-full rounded-md overflow-hidden bg-neutral-100 mb-1.5">
               <video
                 src={presetVideoUrl(p)}
                 className="w-full h-full object-cover"
+                preload="metadata"
                 loop
                 muted
                 playsInline
-                preload="metadata"
-                onLoadedMetadata={(e) => { e.currentTarget.currentTime = THUMBNAIL_FRAME_TIME; }}
+                onLoadedMetadata={(e) => { e.currentTarget.currentTime = THUMBNAIL_FRAME_TIME; e.currentTarget.pause(); }}
                 onError={(e) => { e.currentTarget.style.display = "none"; }}
               />
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setPreviewPreset(p);
-                }}
-                className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/40 opacity-0 group-hover:opacity-100 transition-all"
-              >
-                <Eye className="w-4 h-4 text-white" />
-              </button>
               {p.tier === "dynamic" && (
-                <span className="absolute top-1 right-1 text-[8px] font-semibold uppercase tracking-wide text-[#c7f038]">
+                <span className="absolute top-1 bg-black p-1.25 rounded-full right-1 text-[8px] font-semibold uppercase tracking-wide text-[#c7f038]">
                   HD
                 </span>
               )}
@@ -273,44 +261,11 @@ export function CaptionsPanel({ captionState, onGenerate, onReset, onDraftChange
 
             {p.label}
             {appliedPreset === p.id && (
-              <Check className="absolute -top-1.5 -left-1.5 w-3.5 h-3.5 bg-emerald-500 text-white rounded-full p-0.5" />
+              <Check className="absolute -top-1.5 -left-1.5 w-3.5 h-3.5 bg-black text-white rounded-full p-0.5" />
             )}
           </div>
         ))}
       </div>
-
-      <Dialog open={!!previewPreset} onOpenChange={(open) => !open && setPreviewPreset(null)}>
-        <DialogContent
-          showCloseButton={false}
-          className="w-[240px] max-w-[240px] p-0 overflow-hidden gap-0"
-        >
-          {previewPreset && (
-            <>
-              <div className="relative w-full bg-black" style={{ aspectRatio: "9 / 16" }}>
-                <video
-                  src={presetVideoUrl(previewPreset)}
-                  className="w-full h-full object-contain"
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                  preload="metadata"
-                  onError={(e) => { e.currentTarget.style.display = "none"; }}
-                />
-                <button
-                  onClick={() => setPreviewPreset(null)}
-                  className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-              <div className="p-3">
-                <DialogTitle className="text-sm font-semibold">{previewPreset.label}</DialogTitle>
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
