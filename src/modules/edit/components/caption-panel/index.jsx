@@ -47,7 +47,6 @@ const LANGUAGES = [
 // Target languages for VEED's translation_language param — used as a workaround
 // when a source script (e.g. Devanagari, Thai) isn't supported for styled rendering.
 const TRANSLATE_TO = [
-  { code: "", label: "None (keep original language)" },
   { code: "en-US", label: "English" },
   { code: "es-ES", label: "Spanish" },
   { code: "fr-FR", label: "French" },
@@ -75,18 +74,17 @@ export function CaptionsPanel({ captionState, onGenerate, onReset, onDraftChange
   const [view, setView] = useState("grid");
   const [selected, setSelected] = useState(null);
   const [language, setLanguage] = useState("");
-  const [translateTo, setTranslateTo] = useState("");
+  const [translateTo, setTranslateTo] = useState("en-US");
   const [position, setPosition] = useState("bottom");
   const [previewPreset, setPreviewPreset] = useState(null);
 
   const busy = captionState?.status === "rendering" || captionState?.status === "captioning";
   const appliedPreset = captionState?.status === "done" ? captionState.preset : null;
-  const selectedLanguage = LANGUAGES.find((l) => l.code === language);
 
   const openPreset = (preset) => {
     setSelected(preset);
     setLanguage("");
-    setTranslateTo("");
+    setTranslateTo("en-US");
     setPosition("bottom");
     setView("detail");
     onDraftChange?.({ presetLabel: preset.label, position: "bottom" });
@@ -167,12 +165,6 @@ export function CaptionsPanel({ captionState, onGenerate, onReset, onDraftChange
               <option key={l.code} value={l.code}>{l.label}</option>
             ))}
           </select>
-          {selectedLanguage?.scriptRisk && !translateTo && (
-            <p className="text-[10px] text-amber-600">
-              {selectedLanguage.label} script isn&apos;t always supported for styled rendering — set a translation
-              language above (e.g. English) if generation fails.
-            </p>
-          )}
         </div>
 
         <button

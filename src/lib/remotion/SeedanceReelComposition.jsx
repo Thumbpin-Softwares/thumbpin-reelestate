@@ -1,3 +1,9 @@
+// Audio (both the Part 2 voiceover and background music) uses the classic,
+// stable `remotion` Audio (ffmpeg-based extraction) rather than
+// @remotion/media's — that package is explicitly "Experimental
+// WebCodecs-based media tags" and would silently drop a track on
+// codec/format edge cases instead of erroring, which is why background
+// music in particular looked like it "sometimes" didn't apply.
 import {
   AbsoluteFill,
   Img,
@@ -9,8 +15,8 @@ import {
   Video,
   getRemotionEnvironment,
   OffthreadVideo,
+  Audio,
 } from "remotion";
-import { Audio } from "@remotion/media";
 import { IntroAnimation } from "./IntroAnimation";
 import { OutroAnimation } from "./OutroAnimation";
 import { getOverlayFontCss, hexToRgba } from "./overlay-fonts";

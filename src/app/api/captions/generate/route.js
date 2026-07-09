@@ -5,7 +5,7 @@ import { uploadToR2, buildUserKey } from "@/lib/r2-upload";
 import dbConnect from "@/lib/mongodb";
 import Asset from "@/models/Asset";
 import { consumeCreditsForAction, refundCreditsForAction } from "@/lib/credit-system";
-import { computeCaptionCreditCost } from "@/lib/credit-costs";
+import { computeCaptionCreditCost, CAPTION_FAILED_RUN_CHARGE_CREDITS } from "@/lib/credit-costs";
 import { CAPTION_PRESETS } from "@/lib/remotion/caption-presets";
 import { fal } from "@fal-ai/client";
 
@@ -91,16 +91,21 @@ export async function POST(request) {
     return NextResponse.json({ url, creditsCharged: creditsCost });
   } catch (err) {
     console.error("[captions/generate] Error:", err.message, JSON.stringify(err.body ?? err, null, 2));
+    // VEED still bills us for the attempt even when it fails, so only refund
+    // the margin — keep a flat raw-cost charge instead of a full refund.
+    const chargeOnFailure = Math.min(CAPTION_FAILED_RUN_CHARGE_CREDITS, creditsCost);
+    const refundAmount = Math.max(0, creditsCost - chargeOnFailure);
     await refundCreditsForAction({
       userId,
       action: "captions_generation",
       debit,
-      metadata: { endpoint: "/api/captions/generate", reason: "generation_failed", message: err.message },
+      amount: refundAmount,
+      metadata: { endpoint: "/api/captions/generate", reason: "generation_failed", message: err.message, chargeOnFailure },
     });
     const detail = err.body?.detail;
     const message = Array.isArray(detail)
       ? detail.map((d) => `${d.loc?.join(".")}: ${d.msg}`).join("; ")
       : (detail || err.message || "Caption generation failed");
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: message, creditsCharged: chargeOnFailure }, { status: 500 });
   }
 }

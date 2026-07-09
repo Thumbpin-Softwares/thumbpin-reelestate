@@ -1,5 +1,9 @@
-import { AbsoluteFill, Img, Sequence, OffthreadVideo, useVideoConfig } from "remotion";
-import { Audio } from "@remotion/media";
+// Background music uses the classic, stable `remotion` Audio (ffmpeg-based
+// extraction) rather than @remotion/media's — that package is explicitly
+// "Experimental WebCodecs-based media tags" and would silently drop the
+// music track on codec/format edge cases some stock MP3s hit, instead of
+// erroring, which is why it looked like music "sometimes" didn't apply.
+import { AbsoluteFill, Img, Sequence, OffthreadVideo, useVideoConfig, Audio } from "remotion";
 import { getOverlayFontCss, hexToRgba } from "./overlay-fonts";
 import { applyCutRanges, calcActionReelBaseDurationInFrames } from "./duration";
 
