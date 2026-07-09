@@ -92,7 +92,7 @@ export function Navbar() {
                         {item.title}
                         <ChevronDown className="w-3.5 h-3.5" />
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start" className="min-w-[360px] rounded-[28px] border border-[#c7f038]/30 bg-white/85 p-3 backdrop-blur-2xl shadow-[0_30px_80px_rgba(199,240,56,0.18)] before:absolute before:inset-0 before:rounded-[28px] before:bg-[radial-gradient(circle_at_top_right,rgba(199,240,56,0.18),transparent_45%)] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95">
+                      <DropdownMenuContent align="start" className="min-w-90 rounded-[28px] border border-[#c7f038]/30 bg-white/85 p-3 backdrop-blur-2xl shadow-[0_30px_80px_rgba(199,240,56,0.18)] before:absolute before:inset-0 before:rounded-[28px] before:bg-[radial-gradient(circle_at_top_right,rgba(199,240,56,0.18),transparent_45%)] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95">
                         {item.items.length === 0 ? (
                           <div className="px-2 py-1.5 text-xs text-muted-foreground">
                             Coming soon

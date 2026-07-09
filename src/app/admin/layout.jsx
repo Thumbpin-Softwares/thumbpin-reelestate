@@ -13,6 +13,7 @@ import {
   X,
   ChevronRight,
   LayoutGrid,
+  MessageCircle,
 } from "lucide-react";
 
 export default function AdminLayout({ children }) {
@@ -61,6 +62,7 @@ export default function AdminLayout({ children }) {
     { label: "Dashboard", href: "/admin", icon: LayoutDashboard },
     { label: "Manage Avatars", href: "/admin/avatars", icon: ImageIcon },
     { label: "Manage Users", href: "/admin/users", icon: Users },
+    { label: "Support", href: "/admin/support", icon: MessageCircle },
   ];
 
   return (
