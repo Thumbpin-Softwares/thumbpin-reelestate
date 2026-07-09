@@ -182,6 +182,7 @@ export function OverlaysPanel({
                   max={140}
                   value={selected.fontSize}
                   onChange={(e) => onUpdate(selected.id, { fontSize: Number(e.target.value) })}
+                  className="accent-[#c7f038]"
                 />
               </div>
 
@@ -230,6 +231,7 @@ export function OverlaysPanel({
                   max={100}
                   value={selected.bgOpacity || 0}
                   onChange={(e) => onUpdate(selected.id, { bgOpacity: Number(e.target.value) })}
+                  className="accent-[#c7f038]"
                 />
                 {(selected.bgOpacity || 0) > 0 && (
                   <div className="flex items-center gap-1.5 mt-1">
@@ -265,6 +267,7 @@ export function OverlaysPanel({
                 max={100}
                 value={selected.width}
                 onChange={(e) => onUpdate(selected.id, { width: Number(e.target.value) })}
+                className="accent-[#c7f038]"
               />
             </div>
           )}
