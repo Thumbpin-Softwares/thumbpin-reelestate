@@ -49,7 +49,7 @@ export default function DashboardPage() {
 
   const actions = [
     {
-      title: "Reel Generator",
+      title: "Real Estate Ad Generator",
       description:
         "Build stunning real estate reels that grab users' attention.",
       href: null,
@@ -96,7 +96,7 @@ export default function DashboardPage() {
               </div>
             );
 
-            if (action.title === "Reel Generator") {
+            if (action.title === "Real Estate Ad Generator") {
               return (
                 <button
                   key={action.title}

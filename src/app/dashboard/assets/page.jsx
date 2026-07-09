@@ -14,6 +14,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAssets } from "@/hooks/use-assets";
 import { toast } from "sonner";
+import { appNotify } from "@/modules/common/components/notification";
 import { CollectionCard } from "@/modules/common/components/collection-card";
 import { AvatarCollectionModal } from "@/modules/dashboard/components/avatar-collection-modal";
 import { AssetCard } from "@/modules/dashboard/components/asset-card";
@@ -240,16 +241,18 @@ export default function AssetLibraryPage() {
     }
   }
 
-  async function handleDelete(id) {
+  async function handleDelete(id, name) {
     setDeleting(id);
     const result = await deleteAsset(id);
 
     if (result.success) {
-      toast.success("Asset deleted");
+      appNotify.success(name || "Asset", {
+        description: "This asset was permanently deleted and cannot be recovered.",
+      });
       if (selectedAsset?.id === id) setSelectedAsset(null);
       if (previewAsset?.id === id) setPreviewAsset(null);
     } else {
-      toast.error("Delete failed", { description: result.error });
+      appNotify.error("Delete failed", { description: result.error });
     }
     setDeleting(null);
   }
@@ -274,9 +277,11 @@ export default function AssetLibraryPage() {
     const result = await bulkDeleteAssets(ids);
 
     if (result.success) {
-      toast.success(`${ids.length} asset${ids.length !== 1 ? "s" : ""} deleted`);
+      appNotify.success(`${ids.length} asset${ids.length !== 1 ? "s" : ""} deleted`, {
+        description: "These assets were permanently deleted and cannot be recovered.",
+      });
     } else {
-      toast.error("Delete failed", { description: result.error });
+      appNotify.error("Delete failed", { description: result.error });
     }
 
     setBulkDeleting(false);
@@ -410,7 +415,7 @@ export default function AssetLibraryPage() {
                       images={collection.images}
                       editable={asset.is_custom}
                       onRename={(newName) => renameAsset(asset.id, newName)}
-                      onDelete={() => handleDelete(asset.id)}
+                      onDelete={() => handleDelete(asset.id, asset.name)}
                       deleting={deleting === asset.id}
                       onView={() => {
                         setPreviewImageLoading(true);
@@ -553,7 +558,7 @@ export default function AssetLibraryPage() {
                           deleting={deleting === asset.id}
                           onSelect={() => setSelectedAsset(asset)}
                           onPreview={() => setPreviewAsset(asset)}
-                          onDelete={() => handleDelete(asset.id)}
+                          onDelete={() => handleDelete(asset.id, asset.name)}
                           selectMode={selectMode}
                           selected={selectedIds.has(asset.id)}
                           onToggleSelect={() => toggleSelected(asset.id)}
@@ -574,7 +579,7 @@ export default function AssetLibraryPage() {
                         images={collection.images}
                         editable
                         onRename={(newName) => renameAsset(asset.id, newName)}
-                        onDelete={() => handleDelete(asset.id)}
+                        onDelete={() => handleDelete(asset.id, asset.name)}
                         deleting={deleting === asset.id}
                         onView={() => {
                           setPreviewImageLoading(true);
@@ -606,7 +611,7 @@ export default function AssetLibraryPage() {
                     deleting={deleting === asset.id}
                     onSelect={() => setSelectedAsset(asset)}
                     onPreview={() => setPreviewAsset(asset)}
-                    onDelete={() => handleDelete(asset.id)}
+                    onDelete={() => handleDelete(asset.id, asset.name)}
                     selectMode={selectMode}
                     selected={selectedIds.has(asset.id)}
                     onToggleSelect={() => toggleSelected(asset.id)}
@@ -857,17 +862,17 @@ export default function AssetLibraryPage() {
 
       {/* Bulk delete confirmation */}
       <Dialog open={bulkDeleteConfirmOpen} onOpenChange={(open) => !bulkDeleting && setBulkDeleteConfirmOpen(open)}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-sm rounded-3xl border border-[#c7f038]/20 bg-white backdrop-blur-2xl shadow-[0_20px_60px_rgba(199,240,56,0.18)]">
           <DialogHeader>
-            <DialogTitle>Delete {selectedIds.size} asset{selectedIds.size !== 1 ? "s" : ""}?</DialogTitle>
+            <DialogTitle className="text-xl font-semibold tracking-tight">Delete {selectedIds.size} asset{selectedIds.size !== 1 ? "s" : ""}?</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm leading-relaxed text-neutral-600">
             This will permanently delete the selected asset{selectedIds.size !== 1 ? "s" : ""}. This action can&apos;t be undone.
           </p>
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex justify-end gap-3 pt-4">
             <Button
               variant="outline"
-              className="cursor-pointer"
+              className="cursor-pointer rounded-xl bg-red-500 text-white hover:bg-red-600 hover:text-white"
               disabled={bulkDeleting}
               onClick={() => setBulkDeleteConfirmOpen(false)}
             >
@@ -875,18 +880,16 @@ export default function AssetLibraryPage() {
             </Button>
             <Button
               variant="destructive"
-              className="cursor-pointer"
+              className="cursor-pointer gap-2 rounded-xl bg-[#c7f038] text-black hover:bg-[#b7df33]"
               disabled={bulkDeleting}
               onClick={handleBulkDelete}
             >
               {bulkDeleting ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Deleting...
                 </>
               ) : (
                 <>
-                  <Trash2 className="w-4 h-4 mr-2" />
                   Delete
                 </>
               )}
