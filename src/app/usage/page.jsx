@@ -1,4 +1,5 @@
 import Hero from "@/modules/usage/layout/hero";
+import Carousal from "@/modules/common/components/carousal";
 
 export default function UsagePage() {
   return (
@@ -6,6 +7,7 @@ export default function UsagePage() {
       <div className="max-w-5xl mx-auto">
         <Hero />
       </div>
+      <Carousal />
     </main>
   );
 }

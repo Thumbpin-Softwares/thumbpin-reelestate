@@ -1,17 +1,19 @@
 import TrustMarker from "../../components/trust-marker";
 import Image from "next/image";
 import { VideoIcon, Scissors, Music, Captions } from "lucide-react";
+import Link from "next/link";
 
 export default function Hero(){
     return(
         <main className="flex items-center justify-between">
-            <div className="flex flex-col gap-4 w-lg">
+            <div className="flex flex-col gap-4 w-md">
                 <TrustMarker />
                 <h1 className="text-6xl font-semibold tracking-tight">Real Estate Video Ad maker</h1>
-                <span className="text-neutral-600 text-sm">Create beautiful real estate ads with just a few clicks that are perfect for you</span>
+                <span className="text-neutral-600">Create beautiful real estate ads with just a few clicks that are perfect for you</span>
 
-                <div>
-                    
+                <div className="py-4">
+                    <Link href="/dashboard" className="bg-[#c7f038] text-xl font-semibold tracking-tight px-6 py-4 rounded-full">Get Started</Link>
+                    <Link href="/" className="bg-white text-xl font-semibold tracking-tight px-6 py-4 rounded-full">Learn More</Link>
                 </div>
             </div>
             <div className="flex items-center justify-center gap-4">
