@@ -3,6 +3,7 @@ import Carousal from "@/modules/common/components/carousal";
 import About from "@/modules/usage/components/about";
 import Guide from "@/modules/usage/layout/guide";
 import Feature from "@/modules/usage/layout/feature";
+import Faq from "@/modules/usage/layout/faq";
 
 export default function UsagePage() {
   return (
@@ -18,6 +19,7 @@ export default function UsagePage() {
       <div className="py-12 max-w-5xl mx-auto">
         <Feature />
       </div>
+      <Faq />
     </main>
   );
 }

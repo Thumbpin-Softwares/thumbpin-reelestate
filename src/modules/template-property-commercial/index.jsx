@@ -26,25 +26,34 @@ export default function PropertyCommercialRunner({ template }) {
   const [generatingScript, setGeneratingScript] = useState(false);
   const [storyboard, setStoryboard] = useState(null);
   const [renderedFrames, setRenderedFrames] = useState(null);
+  const [avatarGender, setAvatarGender] = useState(null);
   const avatarHook = useAvatars();
 
   // Only count photos once their R2 upload has actually finished — those
   // public URLs are what the script generator reads to ground its
   // image_prompts in the real property, so Continue shouldn't be reachable
-  // while any are still uploading (or failed).
+  // while any are still uploading (or failed). Asset-anchored architecture
+  // also requires a gender pick before moving on — Veo's native dialogue
+  // needs it and nothing downstream is allowed to guess it.
   const uploadedImages = images.filter((img) => img.r2Url);
-  const isValid = images.length >= 1 && uploadedImages.length === images.length && avatarHook.selectedAvatars.length >= 1;
+  const isValid =
+    images.length >= 1 &&
+    uploadedImages.length === images.length &&
+    avatarHook.selectedAvatars.length >= 1 &&
+    !!avatarGender;
 
   // Derived at render time, not synced into state via an effect — always
   // reflects whatever's finished uploading so far, no cascading setState.
   const scriptValuesWithImages = {
     ...scriptValues,
     propertyImages: uploadedImages.map((img) => img.r2Url),
+    avatarImage: avatarHook.selectedAvatars[0]?.url,
   };
 
   const handleClear = () => {
     setImages([]);
     avatarHook.clearSelectedAvatars();
+    setAvatarGender(null);
   };
 
   // Extra lock on top of the disabled button — a rapid double-click can
@@ -98,13 +107,15 @@ export default function PropertyCommercialRunner({ template }) {
               onNext={() => setStep(1)}
               onClear={handleClear}
               prebuiltLabel="RE Agents"
+              avatarGender={avatarGender}
+              setAvatarGender={setAvatarGender}
             />
           )}
 
           {step === 1 && (
             <StepScript
               values={scriptValuesWithImages}
-              onChange={({ propertyImages, ...rest }) => setScriptValues(rest)}
+              onChange={({ propertyImages, avatarImage, ...rest }) => setScriptValues(rest)}
               onBack={() => setStep(0)}
               onNext={handleGenerateScript}
               loading={generatingScript}
@@ -131,6 +142,7 @@ export default function PropertyCommercialRunner({ template }) {
             <StepGeneration
               template={template}
               renderedFrames={renderedFrames}
+              gender={avatarGender}
               onAbort={() => setStep(2)}
             />
           )}

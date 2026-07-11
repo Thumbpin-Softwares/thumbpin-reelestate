@@ -5,13 +5,17 @@ import { getResolvedUserId } from "@/lib/user-resolver";
 import { getTemplateBySlug } from "@/lib/templates";
 import { runVideoAdPipeline } from "@/lib/template-generators/run-pipeline";
 
-// One route for every template's Phase 4/4.1/4.2/5 — the in-scene-presenter
-// pipeline: animate each frame (Veo), synthesize its narration (ElevenLabs
-// Turbo), lip-sync the two together (sync-lipsync), then merge every frame
-// into one master MP4. `frames` here already carry `imageUrl` from the
-// earlier Phase 3 call StepFinalize makes, so runVideoAdPipeline's Phase 3
-// step is a no-op for this route (no duplicate image billing). Subject to
-// TEST_MODE_LIMIT in run-pipeline.js while lip-sync quality is being tuned.
+// One route for every template's Phase 4/5 — the in-scene-presenter,
+// asset-anchored pipeline: animate each frame with Veo 3.1 using THAT
+// frame's own avatar_url as the starting image (native synchronized
+// dialogue/audio generated directly from the prompt — no separate TTS or
+// lip-sync-merge call needed), then merge every frame into one master MP4.
+// `frames` here already carry `imageUrl`/`avatar_url`/`reference_image_url`
+// from the earlier Phase 3 call StepFinalize makes, so runVideoAdPipeline's
+// Phase 3 step is a no-op for this route (no duplicate image billing).
+// `gender` is a UI-provided flag (picked in Add Assets), never guessed
+// server-side. Subject to TEST_MODE_LIMIT in run-pipeline.js while
+// presenter/dialogue quality is being tuned.
 export async function POST(request, { params }) {
   const { slug } = await params;
 
@@ -37,11 +41,16 @@ export async function POST(request, { params }) {
     return NextResponse.json({ error: "frames must be a non-empty array" }, { status: 400 });
   }
 
+  const gender = body.gender;
+  if (!gender) {
+    return NextResponse.json({ error: "gender is required" }, { status: 400 });
+  }
+
   try {
     const userId = await getResolvedUserId(request);
     const { clips, finalVideoUrl } = await runVideoAdPipeline(frames, {
       userId: userId || "template",
-      voiceId: body.voiceId,
+      gender,
     });
     return NextResponse.json({ success: true, clips, finalVideoUrl });
   } catch (err) {
