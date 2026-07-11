@@ -1,113 +1,67 @@
-import { RectangleGoggles } from "lucide-react";
+import LargeText from "../../components/large-text";
+import { FaXTwitter, FaYoutube, FaInstagram } from "react-icons/fa6";
 import Link from "next/link";
-
-const fields = [
-  {
-    title: "Product",
-    headings: ["Features", "Pricing"],
-    links: ["/", "/pricing"],
-  },
-  {
-    title: "Company",
-    headings: ["About", "Blog", "Careers"],
-    links: ["/", "/", "/"],
-  },
-  {
-    title: "Resources",
-    headings: ["Documentation", "Support", "Contact"],
-    links: ["/", "/", "/"],
-  },
-];
-
-const tags = [
-  "Best Ads for real estate",
-  "AI Ads Generator",
-  "Video Ads",
-  "AI Ad Maker",
-  "Facebook Ads",
-  "Instagram Ads",
-  "Copyright Free Images",
-  "AI Videos",
-];
+import { RectangleGoggles } from "lucide-react";
 
 export default function Footer() {
   return (
-    <footer className="bg-neutral-200 text-neutral-800">
-      {/* Top Section */}
-      <div className="max-w-7xl mx-auto px-6 md:px-12 lg:px-24 py-8 flex flex-col lg:flex-row gap-12 lg:gap-0 items-start lg:items-center justify-between">
-        <div className="flex flex-col gap-4">
-          <div className="flex gap-2 items-center">
-            <div className="bg-black flex items-center justify-center p-2 rounded-full">
-              <RectangleGoggles
-                className="w-8 h-8"
-                fill="#c7f038"
-                stroke="none"
-              />
-            </div>
-
-            <span className="text-xl">Thumbplay.ai</span>
+    <main className="w-full rounded-t-[80px] p-6 bg-neutral-700">
+      <div className="flex items-start justify-between pt-12 px-12">
+        <div className="flex h-72 flex-col items-start justify-between">
+          <div className="flex gap-2">
+            <Link href="" className="p-2 border border-white rounded-full">
+              <FaXTwitter className="text-white text-lg" />
+            </Link>
+            <Link href="" className="p-2 border border-white rounded-full">
+              <FaYoutube className="text-white text-lg" />
+            </Link>
+            <Link href="" className="p-2 border border-white rounded-full">
+              <FaInstagram className="text-white text-lg" />
+            </Link>
           </div>
 
-          <p className="text-sm max-w-sm text-neutral-800">
-            AI-powered UGC video ad generator, built for Indian creators &
-            brands.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-8 sm:gap-12">
-          {fields.map((item, index) => (
-            <div key={index}>
-              <h3 className="font-medium">{item.title}</h3>
-
-              <ul className="mt-4 space-y-2">
-                {item.headings.map((subitem, subindex) => (
-                  <li key={subindex}>
-                    <Link
-                      href={item.links[subindex]}
-                      className="text-neutral-500 hover:text-black transition-colors"
-                    >
-                      {subitem}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+          <div className="flex flex-col gap-4 items-center justify-center">
+            <div className="flex gap-4 items-center justify-center">
+              <div className="p-4 bg-black rounded-full">
+                <RectangleGoggles size={32} fill="#c7f038" />
+              </div>
+              <span className="text-neutral-400 w-42 text-xs">
+                The easy way to create stunning real estate video Ad, add
+                subtitles and grow your audience.
+              </span>
             </div>
-          ))}
+            <span className="text-neutral-400 text-sm tracking-tight">
+              @Copyright 2026 Thumbplay.ai
+            </span>
+          </div>
+        </div>
+
+        <div className="flex flex-col items-start gap-2">
+          <h1 className="text-lg font-semibold text-white">Video Generator</h1>
+          <Link href="" className="text-neutral-400 text-sm">Frustrated Anchor</Link>
+          <Link href="" className="text-neutral-400 text-sm">Model Exiting Luxury Vehicle</Link>
+          <Link href="" className="text-neutral-400 text-sm">Action Packed Property Reveal</Link>
+        </div>
+
+        <div className="flex flex-col items-start gap-2">
+          <h1 className="text-lg font-semibold text-white">Product</h1>
+          <Link href="" className="text-neutral-400 text-sm">Pricing</Link>
+          <Link href="" className="text-neutral-400 text-sm">Usage</Link>
+          <Link href="" className="text-neutral-400 text-sm">Ad Generator</Link>
+          <Link href="" className="text-neutral-400 text-sm">Ad Editor</Link>
+        </div>
+
+        <div className="flex flex-col items-start gap-2">
+          <h1 className="text-lg font-semibold text-white">Resources</h1>
+          <Link href="" className="text-neutral-400 text-sm">Blog</Link>
+          <Link href="" className="text-neutral-400 text-sm">Video Guides</Link>
+          <Link href="" className="text-neutral-400 text-sm">Live</Link>
+          <Link href="" className="text-neutral-400 text-sm">Documentation</Link>
         </div>
       </div>
-
-      {/* Tags */}
-      <div className="border-y border-neutral-700">
-        <div className="max-w-7xl mx-auto px-6 md:px-12 lg:px-24 py-4">
-          <ul className="flex flex-wrap justify-center gap-x-4 gap-y-2">
-            {tags.map((item, index) => (
-              <li
-                key={index}
-                className="text-neutral-500 text-sm"
-              >
-                {item}
-              </li>
-            ))}
-          </ul>
-        </div>
+      <div className="flex justify-center items-center">
+        <LargeText />
       </div>
-
-      {/* Bottom */}
-      <div className="max-w-7xl mx-auto px-6 md:px-12 lg:px-24 py-4 flex flex-col sm:flex-row gap-4 sm:gap-0 items-center justify-between">
-        <span className="text-neutral-500 text-sm text-center sm:text-left">
-          © 2026 Thumbplay.ai. All rights reserved.
-        </span>
-
-        <ul className="flex flex-wrap justify-center gap-4 text-neutral-500 text-sm">
-          <li>
-            <Link href="/" className="hover:text-black transition-colors">Privacy Policy</Link>
-          </li>
-
-          <li>
-            <Link href="/" className="hover:text-black transition-colors">Terms & Conditions</Link>
-          </li>
-        </ul>
-      </div>
-    </footer>
+    </main>
   );
 }
