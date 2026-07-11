@@ -4,6 +4,9 @@ import About from "@/modules/usage/components/about";
 import Guide from "@/modules/usage/layout/guide";
 import Feature from "@/modules/usage/layout/feature";
 import Faq from "@/modules/usage/layout/faq";
+import Testimonial from "@/modules/common/layout/testimonial";
+import Cta from "@/modules/usage/layout/cta";
+import PostCta from "@/modules/usage/layout/post-cta";
 
 export default function UsagePage() {
   return (
@@ -20,6 +23,13 @@ export default function UsagePage() {
         <Feature />
       </div>
       <Faq />
+      <div className="py-24">
+        <Testimonial />
+      </div>
+      <Cta />
+      <div className="pt-12">
+        <PostCta />
+      </div>
     </main>
   );
 }
