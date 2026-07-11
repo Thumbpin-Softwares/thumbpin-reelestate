@@ -35,7 +35,7 @@ export default function Collapsible({ question, answer }) {
   };
 
   return (
-    <main className="bg-neutral-100 max-w-4xl ring-2 ring-neutral-200 drop-shadow-sm p-4 rounded-xl">
+    <main className="bg-neutral-100 max-w-4xl w-4xl ring-2 ring-neutral-200 drop-shadow-sm p-4 rounded-xl">
       <button type="button" onClick={toggle} className="w-full flex items-center justify-between text-left">
         <span className="text-xl font-semibold tracking-tight">{question}</span>
         <div ref={iconRef} className="p-2 bg-black rounded-full">
