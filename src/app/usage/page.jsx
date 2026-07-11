@@ -15,7 +15,7 @@ export default function UsagePage() {
         <About />
       </div>
       <Guide />
-      <div className="py-12">
+      <div className="py-12 max-w-5xl mx-auto">
         <Feature />
       </div>
     </main>
