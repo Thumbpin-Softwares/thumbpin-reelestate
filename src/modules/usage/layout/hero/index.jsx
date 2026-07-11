@@ -13,7 +13,7 @@ export default function Hero(){
 
                 <div className="py-4">
                     <Link href="/dashboard" className="bg-[#c7f038] text-xl font-semibold tracking-tight px-6 py-4 rounded-full">Get Started</Link>
-                    <Link href="/" className="bg-white text-xl font-semibold tracking-tight px-6 py-4 rounded-full">Learn More</Link>
+                    <Link href="/resources" className="bg-white text-xl font-semibold tracking-tight px-6 py-4 rounded-full">Learn More</Link>
                 </div>
             </div>
             <div className="flex items-center justify-center gap-4">
