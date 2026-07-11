@@ -13,6 +13,12 @@ import { ModelSelector } from "@/modules/template/components/ModelSelector";
 // prebuilt-avatar label, its own upload endpoint); the layout, validation
 // wiring, and clear-confirm flow are identical everywhere, so adding
 // template #51 means composing this, not rebuilding it.
+//
+// Asset-anchored architecture: the backend never guesses the presenter's
+// gender (no vision classification, no hardcoding) — the user picks it
+// right here, once, when they choose their avatar. `avatarGender`/
+// `setAvatarGender` are optional so templates that don't need Veo's native
+// dialogue (and therefore don't need a gender flag at all) can omit them.
 export function AddAssetsStep({
   images,
   setImages,
@@ -25,6 +31,8 @@ export function AddAssetsStep({
   prebuiltLabel,
   uploadEndpoint,
   continueLabel = "Continue to Script",
+  avatarGender,
+  setAvatarGender,
 }) {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
@@ -32,7 +40,28 @@ export function AddAssetsStep({
     <div className="space-y-4 animate-fade-in">
       <div className="grid md:grid-cols-2 gap-6">
         <PropertyImages images={images} setImages={setImages} max={max} helpHref={helpHref} />
-        <ModelSelector avatarHook={avatarHook} prebuiltLabel={prebuiltLabel} uploadEndpoint={uploadEndpoint} />
+        <div className="space-y-3">
+          <ModelSelector avatarHook={avatarHook} prebuiltLabel={prebuiltLabel} uploadEndpoint={uploadEndpoint} />
+          {setAvatarGender && avatarHook.selectedAvatars.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Presenter gender:</span>
+              {["Male", "Female"].map((g) => (
+                <button
+                  key={g}
+                  type="button"
+                  onClick={() => setAvatarGender(g)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    avatarGender === g
+                      ? "bg-primary text-white shadow"
+                      : "border border-border/50 text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {g}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center justify-between pt-2">

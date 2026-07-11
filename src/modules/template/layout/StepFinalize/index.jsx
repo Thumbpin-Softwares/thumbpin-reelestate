@@ -69,17 +69,29 @@ export function StepFinalize({ template, storyboard, images = [], selectedAvatar
   // other double-mount) can both pass a state-only guard before either
   // commits. This ref is what actually stops the second fetch from firing —
   // this project's real fal.ai cost leak on this exact effect shape.
+  //
+  // Because this ref guarantees the fetch below only ever fires once, ever,
+  // there is no second/newer request that could make this one "stale" — so
+  // its result must always be applied when it resolves. (A previous version
+  // of this effect also tracked a `cancelled` flag via the cleanup function,
+  // a pattern meant to discard a superseded request's result — but combined
+  // with this ref, it instead discarded the ONLY request's result during
+  // Strict Mode's dev-only mount→cleanup→mount cycle: the cleanup marked
+  // the one real fetch "cancelled" before it resolved, so a successful
+  // response never reached setRenderedFrames. Removed for that reason.)
   const startedRef = useRef(false);
 
   useEffect(() => {
     if (!storyboard?.length || startedRef.current) return;
     startedRef.current = true;
 
-    let cancelled = false;
     (async () => {
       setGeneratingImages(true);
       setImagesError(null);
       try {
+        // Asset-anchored: each `storyboard` frame already carries its own
+        // avatar_url/reference_image_url (assigned once, when the script
+        // was generated) — nothing extra to send here.
         const res = await fetch(`/api/template/generate-images/${template.slug}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -87,20 +99,17 @@ export function StepFinalize({ template, storyboard, images = [], selectedAvatar
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Image generation failed");
-        if (!cancelled) setRenderedFrames(data.frames);
+        setRenderedFrames(data.frames);
       } catch (err) {
-        if (!cancelled) {
-          setImagesError(err.message);
-          toast.error("Storyboard image generation failed", { description: err.message });
-        }
+        setImagesError(err.message);
+        toast.error("Storyboard image generation failed", { description: err.message });
       } finally {
-        if (!cancelled) setGeneratingImages(false);
+        setGeneratingImages(false);
       }
     })();
-
-    return () => {
-      cancelled = true;
-    };
+    // Intentionally mount-only (startedRef enforces that) — images/selectedAvatars
+    // are read once at that point, not tracked as reactive deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storyboard, template.slug]);
 
   const propertyPhotos = images.filter((img) => img.r2Url || img.url);

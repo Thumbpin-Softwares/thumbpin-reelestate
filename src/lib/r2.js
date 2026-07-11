@@ -49,3 +49,21 @@ export async function getAssetUrl(key, expiresIn = 3600, { contentDisposition } 
   });
   return awsGetSignedUrl(s3, command, { expiresIn });
 }
+
+/**
+ * Frontend hooks (e.g. useAvatars) hand back relative `/api/r2?key=...` proxy
+ * URLs so <img> tags can load them same-origin — but that relative path is
+ * meaningless to a third-party API (fal.ai etc.) fetching it server-side.
+ * Same fix already applied ad-hoc in luxury-car-exit/action-reel/news-anchor/
+ * comedy-reel/home-tour's generate-pipeline routes; centralized here so the
+ * template pipeline (and any future one) doesn't have to repeat it.
+ */
+export function resolveR2Url(url) {
+  if (!url || typeof url !== "string") return url;
+  if (url.startsWith("http")) return url;
+  if (url.includes("/api/r2?key=") && R2_PUBLIC_URL) {
+    const key = decodeURIComponent(url.split("?key=")[1] || "");
+    if (key) return `${R2_PUBLIC_URL}/${key}`;
+  }
+  return url;
+}

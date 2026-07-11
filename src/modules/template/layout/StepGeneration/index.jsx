@@ -13,7 +13,7 @@ import { GenerationProgressShell } from "@/modules/common/components/generation-
 // GenerationProgress renders through (GenerationProgressShell), so this
 // screen matches luxury-car-exit / product-to-video / etc. instead of
 // inventing a new one.
-export function StepGeneration({ template, renderedFrames, onAbort, onDone }) {
+export function StepGeneration({ template, renderedFrames, gender, onAbort, onDone }) {
   const [phase, setPhase] = useState("loading"); // "loading" | "error" | "done"
   const [error, setError] = useState(null);
   const [finalVideoUrl, setFinalVideoUrl] = useState(null);
@@ -42,7 +42,7 @@ export function StepGeneration({ template, renderedFrames, onAbort, onDone }) {
       const res = await fetch(`/api/template/generate-videos/${template.slug}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ frames: renderedFrames }),
+        body: JSON.stringify({ frames: renderedFrames, gender }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Video generation failed");
@@ -56,7 +56,7 @@ export function StepGeneration({ template, renderedFrames, onAbort, onDone }) {
     } finally {
       inFlightRef.current = false;
     }
-  }, [template.slug, renderedFrames, onDone]);
+  }, [template.slug, renderedFrames, gender, onDone]);
 
   useEffect(() => {
     if (hasStartedGeneration.current) return; // blocks a Strict-Mode double-mount from ever calling fetch twice

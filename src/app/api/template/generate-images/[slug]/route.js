@@ -11,6 +11,11 @@ import { generateFrameImages } from "@/lib/template-generators/generate-images";
 // generate-script there's no per-slug generator registry here — just the
 // shared worker. If a template ever needs a different image pipeline, this
 // is where that per-slug branching would get added.
+//
+// Asset-anchored architecture: each frame in `frames` already carries its
+// own `avatar_url`/`reference_image_url` (assigned by generic.js's
+// generateScript, resolved to absolute R2 URLs there) — nothing to pass in
+// separately here.
 export async function POST(request, { params }) {
   const { slug } = await params;
 

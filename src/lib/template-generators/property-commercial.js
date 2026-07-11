@@ -6,5 +6,5 @@ import { generateScript as generateGenericScript } from "./generic";
 // freely later (e.g. swap to a commercial-listing-specific prompt) without
 // touching any other template.
 export async function generateScript({ template, values }) {
-  return generateGenericScript({ template, values });
+  return generateGenericScript({ template, values, avatarImage: values.avatarImage });
 }

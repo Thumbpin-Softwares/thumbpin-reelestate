@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import gsap from "gsap";
+import Link from "next/link";
 
 export default function Feature() {
   const [volumeLevel, setVolumeLevel] = useState(12);
@@ -339,6 +340,10 @@ export default function Feature() {
             instantly recognizable across every platform.
           </p>
         </div>
+      </div>
+
+      <div className="flex items-center justify-center w-full">
+        <Link className="bg-[#c7f038] drop-shadow-lg hover:scale-105 duration-300 p-6 text-xl font-semibold tracking-tight rounded-full" href="/dashboard">Let{"\'"}s Get Started</Link>
       </div>
     </main>
   );

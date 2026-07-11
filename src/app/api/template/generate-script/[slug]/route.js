@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-config";
 import { getTemplateBySlug } from "@/lib/templates";
+import { resolveR2Url } from "@/lib/r2";
 import { getScriptGenerator } from "@/lib/template-generators";
 
 // One route for every template's script generation. The slug picks which
@@ -29,8 +30,19 @@ export async function POST(request, { params }) {
   }
 
   try {
+    const values = body.values || {};
+    // Resolve relative /api/r2?key=... proxy URLs (fine for <img> tags,
+    // meaningless to a third-party model fetching server-side) to absolute
+    // URLs BEFORE they get baked into the storyboard's per-frame
+    // avatar_url/reference_image_url — every downstream phase trusts those
+    // fields as already-correct, asset-anchored references.
+    const resolvedValues = {
+      ...values,
+      avatarImage: resolveR2Url(values.avatarImage),
+      propertyImages: (values.propertyImages || []).map(resolveR2Url),
+    };
     const generateScript = await getScriptGenerator(slug);
-    const result = await generateScript({ template, values: body.values || {}, session });
+    const result = await generateScript({ template, values: resolvedValues, session });
     return NextResponse.json({ success: true, ...result });
   } catch (err) {
     console.error(`[api/template/generate-script/${slug}] failed:`, err);

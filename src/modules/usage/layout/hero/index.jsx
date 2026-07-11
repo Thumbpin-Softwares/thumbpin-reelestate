@@ -12,7 +12,7 @@ export default function Hero(){
                 <span className="text-neutral-600">Create beautiful real estate ads with just a few clicks that are perfect for you</span>
 
                 <div className="py-4">
-                    <Link href="/dashboard" className="bg-[#c7f038] text-xl font-semibold tracking-tight px-6 py-4 rounded-full">Get Started</Link>
+                    <Link href="/dashboard" className="bg-[#c7f038] text-xl font-semibold tracking-tight px-6 py-4 hover:scale-110 drop-shadow-md duration-300 rounded-full">Get Started</Link>
                     <Link href="/resources" className="bg-white text-xl font-semibold tracking-tight px-6 py-4 rounded-full">Learn More</Link>
                 </div>
             </div>
