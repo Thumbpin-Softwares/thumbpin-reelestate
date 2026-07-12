@@ -21,19 +21,26 @@ if (process.env.FAL_KEY) {
 }
 
 /**
- * POST /api/comedy-reel/generate-pipeline
+ * POST /api/seedance-reel/generate-pipeline
  *
- * Sibling of /api/action-reel/generate-pipeline — identical 2-part pipeline
- * shape (hook clip + highlights/CTA clip, both Seedance-baked-audio, hard cut
- * via the shared "ActionReel" Remotion composition), reusing the same
- * SeedanceJob model and action_reel_video credit action. Only the two MASTER
- * TEMPLATES differ: "Nosy Padosi" cultural-comedy theme (peeking from behind a
- * door, whispering, privacy gag) instead of the helicopter/action theme.
+ * 2-part luxury "Car Exit" real estate reel — same architecture as
+ * action-reel/comedy-reel (fixed ~30s, 2 master-template-driven Seedance
+ * clips, hard cut, no separate broll/crossfade layer), reusing the shared
+ * "ActionReel" Remotion composition:
+ *   Part 1 (~15s): Car-exit intro — presenter steps out of a luxury car,
+ *                  hard cuts to 2 property shots, back to presenter finishing
+ *                  the hook. Seedance-baked lip-synced dialogue.
+ *   Part 2 (~15s): Highlights + CTA — 4 quick property beats, hard cut to
+ *                  presenter delivering the CTA with a keys toss.
  *
- * One wrinkle unique to this theme: Part 1's template has a parenthetical
- * stage-direction quote ("shhh" gesture) that is NOT spoken dialogue — the
- * reproduce-prompt instructions explicitly call that out so the LLM doesn't
- * overwrite it with spoken lines.
+ * Both Seedance prompts are produced by asking the LLM to REPRODUCE one of
+ * the two MASTER TEMPLATES below exactly (see action-reel's route for the
+ * full rationale) — only the quoted dialogue changes.
+ *
+ * Kept from the previous 3-part version: the "real_estate_video" credit
+ * action, adjustable per-request voiceSettings (stability/style/etc — unlike
+ * action-reel/comedy-reel's fixed per-voice defaults), and the "quality"
+ * (Seedance resolution) choice from StepFinalize.
  */
 
 async function callLLM(prompt) {
@@ -49,7 +56,7 @@ async function callLLM(prompt) {
     throw new Error("openrouter/router returned empty output");
   } catch (err) {
     console.warn(
-      "[ComedyReel] openrouter/router call failed, falling back to fal-ai/any-llm:",
+      "[SeedanceReel] openrouter/router call failed, falling back to fal-ai/any-llm:",
       err.message,
     );
     const fallback = await fal.subscribe("fal-ai/any-llm", {
@@ -57,13 +64,6 @@ async function callLLM(prompt) {
     });
     return (fallback?.data?.output ?? fallback?.output ?? "").toString().trim();
   }
-}
-
-const DEFAULT_VOICE_SETTINGS = { stability: 0.5, similarity_boost: 0.75, style: 0.3, speed: 0.6 };
-
-function resolutionForQuality(quality) {
-  // Always cap at 720p — pass through silently regardless of what the user picks
-  return "720p";
 }
 
 async function generateAndUploadTTS(text, voiceId, userId, keyPrefix, language) {
@@ -92,39 +92,37 @@ async function callSeedanceAndUpload(seedanceInput, userId, keyName, signal) {
 }
 
 // ── Fixed master templates — reproduced as-is except for the quoted dialogue ─
-const MASTER_TEMPLATE_A = `A hyper-realistic, vertical (9:16) UGC-style comedy real estate vlog. Natural lighting.
+const MASTER_TEMPLATE_A = `A hyper-realistic, vertical (9:16) UGC-style luxury real estate vlog. Natural, dynamic lighting. It looks like a high-budget smartphone video. All spoken dialogue is delivered in a natural, conversational Hindi accent — casual everyday rhythm and pacing, like a real person talking to a friend, not overly enunciated or textbook-perfect.
 
-[0:00 - 0:06] The video opens with the female agent, Anvi (using #image7 and #image5), peeking out suspiciously from behind a wooden door, looking left and right as if she is hiding from someone. She holds the camera selfie-style close to her face and whispers dramatically: "Kya aap bhi apne padosiyon ki taak-jhaak se pareshan hain?" Then she steps out confidently, her tone changing to a loud, energetic pitch: "Tension mat lijiye! Main hoon Anvi..."
+[0:00 - 0:05] The video opens with a sleek luxury car pulling up to a stop. The female agent, Anvi (using #image7 for her facial features and #image5 for her black outfit), steps out of the car with effortless elegance and begins walking confidently toward the camera. She holds the camera selfie-style and looks directly into the lens with warm, inviting energy and says: "Kya aapne kabhi socha hai ki aapka agla ghar bilkul filmy ho sakta hai? Hello, main hoon Anvi..."
 
-[0:06 - 0:09] Hard cut. A fast drone-style push-in shot of the luxury villa exterior, matching #image1.
+[0:05 - 0:08] Hard cut. The camera suddenly snaps to a sweeping establishing shot of a massive modern luxury villa exterior, matching exactly with #image1.
 
-[0:09 - 0:12] Hard cut. A slow pan across the stunning, high-ceiling luxury loft space, matching #image3.
+[0:08 - 0:11] Hard cut. A smooth, elegant panning shot of a striking interior space with premium finishes, exactly matching #image2.
 
-[0:12 - 0:15] Hard cut. Back to Anvi (#image7 and #image5). She winks at the camera selfie-style and finishes: "...aur aaj main aapko dikhaungi ek aisi private luxury property, jahan koi disturbance nahi!" (She smiles and puts a finger to her lips in a "shhh" gesture for the last 2 seconds).`;
+[0:11 - 0:15] Hard cut. Back to the agent Anvi (#image7 and #image5), now standing at the villa's entrance with the luxury car still visible behind her. She smiles confidently, holding the camera selfie-style, and finishes her sentence: "...aapki real estate expert, aur aaj main aapko dikhane waali hoon aapka naya dream home!" She stops speaking at exactly 13 seconds and spends the final 2 seconds simply holding a bright, confident smile at the camera, ending the video naturally.`;
 
-const MASTER_TEMPLATE_B = `A hyper-realistic, vertical (9:16) UGC-style comedy real estate vlog. Natural interior lighting, dynamic fast-paced editing.
+const MASTER_TEMPLATE_B = `A hyper-realistic, vertical (9:16) UGC-style high-energy luxury real estate vlog. Dynamic, fast-paced cinematic editing. Natural interior lighting. All spoken dialogue is delivered in a natural, conversational Hindi accent — casual everyday rhythm and pacing, like a real person talking to a friend, not overly enunciated or textbook-perfect.
 
-[0:00 - 0:03] The video opens with a fast, FPV drone-style sweeping shot moving towards the gated entrance of the luxury villa, matching exactly with #image1. The voiceover starts: "Yahaan koi padosi nahi jo aapki zindagi mein jhanke..."
+[0:00 - 0:03] The video opens with a fast, sweeping shot moving towards the modern luxury villa exterior, matching exactly with #image1. The voiceover starts: "Zara sochiye... itna khoobsurat ghar..."
 
-[0:03 - 0:06] Hard cut. A smooth, gliding tracking shot through the warm-toned living and dining area, matching #image4. The voiceover continues: "...sirf aapki privacy, aapka sukoon..."
+[0:03 - 0:06] Hard cut. A rapid, sweeping low-angle pan across a stunning, high-ceiling luxury living space, matching #image3. The voiceover continues: "...premium living space..."
 
-[0:06 - 0:08] Hard cut. A rapid, sweeping low-angle pan across the stunning, high-ceiling luxury loft space, matching #image3. The voiceover continues: "...aur full-height windows jahan se sirf view dikhta hai, taak-jhaak nahi..."
+[0:06 - 0:08] Hard cut. A smooth, gliding tracking shot moving through a warm-toned interior area, matching #image4. The voiceover continues: "...shandaar designer decor..."
 
-[0:08 - 0:10] Hard cut. A quick snap-pan landing perfectly on the elegant dining setup with the mirror wall, matching #image2. The voiceover says: "...matlab, peace of mind, guaranteed."
+[0:08 - 0:10] Hard cut. A quick snap-pan landing perfectly on an elegant space showcasing premium finishes, matching #image2. The voiceover says: "...aur ek perfect vibe. Hai na kamaal?"
 
-[0:10 - 0:15] Hard cut. Back to Anvi (using #image7 for her facial features and #image5 for her black outfit). She is standing confidently inside the luxury living room, gently closing a set of curtains with a playful smirk. Looking directly into the lens, she says: "Toh agli baar koi padosi jhanke, toh bas curtains band kar dena. Neeche link par click karein aur apna private paradise book karein!" She completely stops speaking at exactly 13 seconds, leaving the final 2 seconds showing her playful smile as she finishes closing the curtain, ending the video naturally.`;
+[0:10 - 0:15] Hard cut. Back to the female agent, Anvi (using #image7 for her facial features and #image5 for her black outfit). She is standing confidently beside the luxury car outside the property. Looking directly into the lens, she enthusiastically points her finger down toward the CTA link, and then playfully tosses a set of car keys directly toward the camera lens. She says: "Toh intezaar kaisa? Neeche diye gaye link par abhi click karein aur apna dream home book karein!" She completely stops speaking at exactly 13 seconds, leaving the final 2 seconds showing her confident smile as the keys fly toward the viewer, ending the video naturally.`;
 
 const TEMPLATE_MARKERS = {
-  A: ["#image1", "#image3", "#image5", "#image7", "Anvi", "Hard cut"],
-  B: ["#image1", "#image2", "#image3", "#image4", "#image5", "#image7", "Anvi", "curtain", "Hard cut"],
+  A: ["#image1", "#image2", "#image5", "#image7", "luxury car", "Hard cut"],
+  B: ["#image1", "#image2", "#image3", "#image4", "#image5", "#image7", "keys", "Hard cut"],
 };
 
 function buildReproducePrompt({ masterTemplate, dialogue, partLabel }) {
-  return `Reproduce the following video-generation prompt EXACTLY, with ONE change: replace the SPOKEN dialogue (the quoted text following cues like "says," "whispers," "finishes," "continues," or "the voiceover says/starts/continues") with this actual dialogue, which must be spoken in full and unchanged: "${dialogue}"
+  return `Reproduce the following video-generation prompt EXACTLY, with ONE change: replace all of the example spoken dialogue (the text inside quotation marks) with this actual dialogue, which must be spoken in full and unchanged: "${dialogue}"
 
-You decide exactly where to split this dialogue across the spoken-dialogue quotes — it does not have to break at the same word as the example. You may also nudge the timestamp ranges in brackets (e.g. "[0:00 - 0:06]") so the pacing fits the new dialogue naturally — they must still start at 0:00, stay in the same order, and sum to 15 seconds total.
-
-IMPORTANT: if the template contains a short parenthetical quote describing a GESTURE or expression rather than spoken words (for example a "shhh" gesture), leave that one exactly as written — do not replace it with dialogue.
+You decide exactly where to split this dialogue across the quoted lines — it does not have to break at the same word as the example. You may also nudge the timestamp ranges in brackets (e.g. "[0:00 - 0:05]") so the pacing fits the new dialogue naturally — they must still start at 0:00, stay in the same order, and sum to 15 seconds total.
 
 Do NOT change anything else: keep every camera movement, action description, character description, image reference (#image1, #image2, etc.), and "Hard cut." exactly as written below. Do not invent dialogue beyond the actual dialogue given above.
 
@@ -157,13 +155,15 @@ function splitWordsIntoChunks(text, n) {
 }
 
 function fillTemplateAFallback(dialogue) {
-  const [beat1, beat2, beat3] = splitWordsIntoChunks(dialogue, 3);
+  const [beat1, beat2] = splitWordsIntoChunks(dialogue, 2);
   return MASTER_TEMPLATE_A
-    .replace(`"Kya aap bhi apne padosiyon ki taak-jhaak se pareshan hain?"`, `"${beat1}"`)
-    .replace(`"Tension mat lijiye! Main hoon Anvi..."`, `"${beat2}..."`)
     .replace(
-      `"...aur aaj main aapko dikhaungi ek aisi private luxury property, jahan koi disturbance nahi!"`,
-      `"...${beat3}"`,
+      `"Kya aapne kabhi socha hai ki aapka agla ghar bilkul filmy ho sakta hai? Hello, main hoon Anvi..."`,
+      `"${beat1}..."`,
+    )
+    .replace(
+      `"...aapki real estate expert, aur aaj main aapko dikhane waali hoon aapka naya dream home!"`,
+      `"...${beat2}"`,
     );
 }
 
@@ -174,12 +174,12 @@ function fillTemplateBFallback(dialogue) {
   const stripEnd = (s) => s.replace(/[.?!]+$/, "");
   const [beat1, beat2, beat3, beat4] = splitWordsIntoChunks(highlights, 4).map(stripEnd);
   return MASTER_TEMPLATE_B
-    .replace(`"Yahaan koi padosi nahi jo aapki zindagi mein jhanke..."`, `"${beat1}..."`)
-    .replace(`"...sirf aapki privacy, aapka sukoon..."`, `"...${beat2}..."`)
-    .replace(`"...aur full-height windows jahan se sirf view dikhta hai, taak-jhaak nahi..."`, `"...${beat3}..."`)
-    .replace(`"...matlab, peace of mind, guaranteed."`, `"...${beat4}"`)
+    .replace(`"Zara sochiye... itna khoobsurat ghar..."`, `"${beat1}..."`)
+    .replace(`"...premium living space..."`, `"...${beat2}..."`)
+    .replace(`"...shandaar designer decor..."`, `"...${beat3}..."`)
+    .replace(`"...aur ek perfect vibe. Hai na kamaal?"`, `"...${beat4}"`)
     .replace(
-      `"Toh agli baar koi padosi jhanke, toh bas curtains band kar dena. Neeche link par click karein aur apna private paradise book karein!"`,
+      `"Toh intezaar kaisa? Neeche diye gaye link par abhi click karein aur apna dream home book karein!"`,
       `"${cta || beat4}"`,
     );
 }
@@ -196,12 +196,19 @@ async function reproduceTemplate({ template, markers, dialogue, partLabel, fallb
       .trim();
     if (isValidReproduction(cleaned, markers)) return cleaned;
     console.warn(
-      `[ComedyReel] ${partLabel} reproduction failed validation, using fallback template.`,
+      `[SeedanceReel] ${partLabel} reproduction failed validation, using fallback template.`,
     );
   } catch (err) {
-    console.warn(`[ComedyReel] ${partLabel} reproduction LLM call failed:`, err.message);
+    console.warn(`[SeedanceReel] ${partLabel} reproduction LLM call failed:`, err.message);
   }
   return fallbackFn(dialogue);
+}
+
+const DEFAULT_VOICE_SETTINGS = { stability: 0.5, similarity_boost: 0.75, style: 0.3, speed: 0.6 };
+
+function resolutionForQuality(quality) {
+  if (quality === "1080p" || quality === "720p") return "720p";
+  return "720p"; // "auto" and anything unrecognized
 }
 
 export async function POST(request) {
@@ -268,11 +275,13 @@ export async function POST(request) {
       }
     }
     console.log(
-      `[ComedyReel] Resolved ${avatarUrls.length} avatar URL(s):`,
+      `[SeedanceReel] Resolved ${avatarUrls.length} avatar URL(s):`,
       avatarUrls,
     );
 
-    // Collect location image files (up to 4)
+    // Collect location image files — the master templates only ever
+    // reference #image1-4, so only the first 4 matter regardless of how
+    // many StepUpload lets the user attach.
     const locationBufs = [];
     for (let i = 0; i < 4; i++) {
       const f = formData.get(`locationImage_${i}`);
@@ -305,8 +314,8 @@ export async function POST(request) {
 
     const creditResult = await consumeCreditsForAction({
       userId,
-      action: "action_reel_video",
-      metadata: { endpoint: "/api/comedy-reel/generate-pipeline" },
+      action: "real_estate_video",
+      metadata: { endpoint: "/api/seedance-reel/generate-pipeline" },
     });
     if (!creditResult.ok) {
       return NextResponse.json(creditResult.payload, {
@@ -330,13 +339,13 @@ export async function POST(request) {
             userId,
             "images",
             "jpg",
-            `comedy-location-${i}`,
+            `sreel-location-${i}`,
           );
           const url = await uploadToR2(cropped, key, "image/jpeg");
           if (url.startsWith("http")) locationR2Urls[i] = url;
         } catch (e) {
           console.warn(
-            `[ComedyReel] Failed to upload location image ${i}:`,
+            `[SeedanceReel] Failed to upload location image ${i}:`,
             e.message,
           );
         }
@@ -345,7 +354,7 @@ export async function POST(request) {
 
     if (locationBufs.length > 0 && locationR2Urls.filter(Boolean).length === 0) {
       console.error(
-        `[ComedyReel] All ${locationBufs.length} location image upload(s) failed.`,
+        `[SeedanceReel] All ${locationBufs.length} location image upload(s) failed.`,
       );
     }
 
@@ -354,11 +363,11 @@ export async function POST(request) {
     if (customVoiceBuf) {
       try {
         const ext = extFromMime(customVoiceMimeType);
-        const key = buildUserKey(userId, "audio", ext, "comedy-custom-voice");
+        const key = buildUserKey(userId, "audio", ext, "sreel-custom-voice");
         customVoiceUrl = await uploadToR2(customVoiceBuf, key, customVoiceMimeType);
       } catch (e) {
         console.warn(
-          "[ComedyReel] Custom voice upload failed, falling back to TTS:",
+          "[SeedanceReel] Custom voice upload failed, falling back to TTS:",
           e.message,
         );
       }
@@ -387,7 +396,7 @@ export async function POST(request) {
           try {
             await SeedanceJob.updateOne({ jobId }, { $set: patch });
           } catch (e) {
-            console.error("[ComedyReel] Job persist failed:", e.message);
+            console.error("[SeedanceReel] Job persist failed:", e.message);
           }
         }
 
@@ -406,7 +415,7 @@ export async function POST(request) {
             message: "Splitting script into 2 parts…",
           });
 
-          const splitPrompt = `You are a video script editor. Split this real estate ad script into exactly TWO parts for a fast-paced comedy vertical reel video.
+          const splitPrompt = `You are a video script editor. Split this real estate ad script into exactly TWO parts for a fast-paced, high-energy vertical reel video.
 
 RULES:
 - Part 1 (HOOK ≤40 words): Opening hook. High energy, attention-grabbing, presenter speaks directly to camera. Must end at a natural sentence boundary.
@@ -436,7 +445,7 @@ ${script}`;
             }
           } catch (splitErr) {
             console.warn(
-              "[ComedyReel] LLM split failed, using word-count split:",
+              "[SeedanceReel] LLM split failed, using word-count split:",
               splitErr.message,
             );
           }
@@ -537,14 +546,14 @@ ${part2}`;
                     part2_tts = parsed.part2.trim();
                   } else {
                     console.warn(
-                      "[ComedyReel] Roman→native conversion incomplete — keeping both parts in Roman for consistency:",
+                      "[SeedanceReel] Roman→native conversion incomplete — keeping both parts in Roman for consistency:",
                       parsed,
                     );
                   }
                 }
               } catch (adaptErr) {
                 console.warn(
-                  "[ComedyReel] Roman→native conversion failed:",
+                  "[SeedanceReel] Roman→native conversion failed:",
                   adaptErr.message,
                 );
               }
@@ -578,7 +587,7 @@ ${part2}`;
                 }
               } catch (romanErr) {
                 console.warn(
-                  "[ComedyReel] Native→Roman transliteration failed:",
+                  "[SeedanceReel] Native→Roman transliteration failed:",
                   romanErr.message,
                 );
               }
@@ -590,8 +599,8 @@ ${part2}`;
 
           // ── Stage 2: Voice — the user's own recording (if provided) goes
           // straight to Seedance as the reference audio for BOTH parts,
-          // bypassing ElevenLabs TTS entirely; the selected prebuilt voice is
-          // ignored in that case. Otherwise, generate both TTS parts. ───────
+          // bypassing ElevenLabs TTS entirely; the selected prebuilt voice
+          // is ignored in that case. Otherwise, generate both TTS parts. ───
           let part1AudioUrl = null;
           let part2AudioUrl = null;
 
@@ -609,22 +618,22 @@ ${part2}`;
             });
 
             const [p1TtsResult, p2TtsResult] = await Promise.allSettled([
-              generateAndUploadTTS(part1_tts, voiceId, userId, "comedy-part1-voice", language),
-              generateAndUploadTTS(part2_tts, voiceId, userId, "comedy-part2-voice", language),
+              generateAndUploadTTS(part1_tts, voiceId, userId, "sreel-part1-voice", language),
+              generateAndUploadTTS(part2_tts, voiceId, userId, "sreel-part2-voice", language),
             ]);
 
             if (p1TtsResult.status === "fulfilled") {
               part1AudioUrl = p1TtsResult.value;
             } else
               console.error(
-                "[ComedyReel] Part 1 TTS failed:",
+                "[SeedanceReel] Part 1 TTS failed:",
                 p1TtsResult.reason?.message,
               );
             if (p2TtsResult.status === "fulfilled") {
               part2AudioUrl = p2TtsResult.value;
             } else
               console.error(
-                "[ComedyReel] Part 2 TTS failed:",
+                "[SeedanceReel] Part 2 TTS failed:",
                 p2TtsResult.reason?.message,
               );
           }
@@ -636,7 +645,7 @@ ${part2}`;
           const validLocationUrls = locationR2Urls.filter(Boolean);
           if (validLocationUrls.length < 4 || avatarUrls.slice(0, 3).length < 3) {
             console.warn(
-              `[ComedyReel] Templates assume #image1-4 (location) + #image5/#image7 (avatar); ` +
+              `[SeedanceReel] Templates assume #image1-4 (location) + #image5/#image7 (avatar); ` +
               `got ${validLocationUrls.length} location + ${avatarUrls.slice(0, 3).length} avatar image(s). ` +
               `Seedance will ignore #imageN references with no matching image.`,
             );
@@ -647,7 +656,7 @@ ${part2}`;
               template: MASTER_TEMPLATE_A,
               markers: TEMPLATE_MARKERS.A,
               dialogue: part1_roman,
-              partLabel: "Part 1 (hook)",
+              partLabel: "Part 1 (car exit intro)",
               fallbackFn: fillTemplateAFallback,
             }),
             reproduceTemplate({
@@ -702,7 +711,7 @@ ${part2}`;
           };
 
           console.log(
-            `[ComedyReel] image_urls (${imageUrls.length}, location-first):`,
+            `[SeedanceReel] image_urls (${imageUrls.length}, location-first):`,
             imageUrls,
           );
 
@@ -710,29 +719,29 @@ ${part2}`;
           let part2VideoUrl = null;
 
           await Promise.allSettled([
-            callSeedanceAndUpload(part1Input, userId, "comedy-part1", pipelineSignal)
+            callSeedanceAndUpload(part1Input, userId, "sreel-part1", pipelineSignal)
               .then((url) => {
                 part1VideoUrl = url;
-                console.log("[ComedyReel] Part 1 video uploaded:", url);
+                console.log("[SeedanceReel] Part 1 video uploaded:", url);
                 send({
                   type: "part1_video_done",
                   part1VideoUrl: url,
-                  message: "Part 1 (hook) video ready!",
+                  message: "Part 1 (car exit intro) video ready!",
                 });
                 persistJob({ part1VideoUrl: url });
               })
               .catch((err) => {
-                console.error("[ComedyReel] Part 1 Seedance failed:", err.message);
+                console.error("[SeedanceReel] Part 1 Seedance failed:", err.message);
                 send({
                   type: "seedance_error",
                   message: `Part 1 video failed: ${err.message}`,
                 });
               }),
 
-            callSeedanceAndUpload(part2Input, userId, "comedy-part2", pipelineSignal)
+            callSeedanceAndUpload(part2Input, userId, "sreel-part2", pipelineSignal)
               .then((url) => {
                 part2VideoUrl = url;
-                console.log("[ComedyReel] Part 2 video uploaded:", url);
+                console.log("[SeedanceReel] Part 2 video uploaded:", url);
                 send({
                   type: "part2_video_done",
                   part2VideoUrl: url,
@@ -741,7 +750,7 @@ ${part2}`;
                 persistJob({ part2VideoUrl: url });
               })
               .catch((err) => {
-                console.error("[ComedyReel] Part 2 Seedance failed:", err.message);
+                console.error("[SeedanceReel] Part 2 Seedance failed:", err.message);
                 send({
                   type: "seedance_error",
                   message: `Part 2 video failed: ${err.message}`,
@@ -771,11 +780,11 @@ ${part2}`;
               await dbConnect();
               await Asset.create({
                 userId,
-                name: `Comedy Reel — ${new Date().toLocaleDateString()}`,
+                name: `Seedance Reel — ${new Date().toLocaleDateString()}`,
                 url: primaryUrl,
                 type: "clip",
                 metadata: {
-                  source: "comedy-reel",
+                  source: "seedance-reel",
                   part1VideoUrl,
                   part2VideoUrl,
                   part1AudioUrl,
@@ -784,7 +793,7 @@ ${part2}`;
                 },
               });
             } catch (dbErr) {
-              console.error("[ComedyReel] DB save error:", dbErr);
+              console.error("[SeedanceReel] DB save error:", dbErr);
             }
           }
 
@@ -801,7 +810,7 @@ ${part2}`;
           controller.close();
         } catch (err) {
           clearInterval(pingInterval);
-          console.error("[ComedyReel] Pipeline error:", err);
+          console.error("[SeedanceReel] Pipeline error:", err);
           await persistJob({
             status: "error",
             error: err.message || "Pipeline failed",
@@ -810,10 +819,10 @@ ${part2}`;
           if (userId && debit) {
             await refundCreditsForAction({
               userId,
-              action: "action_reel_video",
+              action: "real_estate_video",
               debit,
               metadata: {
-                endpoint: "/api/comedy-reel/generate-pipeline",
+                endpoint: "/api/seedance-reel/generate-pipeline",
                 reason: "generation_failed",
                 message: err.message,
               },
@@ -835,15 +844,15 @@ ${part2}`;
       },
     });
   } catch (error) {
-    console.error("[ComedyReel] Outer error:", error);
+    console.error("[SeedanceReel] Outer error:", error);
 
     if (userId && debit) {
       await refundCreditsForAction({
         userId,
-        action: "action_reel_video",
+        action: "real_estate_video",
         debit,
         metadata: {
-          endpoint: "/api/comedy-reel/generate-pipeline",
+          endpoint: "/api/seedance-reel/generate-pipeline",
           reason: "unexpected_error",
           message: error.message,
         },

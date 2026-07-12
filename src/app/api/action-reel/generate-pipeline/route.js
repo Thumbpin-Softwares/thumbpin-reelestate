@@ -70,7 +70,7 @@ async function callLLM(prompt) {
   }
 }
 
-const DEFAULT_VOICE_SETTINGS = { stability: 0.5, similarity_boost: 0.75, style: 0.3, speed: 1.0 };
+const DEFAULT_VOICE_SETTINGS = { stability: 0.5, similarity_boost: 0.75, style: 0.3, speed: 0.6 };
 
 function resolutionForQuality(quality) {
   // Always cap at 720p — pass through silently regardless of what the user picks
