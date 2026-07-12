@@ -261,6 +261,7 @@ export function MusicPanel({ music, reelDurationSeconds, onSelect, onTrimChange,
                       min={0}
                       max={100}
                       value={Math.round((music.volume ?? 0.25) * 100)}
+                      className="w-full accent-[#c7f038]"
                       onChange={(e) => {
                         const volume = Number(e.target.value) / 100;
                         if (audioRef.current) audioRef.current.volume = volume;
@@ -273,7 +274,7 @@ export function MusicPanel({ music, reelDurationSeconds, onSelect, onTrimChange,
                     <button
                       onClick={toggleSelectedPreview}
                       disabled={duration === 0}
-                      className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-border/50 py-1.5 text-xs font-medium hover:bg-muted/40 transition-colors disabled:opacity-50"
+                      className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-[#c7f038] py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
                     >
                       {previewingKey === music.key && isPlaying ? (
                         <Pause className="w-3.5 h-3.5" />
@@ -284,7 +285,7 @@ export function MusicPanel({ music, reelDurationSeconds, onSelect, onTrimChange,
                     </button>
                     <button
                       onClick={onClear}
-                      className="shrink-0 text-muted-foreground hover:text-destructive p-1.5"
+                      className="shrink-0 text-white bg-red-500 rounded-md p-1.5"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>

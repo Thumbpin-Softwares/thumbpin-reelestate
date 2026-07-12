@@ -99,7 +99,9 @@ async function callSeedanceAndUpload(seedanceInput, userId, keyName, signal) {
     throw new Error(`Failed to fetch Seedance video: ${videoRes.status}`);
   const videoBuf = Buffer.from(await videoRes.arrayBuffer());
   const key = buildUserKey(userId, "videos", "mp4", keyName);
-  return uploadToR2(videoBuf, key, "video/mp4");
+  // Reopenable in /dashboard/edit — normalize keyframes so the Cut tool's
+  // mid-clip seeks don't land on a black frame (see video-normalize.js).
+  return uploadToR2(videoBuf, key, "video/mp4", { normalizeKeyframes: true });
 }
 
 // ── Fixed master templates — reproduced as-is except for the quoted dialogue ─

@@ -20,7 +20,7 @@ const navItems = [
   { label: "Library", href: "/dashboard/assets", icon: FolderOpen },
   { label: "Edit", href: "/dashboard/edit", icon: Pencil },
   { label: "Help Center", href: "/dashboard/help", icon: BookOpen },
-  { label: "Chat with us", href: "mailto:support@thumbpin.ai", icon: MessageCircle },
+  { label: "Chat with us", href: "/dashboard/support", icon: MessageCircle },
 ];
 
 const whatsNewItem = { label: "What's New", href: "/dashboard/whats-new", icon: Megaphone };

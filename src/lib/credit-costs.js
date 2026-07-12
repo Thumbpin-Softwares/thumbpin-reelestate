@@ -51,6 +51,14 @@ export const CAPTION_PRICING = {
   usdToCredits: 480,
 };
 
+// fal.ai/VEED bills us ~$0.10 for a subtitle run the moment it's submitted,
+// regardless of whether it succeeds — so a failed run still costs us real
+// money. Refunding the full charge on failure would mean eating that cost
+// every time, so we keep a flat raw-cost charge (no margin) instead.
+export const CAPTION_FAILED_RUN_CHARGE_CREDITS = Math.round(
+  CAPTION_PRICING.perMinuteUsd * CAPTION_PRICING.usdToCredits
+); // 48
+
 export function computeCaptionCreditCost({
   durationSeconds,
   isDynamicPreset = false,

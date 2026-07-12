@@ -3,13 +3,15 @@
 import { useState } from "react";
 import { Player } from "@remotion/player";
 import {
+  Check,
+  CheckSquare,
   Eye,
   Loader2,
   Pencil,
   Trash2,
   Video,
 } from "lucide-react";
-import { toast } from "sonner";
+import { appNotify } from "@/modules/common/components/notification";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -50,7 +52,7 @@ function useVideos() {
 }
 
 export function VideoPicker({ onSelect, hideHeader = false, excludeIds = [] }) {
-  const { videos: allVideos, setVideos, pagination, fetching, load } = useVideos();
+  const { videos: allVideos, pagination, fetching, load } = useVideos();
   const [previewVideo, setPreviewVideo] = useState(null);
   // Multi-clip sources (asset.url is only the FIRST clip — the merged reel
   // isn't rendered until the editor's Export) get reconstructed and played as
@@ -60,6 +62,10 @@ export function VideoPicker({ onSelect, hideHeader = false, excludeIds = [] }) {
   const [selectingId, setSelectingId] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const videos = allVideos && excludeIds.length > 0
     ? allVideos.filter((v) => !excludeIds.includes(v.id))
@@ -116,6 +122,52 @@ export function VideoPicker({ onSelect, hideHeader = false, excludeIds = [] }) {
     window.location.href = proxyUrl;
   }
 
+  function toggleSelectMode() {
+    setSelectMode((prev) => !prev);
+    setSelectedIds(new Set());
+  }
+
+  function toggleSelected(id) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function handleBulkDelete() {
+    setBulkDeleting(true);
+    const ids = Array.from(selectedIds);
+    try {
+      const res = await fetch("/api/assets", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Delete failed");
+
+      // Refetch (rather than just filtering client state) so the grid pulls
+      // the next page's cards up to fill the gap left by the deleted ones,
+      // instead of just shrinking. If that emptied the current (non-first)
+      // page, fall back a page.
+      const remaining = (allVideos || []).length - ids.length;
+      await load(remaining === 0 && pagination.page > 1 ? pagination.page - 1 : pagination.page);
+
+      appNotify.success(`${ids.length} video${ids.length !== 1 ? "s" : ""} deleted permanently`, {
+        description: "The selected videos were permanently deleted and cannot be recovered.",
+      });
+    } catch (err) {
+      appNotify.error("Delete failed", { description: err.message });
+    } finally {
+      setBulkDeleting(false);
+      setBulkDeleteConfirmOpen(false);
+      setSelectedIds(new Set());
+      setSelectMode(false);
+    }
+  }
+
   async function handleDeleteConfirm() {
     if (!pendingDelete) return;
     setDeleting(true);
@@ -125,11 +177,17 @@ export function VideoPicker({ onSelect, hideHeader = false, excludeIds = [] }) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || "Failed to delete reel");
       }
-      setVideos((prev) => (prev || []).filter((v) => v.id !== pendingDelete.id));
-      toast.success("Reel deleted");
+      // Refetch (rather than just filtering client state) so the grid pulls
+      // the next page's card up to fill the gap left by the deleted one.
+      const remaining = (allVideos || []).length - 1;
+      await load(remaining === 0 && pagination.page > 1 ? pagination.page - 1 : pagination.page);
+
+      appNotify.success(pendingDelete.name || "Video", {
+        description: "This video was permanently deleted and cannot be recovered.",
+      });
       setPendingDelete(null);
     } catch (err) {
-      toast.error("Delete failed", { description: err.message });
+      appNotify.error("Delete failed", { description: err.message });
     } finally {
       setDeleting(false);
     }
@@ -167,15 +225,53 @@ export function VideoPicker({ onSelect, hideHeader = false, excludeIds = [] }) {
         </div>
       )}
 
+      {/* Select / bulk-delete toolbar */}
+      {!loading && videos.length > 0 && (
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <span className="text-xs text-muted-foreground tabular-nums">
+            Showing {videos.length} of {pagination.total}
+          </span>
+          <div className="flex items-center gap-2 flex-wrap">
+          {selectMode && (
+            <>
+              <span className="text-sm text-muted-foreground">
+                {selectedIds.size} selected
+              </span>
+              <Button
+                size="sm"
+                variant="destructive"
+                className="cursor-pointer"
+                disabled={selectedIds.size === 0}
+                onClick={() => setBulkDeleteConfirmOpen(true)}
+              >
+                <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                Delete Selected
+              </Button>
+            </>
+          )}
+          <Button variant="outline" className="cursor-pointer" onClick={toggleSelectMode}>
+            <CheckSquare className="w-4 h-4 mr-2" />
+            {selectMode ? "Cancel" : "Select"}
+          </Button>
+          </div>
+        </div>
+      )}
+
       {/* Video grid */}
       {!loading && videos.length > 0 && (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {videos.map((video) => {
             const canEdit = !!EDITABLE_SOURCES[video.metadata?.source];
+            const selected = selectedIds.has(video.id);
             return (
               <div
                 key={video.id}
-                className="group rounded-lg overflow-hidden border border-neutral-200 bg-white hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
+                onClick={() => { if (selectMode) toggleSelected(video.id); }}
+                className={`group relative overflow-hidden rounded-3xl border bg-white/80 backdrop-blur-xl ring-1 shadow-[0_10px_40px_rgba(0,0,0,0.06)] hover:shadow-[0_20px_60px_rgba(199,240,56,0.18)] hover:-translate-y-1 transition-all duration-300 ${
+                  selectMode ? "cursor-pointer" : ""
+                } ${
+                  selected ? "border-[#c7f038] ring-2 ring-[#c7f038]" : "border-white/60 ring-[#c7f038]/10 hover:ring-[#c7f038]/40"
+                }`}
               >
                 {/* Thumbnail */}
                 <div className="relative aspect-video overflow-hidden">
@@ -190,8 +286,17 @@ export function VideoPicker({ onSelect, hideHeader = false, excludeIds = [] }) {
                       <Video className="w-8 h-8 text-muted-foreground/30" />
                     </div>
                   )}
-                  <div className="absolute inset-0 bg-black/20 sm:bg-black/0 sm:group-hover:bg-black/20 transition-colors" />
-                  {canEdit ? (
+                  <div className="absolute inset-0 bg-linear-to-t from-black/40 via-transparent to-transparent opacity-70 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity" />
+
+                  {selectMode ? (
+                    <div
+                      className={`absolute top-2 right-2 z-10 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
+                        selected ? "bg-[#c7f038] border-[#c7f038]" : "bg-black/40 border-white/70"
+                      }`}
+                    >
+                      {selected && <Check className="w-3.5 h-3.5 text-black" />}
+                    </div>
+                  ) : canEdit ? (
                     <>
                       <button
                         onClick={() => handleEditClick(video)}
@@ -226,16 +331,18 @@ export function VideoPicker({ onSelect, hideHeader = false, excludeIds = [] }) {
                       </div>
                     </button>
                   )}
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setPendingDelete(video); }}
-                    className="absolute top-2 left-2 z-10 h-8 w-8 rounded-full bg-white/90 backdrop-blur flex items-center justify-center shadow-md opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity hover:bg-white"
-                  >
-                    <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                  </button>
+                  {!selectMode && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setPendingDelete(video); }}
+                      className="absolute top-2 left-2 z-10 h-8 w-8 rounded-full bg-white/90 backdrop-blur flex items-center justify-center shadow-md opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity hover:bg-white"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                    </button>
+                  )}
                 </div>
 
                 {/* Info */}
-                <div className="p-4">
+                <div className="p-5 bg-white/70 backdrop-blur-sm">
                   <p className="font-medium text-sm line-clamp-1">{video.name}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {new Date(video.createdAt).toLocaleDateString("en-IN", {
@@ -255,9 +362,7 @@ export function VideoPicker({ onSelect, hideHeader = false, excludeIds = [] }) {
       {!loading && pagination.totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 pt-2 sm:pb-0 pb-8">
           <Button
-            variant="outline"
-            size="sm"
-            className="bg-neutral-900 text-[#c7f038] hover:opacity-90 hover:bg-neutral-900 shadow-lg gap-2 px-6"
+            className="text-black hover:bg-[#c7f038] bg-[#c7f038] py-2 px-6 rounded-full"
             disabled={fetching || pagination.page <= 1}
             onClick={() => load(pagination.page - 1)}
           >
@@ -267,9 +372,7 @@ export function VideoPicker({ onSelect, hideHeader = false, excludeIds = [] }) {
             {pagination.page} / {pagination.totalPages}
           </span>
           <Button
-            variant="outline"
-            size="sm"
-            className="bg-neutral-900 text-[#c7f038] hover:opacity-90 hover:bg-neutral-900 shadow-lg gap-2 px-6"
+            className="text-black hover:bg-[#c7f038] bg-[#c7f038] py-2 px-6 rounded-full"
             disabled={fetching || pagination.page >= pagination.totalPages}
             onClick={() => load(pagination.page + 1)}
           >
@@ -331,20 +434,58 @@ export function VideoPicker({ onSelect, hideHeader = false, excludeIds = [] }) {
 
       {/* Delete confirmation */}
       <Dialog open={!!pendingDelete} onOpenChange={(open) => !open && !deleting && setPendingDelete(null)}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-sm rounded-3xl border border-[#c7f038]/20 bg-white/95 backdrop-blur-xl shadow-[0_20px_60px_rgba(199,240,56,0.18)]">
           <DialogHeader>
-            <DialogTitle>Delete this reel?</DialogTitle>
+            <DialogTitle className="text-xl font-semibold tracking-tight">Delete this reel?</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm leading-relaxed text-neutral-600">
             This permanently deletes &quot;{pendingDelete?.name || "this reel"}&quot; from your videos. This can&apos;t be undone.
           </p>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="ghost" disabled={deleting} onClick={() => setPendingDelete(null)}>
+          <div className="flex justify-end gap-3 pt-4">
+            <Button
+              variant="ghost"
+              disabled={deleting}
+              onClick={() => setPendingDelete(null)}
+              className="rounded-xl hover:bg-red-600 hover:text-white bg-red-500 text-white"
+            >
               Cancel
             </Button>
-            <Button variant="destructive" disabled={deleting} onClick={handleDeleteConfirm} className="gap-2">
+            <Button
+              variant="destructive"
+              disabled={deleting}
+              onClick={handleDeleteConfirm}
+              className="gap-2 rounded-xl bg-[#c7f038] text-black hover:bg-[#b7df33]"
+            >
               {deleting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               Delete
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk delete confirmation */}
+      <Dialog className="" open={bulkDeleteConfirmOpen} onOpenChange={(open) => !bulkDeleting && setBulkDeleteConfirmOpen(open)}>
+        <DialogContent className="max-w-sm rounded-3xl border border-[#c7f038]/20 bg-white/95 backdrop-blur-xl shadow-[0_20px_60px_rgba(199,240,56,0.18)]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold tracking-tight">
+              Delete {selectedIds.size} video{selectedIds.size !== 1 ? "s" : ""}?
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm leading-relaxed text-neutral-600">
+            This permanently deletes the selected video{selectedIds.size !== 1 ? "s" : ""}. This can&apos;t be undone.
+          </p>
+          <div className="flex justify-end gap-3 pt-4">
+            <Button variant="ghost" disabled={bulkDeleting} onClick={() => setBulkDeleteConfirmOpen(false)} className="rounded-xl hover:bg-red-600 hover:text-white bg-red-500 text-white">
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={bulkDeleting}
+              onClick={handleBulkDelete}
+              className="gap-2 rounded-xl bg-[#c7f038] text-black hover:bg-[#b7df33]"
+            >
+              {bulkDeleting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              Delete Selected
             </Button>
           </div>
         </DialogContent>

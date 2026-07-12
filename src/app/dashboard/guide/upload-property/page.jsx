@@ -1,19 +1,22 @@
 export default function Page() {
   return (
     <main className="flex flex-col justify-center items-center">
-      <div className="pb-6 max-w-4xl space-y-2">
-        <h1 className="text-6xl! font-light! text-center">
+      <div className="pb-6 max-w-4xl space-y-4">
+        <span className="inline-flex w-fit rounded-full bg-[#c7f038] px-4 py-1.5 text-sm font-medium text-neutral-900 shadow-sm">
+          Resource Guide
+        </span>
+        <h1 className="text-6xl! font-light! text-left">
           How to upload good property images
         </h1>
-        <p className="py-4 text-black text-xl text-center">
+        <p className="py-4 text-black text-xl text-left">
           This comprehensive guide explains how to capture and upload
           property photos that help our AI generate more realistic and
           visually compelling videos.
         </p>
       </div>
 
-      <div className="max-w-3xl w-full">
-        <h2>Why your source photos matter</h2>
+      <div className="w-full space-y-6 prose prose-neutral max-w-4xl">
+        <h2 className="scroll-mt-24 text-2xl font-semibold tracking-tight text-neutral-900 pt-4 border-t border-neutral-100 first:border-t-0 first:pt-0">Why your source photos matter</h2>
         <p>
           Every home tour, site view, and interior shot our AI generates is
           built on top of the images you upload. The model doesn&apos;t
@@ -25,7 +28,7 @@ export default function Page() {
           see, which is where quality drops.
         </p>
 
-        <h2>What to upload</h2>
+        <h2 className="scroll-mt-24 text-2xl font-semibold tracking-tight text-neutral-900 pt-4 border-t border-neutral-100 first:border-t-0 first:pt-0">What to upload</h2>
         <p>
           Aim to cover the property the way a buyer would walk through it.
           For most listings, that means:
@@ -62,7 +65,7 @@ export default function Page() {
           </li>
         </ul>
 
-        <h2>Technical checklist</h2>
+        <h2 className="scroll-mt-24 text-2xl font-semibold tracking-tight text-neutral-900 pt-4 border-t border-neutral-100 first:border-t-0 first:pt-0">Technical checklist</h2>
         <p>
           Before you upload, run through this quick checklist — it&apos;s the
           fastest way to guarantee a clean result:
@@ -95,7 +98,7 @@ export default function Page() {
           </li>
         </ul>
 
-        <h2>What to avoid</h2>
+        <h2 className="scroll-mt-24 text-2xl font-semibold tracking-tight text-neutral-900 pt-4 border-t border-neutral-100 first:border-t-0 first:pt-0">What to avoid</h2>
         <ul>
           <li>Photos with people, pets, or reflections of the photographer in mirrors or glass.</li>
           <li>Heavy filters, watermarks, or text overlays baked into the image.</li>
@@ -104,7 +107,7 @@ export default function Page() {
           <li>Duplicate near-identical shots of the same angle — pick your best one per room.</li>
         </ul>
 
-        <h2>Matching photos to the right tool</h2>
+        <h2 className="scroll-mt-24 text-2xl font-semibold tracking-tight text-neutral-900 pt-4 border-t border-neutral-100 first:border-t-0 first:pt-0">Matching photos to the right tool</h2>
         <p>
           Once your images are uploaded to your Asset Library, they power a
           few different generation tools — pick the one that fits what
@@ -126,7 +129,7 @@ export default function Page() {
           </li>
         </ul>
 
-        <h2>Quick recap</h2>
+        <h2 className="scroll-mt-24 text-2xl font-semibold tracking-tight text-neutral-900 pt-4 border-t border-neutral-100 first:border-t-0 first:pt-0">Quick recap</h2>
         <ol>
           <li>Cover the exterior, main living spaces, kitchen, primary bedroom/bath, and any standout feature.</li>
           <li>Shoot in good daylight, keep the horizon level, and use the highest resolution you have.</li>
@@ -134,7 +137,7 @@ export default function Page() {
           <li>Upload one strong photo per angle rather than several near-duplicates.</li>
         </ol>
         <p>
-          Better inputs mean better output — spend a few extra minutes on
+          Better inputs mean better output spend a few extra minutes on
           the photoshoot, and the AI will reward you with a noticeably
           sharper final video.
         </p>

@@ -1,5 +1,9 @@
-import { AbsoluteFill, Img, Sequence, OffthreadVideo, useVideoConfig } from "remotion";
-import { Audio } from "@remotion/media";
+// Background music uses the classic, stable `remotion` Audio (ffmpeg-based
+// extraction) rather than @remotion/media's — that package is explicitly
+// "Experimental WebCodecs-based media tags" and would silently drop the
+// music track on codec/format edge cases some stock MP3s hit, instead of
+// erroring, which is why it looked like music "sometimes" didn't apply.
+import { AbsoluteFill, Img, Sequence, OffthreadVideo, useVideoConfig, Audio } from "remotion";
 import { getOverlayFontCss, hexToRgba } from "./overlay-fonts";
 import { applyCutRanges, calcActionReelBaseDurationInFrames } from "./duration";
 
@@ -49,6 +53,9 @@ function Overlay({ overlay }) {
  *   part1VideoUrl, part2VideoUrl — Seedance clips, each with baked lip-synced
  *     audio already (generate_audio: true + audio_urls at generation time), so
  *     no separate <Audio> overlay is needed for dialogue, unlike music below.
+ *     part2VideoUrl is optional — reopened flattened exports (see
+ *     EDITABLE_SOURCES' isFlatExport sources) are a single clip, so they only
+ *     ever populate part1.
  *   part1Duration, part2Duration — seconds, probed client-side after generation.
  *   overlays, musicUrl/musicTrimStartSeconds/musicVolume — editor additions,
  *     same shape/behavior as SeedanceReelComposition.
@@ -81,15 +88,17 @@ function ReelContent({
         </AbsoluteFill>
       </Sequence>
 
-      <Sequence from={part1Frames} durationInFrames={part2Frames}>
-        <AbsoluteFill>
-          <OffthreadVideo
-            src={part2VideoUrl}
-            objectFit="cover"
-            style={{ width: "100%", height: "100%" }}
-          />
-        </AbsoluteFill>
-      </Sequence>
+      {part2VideoUrl && part2Frames > 0 && (
+        <Sequence from={part1Frames} durationInFrames={part2Frames}>
+          <AbsoluteFill>
+            <OffthreadVideo
+              src={part2VideoUrl}
+              objectFit="cover"
+              style={{ width: "100%", height: "100%" }}
+            />
+          </AbsoluteFill>
+        </Sequence>
+      )}
 
       {/* User text/image overlays — on top of everything, full duration.
           Array order is the stacking order: later entries render on top. */}

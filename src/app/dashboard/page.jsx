@@ -12,27 +12,16 @@ import {
 import { Video, Pencil, ArrowRight } from "lucide-react";
 import { Search } from "lucide-react";
 import { useUser } from "@/hooks/use-user";
+import { getAllTemplates } from "@/lib/templates";
 
-const REAL_ESTATE_TEMPLATES = [
-  {
-    title: "Model exiting a luxury vehicle",
-    href: "/dashboard/luxury-car-exit",
-    video: "https://content.thumbpin.in/templates/modelLuxuryVehicle.mp4",
-    tag: "Popular",
-  },
-  {
-    title: "Frustrated Anchor",
-    href: "/dashboard/comedy-reel",
-    video: "https://content.thumbpin.in/users/69e20794114a93d739a79321/videos/comedy-part1-1782435955101-f239cdf4.mp4",
-    tag: "Popular"
-  },
-  {
-    title: "Action-Packed Property Reveal",
-    href: "/dashboard/action-reel",
-    video: "https://content.thumbpin.in/users/69e20794114a93d739a79321/videos/areel-final-1782433444937-1782433444937-38a76a27.mp4",
-    tag: "New",
-  }
-];
+// Every template's own route (dedicated flow via `href`, or the generic
+// /dashboard/template/[slug] runner) lives in the central registry —
+// this page just renders whatever's there, so adding template #51 never
+// touches this file.
+const REAL_ESTATE_TEMPLATES = getAllTemplates().map((t) => ({
+  ...t,
+  href: t.href || `/dashboard/template/${t.slug}`,
+}));
 
 export default function DashboardPage() {
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
@@ -49,7 +38,7 @@ export default function DashboardPage() {
 
   const actions = [
     {
-      title: "Reel Generator",
+      title: "Real Estate Ad Generator",
       description:
         "Build stunning real estate reels that grab users' attention.",
       href: null,
@@ -96,7 +85,7 @@ export default function DashboardPage() {
               </div>
             );
 
-            if (action.title === "Reel Generator") {
+            if (action.title === "Real Estate Ad Generator") {
               return (
                 <button
                   key={action.title}

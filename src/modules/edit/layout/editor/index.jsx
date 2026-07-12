@@ -24,6 +24,8 @@ import { ActionReelComposition, calcActionReelDurationInFrames } from "@/lib/rem
 import { calcDurationInFrames, calcActionReelBaseDurationInFrames, clampBrollClips, applyCutRanges, mapVirtualRangeToOriginal } from "@/lib/remotion/duration";
 import { EDITABLE_SOURCES } from "@/lib/editable-sources";
 import { CaptionsPanel } from "@/modules/edit/components/caption-panel";
+import { editNotify } from "@/modules/edit/components/notification";
+import { notifyCreditsChanged } from "@/hooks/use-user";
 import { OverlaysPanel } from "@/modules/edit/components/overlays-panel";
 import { OverlaysCanvasLayer } from "@/modules/edit/components/overlays-canvas-layer";
 import { MusicPanel } from "@/modules/edit/components/music-panel";
@@ -299,9 +301,8 @@ export function Editor({ compositionProps, onExit }) {
   const handleDownload = async () => {
     if (captionState.videoUrl) {
       const filename = sourceConfig.downloadFilename || "video.mp4";
-      const sep = captionState.videoUrl.includes("?") ? "&" : "?";
       const a = document.createElement("a");
-      a.href = `${captionState.videoUrl}${sep}download=1&filename=${filename}`;
+      a.href = `/api/download?url=${encodeURIComponent(captionState.videoUrl)}&name=${encodeURIComponent(filename)}`;
       a.download = filename;
       document.body.appendChild(a);
       a.click();
@@ -354,9 +355,8 @@ export function Editor({ compositionProps, onExit }) {
       if (!finalUrl) throw new Error("No URL returned from render");
 
       const filename = sourceConfig.downloadFilename || "video.mp4";
-      const sep = finalUrl.includes("?") ? "&" : "?";
       const a = document.createElement("a");
-      a.href = `${finalUrl}${sep}download=1&filename=${filename}`;
+      a.href = `/api/download?url=${encodeURIComponent(finalUrl)}&name=${encodeURIComponent(filename)}`;
       a.download = filename;
       document.body.appendChild(a);
       a.click();
@@ -434,21 +434,41 @@ export function Editor({ compositionProps, onExit }) {
       });
 
       const capData = await capRes.json();
-      if (!capRes.ok) throw new Error(capData.error || `Captioning failed: ${capRes.status}`);
+      if (!capRes.ok) {
+        const failErr = new Error(capData.error || `Captioning failed: ${capRes.status}`);
+        failErr.creditsCharged = capData.creditsCharged;
+        throw failErr;
+      }
 
       setCaptionState({ preset, status: "done", progress: 100, message: "", videoUrl: capData.url, error: null });
       setCaptionDraft(null);
+
+      const credits = capData.creditsCharged;
+      editNotify.success("Captions applied", {
+        description: credits != null ? `${credits} credit${credits !== 1 ? "s" : ""} deducted` : undefined,
+      });
+      notifyCreditsChanged();
     } catch (err) {
       console.error("[Editor] Caption generation failed:", err);
       // VEED's raw "Transcript language ... not supported for subtitle rendering"
       // message (and any other backend error) is meaningless to end users —
-      // surface a generic toast for that specific case and always keep the
-      // inline hint actionable rather than echoing the raw error.
-      if (/not supported for subtitle rendering/i.test(err.message || "")) {
-        toast.error("Internal server error", {
-          description: "The request is not currently supported. Try again later.",
-        });
-      }
+      // surface a generic description for that specific case and always keep
+      // the inline hint actionable rather than echoing the raw error.
+      const description = /not supported for subtitle rendering/i.test(err.message || "")
+        ? "The request is not currently supported. Try again later."
+        : err.message || "Try different settings.";
+
+      // Only the captions/generate step (post-VEED) actually keeps a charge
+      // on failure — the render step before it never touches credits.
+      const creditsCharged = err.creditsCharged;
+      editNotify.error("Captions failed", {
+        description:
+          creditsCharged > 0
+            ? `${description} ${creditsCharged} credit${creditsCharged !== 1 ? "s" : ""} deducted for the failed run.`
+            : description,
+      });
+      if (creditsCharged > 0) notifyCreditsChanged();
+
       setCaptionState((s) => ({ ...s, status: "error", error: "Try different settings." }));
     }
   };
@@ -515,6 +535,9 @@ export function Editor({ compositionProps, onExit }) {
 
   const handleSelectMusic = (track) => {
     setMusic({ key: track.key, url: track.url, name: track.name, trimStart: 0, volume: 0.25 });
+    editNotify.success(`"${track.name}" applied`, {
+      description: "No credits deducted",
+    });
   };
 
   const handleTrimMusic = (trimStart) => {
@@ -716,7 +739,7 @@ export function Editor({ compositionProps, onExit }) {
         </div>
 
         {/* Right panel */}
-        <div className="w-88 shrink-0 border-l border-border/50 bg-white flex flex-col overflow-hidden">
+        <div className="w-92 shrink-0 border-l border-border/50 bg-white flex flex-col overflow-hidden">
           {activePanel ? (
             <>
               <div className="flex items-center gap-2 px-3 py-3 border-b border-border/40 shrink-0">
@@ -771,7 +794,7 @@ export function Editor({ compositionProps, onExit }) {
           ) : (
             <>
               <div className="px-4 py-3 border-b border-border/40 shrink-0">
-                <span className="text-sm font-semibold">Edit</span>
+                <span className="text-sm text-black">Editor{"\'"}s Panel</span>
               </div>
               <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
                 {[
@@ -784,8 +807,8 @@ export function Editor({ compositionProps, onExit }) {
                     onClick={() => setActivePanel(id)}
                     className="flex items-center gap-3 px-3 py-3 rounded-xl border border-border/50 hover:bg-muted/40 hover:border-border transition-colors text-left w-full"
                   >
-                    <div className="w-8 h-8 rounded-lg bg-neutral-100 flex items-center justify-center shrink-0">
-                      <Icon className="w-4 h-4 text-neutral-600" />
+                    <div className="w-8 h-8 rounded-lg bg-black flex items-center justify-center shrink-0">
+                      <Icon className="w-4 h-4 text-[#c7f038]" />
                     </div>
                     <div>
                       <p className="text-xs font-semibold">{label}</p>
