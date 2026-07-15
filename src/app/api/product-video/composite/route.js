@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth-config";
+import { resolveUserFromSession } from "@/lib/user-resolver";
 import dbConnect from "@/lib/mongodb";
 import Asset from "@/models/Asset";
 
@@ -18,8 +17,8 @@ export async function POST(request) {
   }
 
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
+    const user = await resolveUserFromSession();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -160,7 +159,7 @@ Style: This should look EXACTLY like a selfie screenshot from an Instagram Reel 
           try {
             await dbConnect();
             await Asset.create({
-              userId: session.user.id,
+              userId: user._id.toString(),
               name: `${propertyBrief?.location || "Property"} composite - ${angle} angle`,
               type: "composite",
               url: compositeUrl,

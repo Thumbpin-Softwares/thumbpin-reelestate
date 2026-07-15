@@ -1,8 +1,6 @@
 export const maxDuration = 300;
 
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth-config";
 import Asset from "@/models/Asset";
 import SeedanceJob from "@/models/SeedanceJob";
 import dbConnect from "@/lib/mongodb";
@@ -222,11 +220,6 @@ export async function POST(request) {
   let debit = null;
 
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { resolveUserFromSession } = await import("@/lib/user-resolver");
     const user = await resolveUserFromSession(request);
     if (!user) {

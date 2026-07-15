@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
 import { fal } from "@fal-ai/client";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth-config";
 import { hasSufficientCreditsForAction } from "@/lib/credit-system";
 
 /**
@@ -106,11 +104,6 @@ export async function POST(request) {
   }
 
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { resolveUserFromSession } = await import("@/lib/user-resolver");
     const user = await resolveUserFromSession(request);
     if (!user) {

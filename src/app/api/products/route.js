@@ -1,19 +1,18 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth-config";
+import { resolveUserFromSession } from "@/lib/user-resolver";
 import dbConnect from "@/lib/mongodb";
 import Product from "@/models/Product";
 
 export async function GET(request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
+    const user = await resolveUserFromSession();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     await dbConnect();
     
-    const products = await Product.find({ userId: session.user.id }).sort({ createdAt: -1 });
+    const products = await Product.find({ userId: user._id.toString() }).sort({ createdAt: -1 });
     return NextResponse.json({ products });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -24,8 +23,8 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
+    const user = await resolveUserFromSession();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -39,7 +38,7 @@ export async function POST(request) {
     await dbConnect();
     
     const product = await Product.create({
-      userId: session.user.id,
+      userId: user._id.toString(),
       name,
       description,
       targetAudience,
@@ -57,8 +56,8 @@ export async function POST(request) {
 
 export async function DELETE(request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
+    const user = await resolveUserFromSession();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -71,7 +70,7 @@ export async function DELETE(request) {
 
     await dbConnect();
     
-    const product = await Product.findOneAndDelete({ _id: id, userId: session.user.id });
+    const product = await Product.findOneAndDelete({ _id: id, userId: user._id.toString() });
     if (!product) {
       return NextResponse.json({ error: "Product not found or unauthorized" }, { status: 404 });
     }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Menu, X, LayoutDashboard } from "lucide-react";
 

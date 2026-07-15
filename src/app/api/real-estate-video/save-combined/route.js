@@ -1,6 +1,4 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth-config";
 import { getResolvedUserId } from "@/lib/user-resolver";
 import Asset from "@/models/Asset";
 import dbConnect from "@/lib/mongodb";
@@ -15,7 +13,6 @@ import { uploadToR2, buildUserKey } from "@/lib/r2-upload";
  */
 export async function POST(request) {
   try {
-    const session = await getServerSession(authOptions);
     // ── User Resolution ──────────────────────────────────────────────────────
     const userId = await getResolvedUserId(request);
     if (!userId) {

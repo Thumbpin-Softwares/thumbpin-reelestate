@@ -1,15 +1,14 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import Asset from "@/models/Asset";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth-config";
+import { resolveUserFromSession } from "@/lib/user-resolver";
 import fs from "fs/promises";
 import path from "path";
 
 export async function DELETE(request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
+    const user = await resolveUserFromSession();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -19,7 +18,7 @@ export async function DELETE(request) {
     }
 
     await dbConnect();
-    const asset = await Asset.findOne({ _id: avatar_id, userId: session.user.id });
+    const asset = await Asset.findOne({ _id: avatar_id, userId: user._id.toString() });
 
     if (!asset) {
       return NextResponse.json({ error: "Asset not found" }, { status: 404 });

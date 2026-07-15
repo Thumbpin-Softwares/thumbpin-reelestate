@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import Video from "@/models/Video";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth-config";
+import { resolveUserFromSession } from "@/lib/user-resolver";
 
 export async function GET(request) {
   try {
@@ -13,13 +12,13 @@ export async function GET(request) {
       return NextResponse.json({ error: "Video ID is required" }, { status: 400 });
     }
 
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
+    const user = await resolveUserFromSession();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     await dbConnect();
-    const video = await Video.findOne({ _id: videoId, userId: session.user.id });
+    const video = await Video.findOne({ _id: videoId, userId: user._id.toString() });
 
     if (!video) {
       return NextResponse.json({ error: "Video not found" }, { status: 404 });

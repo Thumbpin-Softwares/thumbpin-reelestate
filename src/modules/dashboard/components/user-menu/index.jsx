@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { signOut } from "next-auth/react";
+import { signOut } from "@/lib/auth-client";
 import { User as UserIcon, LogOut, CreditCard, HelpCircle } from "lucide-react";
 
 export default function UserMenu({ user, initials }) {

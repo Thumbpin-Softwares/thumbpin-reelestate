@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth-config";
+import { resolveUserFromSession } from "@/lib/user-resolver";
 import Asset from "@/models/Asset";
 import dbConnect from "@/lib/mongodb";
 import { consumeCreditsForAction, refundCreditsForAction } from "@/lib/credit-system";
@@ -33,13 +32,13 @@ export async function POST(request) {
   const ai = new GoogleGenAI({ apiKey });
 
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
+    const user = await resolveUserFromSession();
+    if (!user) {
       console.error("[DEBUG] No session found");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    userId = session.user.id;
+    userId = user._id.toString();
     console.log(`[DEBUG] User ID: ${userId}`);
 
     const formData = await request.formData();
@@ -272,7 +271,7 @@ export async function POST(request) {
             console.log(`[DEBUG] Saving to Asset Library...`);
             await dbConnect();
             const asset = await Asset.create({
-              userId: session.user.id,
+              userId: user._id.toString(),
               name: `AI Walkthrough - ${new Date().toLocaleDateString()}`,
               url: persistedVideoUrl,
               type: "clip",

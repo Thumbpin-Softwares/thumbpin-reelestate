@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth-config";
+import { resolveUserFromSession } from "@/lib/user-resolver";
 
 /**
  * POST /api/product-video/generate-script
@@ -26,8 +25,8 @@ export async function POST(request) {
   }
 
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
+    const user = await resolveUserFromSession();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

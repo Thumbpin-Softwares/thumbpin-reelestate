@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useUser } from "@/hooks/use-user";
-import { signOut } from "next-auth/react";
+import { signOut } from "@/lib/auth-client";
 import {
   Crown,
   LogOut,
