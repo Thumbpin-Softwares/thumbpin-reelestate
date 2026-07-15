@@ -56,7 +56,13 @@ export async function signIn(provider, options = {}) {
     // browser itself through the backend's OAuth flow. The backend then
     // redirects back to this app's /auth/callback with a one-time code
     // (see thumbpin-backend's googleCallback + this app's /auth/callback).
-    window.location.href = `${BACKEND_URL}/api/v1/auth/google`;
+    // `origin` tells the backend which frontend to send the user back to —
+    // Google's callback carries no Origin header, and the backend may allow
+    // more than one frontend (e.g. localhost + prod), so without this it
+    // would always redirect to a single fixed default regardless of where
+    // sign-in actually started.
+    const origin = encodeURIComponent(window.location.origin);
+    window.location.href = `${BACKEND_URL}/api/v1/auth/google?origin=${origin}`;
     return;
   }
 
