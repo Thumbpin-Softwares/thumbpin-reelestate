@@ -3,7 +3,7 @@ import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { signIn } from "next-auth/react";
+import { signIn, useSession } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ import { toast } from "sonner";
 
 export default function SignupPage() {
   const router = useRouter();
+  const { refetch } = useSession();
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -26,6 +27,9 @@ export default function SignupPage() {
     const name = formData.get("name");
 
     try {
+      // Goes through this app's own /api/auth/register proxy (same-origin)
+      // so the session cookie ends up on this app's own domain. It already
+      // logs the account in, so there's no separate sign-in step after this.
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -38,19 +42,9 @@ export default function SignupPage() {
         return;
       }
 
-      const result = await signIn("credentials", {
-        email,
-        password,
-        redirect: false,
-      });
-
-      if (result?.error) {
-        toast.error("Account created but sign-in failed. Please log in.");
-        router.push("/auth/login");
-      } else {
-        toast.success("Welcome! Your account is ready 🎉");
-        router.push("/dashboard");
-      }
+      await refetch();
+      toast.success("Welcome! Your account is ready 🎉");
+      router.push("/dashboard");
     } catch (err) {
       toast.error("Something went wrong. Please try again.");
     } finally {

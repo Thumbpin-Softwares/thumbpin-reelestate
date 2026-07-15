@@ -3,7 +3,7 @@ import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { signIn } from "next-auth/react";
+import { signIn, useSession } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ import { toast } from "sonner";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { refetch } = useSession();
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -24,12 +25,12 @@ export default function LoginPage() {
     const result = await signIn("credentials", {
       email: formData.get("email"),
       password: formData.get("password"),
-      redirect: false,
     });
     setLoading(false);
     if (result?.error) {
       toast.error("Invalid email or password");
     } else {
+      await refetch();
       router.push("/dashboard");
     }
   }

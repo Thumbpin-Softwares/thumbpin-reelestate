@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth-config";
+import { resolveUserFromSession } from "@/lib/user-resolver";
 import Video from "@/models/Video";
 import Asset from "@/models/Asset";
 import dbConnect from "@/lib/mongodb";
@@ -46,8 +45,8 @@ export async function GET(request) {
     // Update DB if completed
     try {
       if (isCompleted && info.video_url) {
-        const session = await getServerSession(authOptions);
-        if (session) {
+        const user = await resolveUserFromSession();
+        if (user) {
           await dbConnect();
           
           // Update Video record
@@ -63,13 +62,13 @@ export async function GET(request) {
 
           // Create Asset record if it doesn't exist
           const existingAsset = await Asset.findOne({ 
-            userId: session.user.id,
+            userId: user._id.toString(),
             "metadata.video_id": video_id 
           });
 
           if (!existingAsset && videoRecord) {
             await Asset.create({
-              userId: session.user.id,
+              userId: user._id.toString(),
               name: `Generated Video - ${new Date().toLocaleDateString()}`,
               url: info.video_url,
               type: "video",

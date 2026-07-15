@@ -1,6 +1,4 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth-config";
 import { getResolvedUserId } from "@/lib/user-resolver";
 import { getTemplateBySlug } from "@/lib/templates";
 import { runVideoAdPipeline } from "@/lib/template-generators/run-pipeline";
@@ -24,8 +22,8 @@ export async function POST(request, { params }) {
     return NextResponse.json({ error: `Unknown template "${slug}"` }, { status: 404 });
   }
 
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
+  const userId = await getResolvedUserId(request);
+  if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -47,9 +45,8 @@ export async function POST(request, { params }) {
   }
 
   try {
-    const userId = await getResolvedUserId(request);
     const { clips, finalVideoUrl } = await runVideoAdPipeline(frames, {
-      userId: userId || "template",
+      userId,
       gender,
     });
     return NextResponse.json({ success: true, clips, finalVideoUrl });

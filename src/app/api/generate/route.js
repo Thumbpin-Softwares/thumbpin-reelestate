@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import Video from "@/models/Video";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth-config";
+import { resolveUserFromSession } from "@/lib/user-resolver";
 import { generateTTS } from "@/lib/api/tts";
 import { generateLipSync } from "@/lib/api/lipsync";
 import { consumeCreditsForAction, refundCreditsForAction } from "@/lib/credit-system";
@@ -32,15 +31,15 @@ export async function POST(request) {
     }
 
     // ── 2. Authenticate User ───────────────────────────────
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
+    const user = await resolveUserFromSession();
+    if (!user) {
       return NextResponse.json(
         { error: "Authentication required. Please log in." },
         { status: 401 }
       );
     }
 
-    userId = session.user.id;
+    userId = user._id.toString();
     await dbConnect();
 
     // ── 3. Check & Deduct Credits (centralized) ────────────

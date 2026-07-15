@@ -1,6 +1,4 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth-config";
 import { resolveUserFromSession } from "@/lib/user-resolver";
 import dbConnect from "@/lib/mongodb";
 import Asset from "@/models/Asset";
@@ -13,14 +11,12 @@ const MAX_BYTES_PER_IMAGE = 10 * 1024 * 1024; // 10 MB each
 
 export async function POST(req) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     await dbConnect();
     const resolvedUser = await resolveUserFromSession();
-    const userId = resolvedUser?._id?.toString() ?? session.user.id;
+    if (!resolvedUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = resolvedUser._id.toString();
 
     const formData = await req.formData();
 

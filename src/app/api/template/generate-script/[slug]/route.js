@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth-config";
+import { resolveUserFromSession } from "@/lib/user-resolver";
 import { getTemplateBySlug } from "@/lib/templates";
 import { resolveR2Url } from "@/lib/r2";
 import { getScriptGenerator } from "@/lib/template-generators";
@@ -17,8 +16,8 @@ export async function POST(request, { params }) {
     return NextResponse.json({ error: `Unknown template "${slug}"` }, { status: 404 });
   }
 
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
+  const user = await resolveUserFromSession();
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -42,7 +41,7 @@ export async function POST(request, { params }) {
       propertyImages: (values.propertyImages || []).map(resolveR2Url),
     };
     const generateScript = await getScriptGenerator(slug);
-    const result = await generateScript({ template, values: resolvedValues, session });
+    const result = await generateScript({ template, values: resolvedValues, user });
     return NextResponse.json({ success: true, ...result });
   } catch (err) {
     console.error(`[api/template/generate-script/${slug}] failed:`, err);

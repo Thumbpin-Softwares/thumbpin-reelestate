@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
-import { useSession, signOut } from "next-auth/react";
+import { useSession, signOut } from "@/lib/auth-client";
 import {
   FolderOpen,
   Plus,
@@ -95,7 +95,7 @@ export default function UserNav() {
                 <div className="bg-black flex items-center justify-center p-2 rounded-full shrink-0">
                   <RectangleGoggles className="w-4 h-4" fill="#c7f038" />
                 </div>
-                <span className="text-xl font-semibold">Thumbplay.ai</span>
+                <span className="text-xl font-semibold">Thumbplay AI</span>
               </Link>
             </SheetTitle>
           </SheetHeader>

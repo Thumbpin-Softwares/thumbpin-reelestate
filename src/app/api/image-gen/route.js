@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth-config";
+import { resolveUserFromSession } from "@/lib/user-resolver";
 import { consumeCreditsForAction, refundCreditsForAction } from "@/lib/credit-system";
 import dbConnect from "@/lib/mongodb";
 import Asset from "@/models/Asset";
@@ -120,12 +119,12 @@ export async function POST(request) {
   let debit = null;
 
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const user = await resolveUserFromSession();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    userId = session.user.id;
+    userId = user._id.toString();
 
     const body = await request.json();
     const { prompt, model = "dall-e", settings = {} } = body;

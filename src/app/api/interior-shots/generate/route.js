@@ -1,8 +1,6 @@
 export const maxDuration = 300;
 
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth-config";
 import { uploadToR2, buildUserKey } from "@/lib/r2-upload";
 import { consumeCreditsForAction, refundCreditsForAction } from "@/lib/credit-system";
 import { fal } from "@fal-ai/client";
@@ -31,9 +29,6 @@ export async function POST(request) {
   let debit  = null;
 
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
     const { resolveUserFromSession } = await import("@/lib/user-resolver");
     const user = await resolveUserFromSession(request);
     if (!user) return NextResponse.json({ error: "User not found." }, { status: 404 });

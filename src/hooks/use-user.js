@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/auth-client";
 import { useCallback, useEffect, useState } from "react";
 
 // Fired anywhere in the app right after an action that changes the user's

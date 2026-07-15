@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import Asset from "@/models/Asset";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth-config";
+import { resolveUserFromSession } from "@/lib/user-resolver";
 import { uploadToR2, buildUserKey } from "@/lib/r2-upload";
 
 /**
@@ -13,8 +12,8 @@ import { uploadToR2, buildUserKey } from "@/lib/r2-upload";
  */
 export async function POST(request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
+    const user = await resolveUserFromSession();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -43,12 +42,12 @@ export async function POST(request) {
       const ext = mimeType.includes("png") ? "png" : "jpg";
 
       // ── Upload to R2 ──────────────────────────────────────────────────────
-      const key = buildUserKey(session.user.id, "composites", ext, "composite");
+      const key = buildUserKey(user._id.toString(), "composites", ext, "composite");
       const url = await uploadToR2(buffer, key, mimeType);
 
       // ── Save metadata in MongoDB ──────────────────────────────────────────
       const asset = await Asset.create({
-        userId: session.user.id,
+        userId: user._id.toString(),
         name: name || `RE Composite ${i + 1}`,
         url,
         type: "composite",

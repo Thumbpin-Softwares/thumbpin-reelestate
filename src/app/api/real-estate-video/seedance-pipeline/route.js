@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
 import { fal } from "@fal-ai/client";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth-config";
 import Asset from "@/models/Asset";
 import dbConnect from "@/lib/mongodb";
 import { uploadToR2, buildUserKey } from "@/lib/r2-upload";
@@ -32,11 +30,6 @@ export async function POST(request) {
   const encoder = new TextEncoder();
 
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     if (!process.env.FAL_KEY) {
       return NextResponse.json({ error: "FAL_KEY is not configured" }, { status: 500 });
     }

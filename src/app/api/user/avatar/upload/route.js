@@ -1,6 +1,4 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth-config";
 import { resolveUserFromSession } from "@/lib/user-resolver";
 import dbConnect from "@/lib/mongodb";
 import User from "@/models/User";
@@ -11,11 +9,6 @@ const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 
 export async function POST(req) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     // Check Content-Length header before reading the body
     const contentLength = Number(req.headers.get("content-length") ?? 0);
     if (contentLength > MAX_BYTES) {
@@ -24,7 +17,10 @@ export async function POST(req) {
 
     await dbConnect();
     const resolvedUser = await resolveUserFromSession();
-    const userId = resolvedUser?._id?.toString() ?? session.user.id;
+    if (!resolvedUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = resolvedUser._id.toString();
 
     let formData;
     try {

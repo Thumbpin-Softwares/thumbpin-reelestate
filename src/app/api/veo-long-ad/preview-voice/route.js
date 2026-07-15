@@ -1,6 +1,4 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth-config";
 import { fal } from "@fal-ai/client";
 import { synthesizeVoice } from "@/lib/voice-tts";
 import { hasSufficientCreditsForAction } from "@/lib/credit-system";
@@ -18,10 +16,6 @@ export async function POST(request) {
   // key get gated here (action-reel, comedy-reel, veo-long-ad today). Callers
   // that don't send it (e.g. luxury-car-exit) keep this route's old behavior.
   if (action) {
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
     const { resolveUserFromSession } = await import("@/lib/user-resolver");
     const user = await resolveUserFromSession(request);
     if (!user) {

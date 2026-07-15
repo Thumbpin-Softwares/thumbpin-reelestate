@@ -1,7 +1,7 @@
 "use client";
 
-import { SessionProvider } from "next-auth/react";
+import { AuthProvider as BackendAuthProvider } from "@/lib/auth-client";
 
 export function AuthProvider({ children }) {
-  return <SessionProvider>{children}</SessionProvider>;
+  return <BackendAuthProvider>{children}</BackendAuthProvider>;
 }

@@ -1,6 +1,4 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth-config";
 import { fal } from "@fal-ai/client";
 import { synthesizeVoice } from "@/lib/voice-tts";
 import { hasSufficientCreditsForAction } from "@/lib/credit-system";
@@ -21,11 +19,6 @@ const MAX_PREVIEW_CHARS = 600;
  * burn real ElevenLabs/Sarvam TTS calls on previews they could never actually render.
  */
 export async function POST(request) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const { resolveUserFromSession } = await import("@/lib/user-resolver");
   const user = await resolveUserFromSession(request);
   if (!user) {

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth-config";
+import { resolveUserFromSession } from "@/lib/user-resolver";
 import { getTemplateBySlug } from "@/lib/templates";
 import { generateFrameImages } from "@/lib/template-generators/generate-images";
 
@@ -24,8 +23,8 @@ export async function POST(request, { params }) {
     return NextResponse.json({ error: `Unknown template "${slug}"` }, { status: 404 });
   }
 
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
+  const user = await resolveUserFromSession();
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

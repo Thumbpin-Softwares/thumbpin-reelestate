@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth-config";
+import { resolveUserFromSession } from "@/lib/user-resolver";
 import dbConnect from "@/lib/mongodb";
 import User from "@/models/User";
 
@@ -13,8 +12,8 @@ const CREDIT_PACKS = {
 
 export async function POST(request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const sessionUser = await resolveUserFromSession();
+    if (!sessionUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -29,7 +28,7 @@ export async function POST(request) {
     }
 
     await dbConnect();
-    const user = await User.findById(session.user.id).select("_id email");
+    const user = await User.findById(sessionUser._id.toString()).select("_id email");
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }

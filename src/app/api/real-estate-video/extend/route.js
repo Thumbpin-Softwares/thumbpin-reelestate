@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth-config";
+import { resolveUserFromSession } from "@/lib/user-resolver";
 import dbConnect from "@/lib/mongodb";
 import Asset from "@/models/Asset";
 import { uploadToR2, buildUserKey } from "@/lib/r2-upload";
@@ -30,12 +29,12 @@ export async function POST(request) {
   }
 
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
+    const user = await resolveUserFromSession();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    userId = session.user.id;
+    userId = user._id.toString();
     const body = await request.json();
 
     const {

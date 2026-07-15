@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -73,7 +73,7 @@ export function Navbar() {
               <RectangleGoggles className="w-4 h-4" fill="#c7f038" />
             </div>
             <span className="text-lg sm:text-xl font-medium">
-              Thumbplay.ai
+              Thumbplay AI
             </span>
           </Link>
 
