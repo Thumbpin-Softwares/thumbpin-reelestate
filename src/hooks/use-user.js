@@ -16,67 +16,77 @@ export function notifyCreditsChanged() {
 
 /**
  * Hook to get the current authenticated user and their profile details.
- * All data comes from MongoDB via /api/user/profile.
+ * Identity (name/email/image/createdAt) comes from the session, which is
+ * itself backed by thumbpin-backend's /auth/me (see lib/backend-session.js).
+ * Credits/plan/free-quota come from thumbpin-backend's dedicated credits
+ * module (/api/credits/me -> backend's /credits/me) — the same live Mongo
+ * row as the session, just read through the module that owns balance logic.
  */
 export function useUser() {
   const { data: session, status } = useSession();
-  const [profile, setProfile] = useState(null);
-  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [credits, setCredits] = useState(null);
+  const [loadingCredits, setLoadingCredits] = useState(true);
 
-  const fetchProfile = useCallback(async () => {
+  const fetchCredits = useCallback(async () => {
     if (status === "authenticated" && session?.user?.id) {
       try {
-        const res = await fetch("/api/user/profile");
+        const res = await fetch("/api/credits/me", { cache: "no-store" });
         if (res.ok) {
           const data = await res.json();
-          setProfile(data.user);
+          setCredits({ credits: data.credits, plan: data.plan, freeQuota: data.freeQuota });
         } else {
-          // fallback to session data only
-          setProfile({
-            ...session.user,
-            credits: 0,
-            plan: "free",
-          });
+          setCredits({ credits: 0, plan: "free", freeQuota: null });
         }
       } catch (error) {
-        console.error("[useUser] Error fetching profile:", error);
-        setProfile({
-          ...session.user,
-          credits: 0,
-          plan: "free",
-        });
+        console.error("[useUser] Error fetching credits:", error);
+        setCredits({ credits: 0, plan: "free", freeQuota: null });
       } finally {
-        setLoadingProfile(false);
+        setLoadingCredits(false);
       }
     } else if (status === "unauthenticated") {
-      setProfile(null);
-      setLoadingProfile(false);
+      setCredits(null);
+      setLoadingCredits(false);
     }
   }, [session, status]);
 
   useEffect(() => {
-    fetchProfile();
-  }, [fetchProfile]);
+    fetchCredits();
+  }, [fetchCredits]);
 
   // Instant updates: refetch the moment another part of the app reports a
   // credit change, plus whenever the tab regains focus.
   useEffect(() => {
-    window.addEventListener(CREDITS_CHANGED_EVENT, fetchProfile);
-    window.addEventListener("focus", fetchProfile);
+    window.addEventListener(CREDITS_CHANGED_EVENT, fetchCredits);
+    window.addEventListener("focus", fetchCredits);
     return () => {
-      window.removeEventListener(CREDITS_CHANGED_EVENT, fetchProfile);
-      window.removeEventListener("focus", fetchProfile);
+      window.removeEventListener(CREDITS_CHANGED_EVENT, fetchCredits);
+      window.removeEventListener("focus", fetchCredits);
     };
-  }, [fetchProfile]);
+  }, [fetchCredits]);
 
-  const isLoading = status === "loading" || loadingProfile;
+  const isLoading = status === "loading" || loadingCredits;
+
+  // `profile` keeps the same merged shape earlier code already relies on
+  // (name/email/image/createdAt from session + credits/plan/free-quota
+  // counts from the credits module) so existing consumers don't need to
+  // change how they read it.
+  const profile = session?.user
+    ? {
+        ...session.user,
+        credits: credits?.credits ?? 0,
+        plan: credits?.plan ?? "free",
+        freeVideoGenerationsUsed: credits?.freeQuota?.video?.used ?? session.user.freeVideoGenerationsUsed ?? 0,
+        freeAvatarGenerationsUsed: credits?.freeQuota?.avatar?.used ?? session.user.freeAvatarGenerationsUsed ?? 0,
+      }
+    : null;
 
   return {
     user: session?.user || null,
     profile,
     loading: isLoading,
-    credits: profile?.credits ?? 0,
+    credits: credits?.credits ?? 0,
+    freeQuota: credits?.freeQuota ?? null,
     status,
-    refetch: fetchProfile,
+    refetch: fetchCredits,
   };
 }

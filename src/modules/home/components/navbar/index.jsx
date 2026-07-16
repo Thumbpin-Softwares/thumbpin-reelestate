@@ -38,7 +38,7 @@ const PRODUCT_DROPDOWN_ITEMS = [
 
 const navItems = [
   { title: "Product", dropdown: true, items: PRODUCT_DROPDOWN_ITEMS },
-  { title: "Use Cases", link: "/usage" },
+  { title: "How It Works", link: "/usage" },
   { title: "Resources", link: "/resources"},
   { title: "Pricing", link: "/pricing" },
 ];

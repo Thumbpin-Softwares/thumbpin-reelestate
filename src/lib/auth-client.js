@@ -18,7 +18,11 @@ export function AuthProvider({ children }) {
       const res = await fetch("/api/auth/session", { cache: "no-store" });
       const data = await res.json();
       if (data?.user) {
-        setUser(data.user);
+        // The backend's user doc uses Mongo's `_id`, not NextAuth's `id` —
+        // alias it so every call site that still checks `session.user.id`
+        // (the NextAuth-era convention used throughout this codebase) keeps
+        // working instead of silently never matching.
+        setUser({ id: data.user._id, ...data.user });
         setStatus("authenticated");
       } else {
         setUser(null);
