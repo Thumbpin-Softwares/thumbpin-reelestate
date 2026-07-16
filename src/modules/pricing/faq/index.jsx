@@ -9,6 +9,14 @@ const data = [
     question : "Can I really cancel anytime?",
     answer : "Yes, absolutely. If you want to cancel your plan, simply go to your dashboard and select 'Billing' in the top left dropdown and click on 'Turn off auto-renewal'. If you do cancel, you will continue to have access to all the premium features until the end of your billing cycle.",
   },
+  {
+    question : "What currencies and payment options are available",
+    answer : "All the prices are listed in INR. We accept all major debit cards and credit cards as our payment system uses Razorpay which is one of the most secured and reliable payemnt aggregator. If you have any problems in the payment please feel free to contact us.",
+  },
+  {
+    question : "How do AI credits work?",
+    answer : "Your plan includes set amount of credits each month or year to spend on AI generations. Your full allowance refreshes when your subscription renews, so you get a fresh batch to use. Credits do no carry over, and you can move to a higher plan whenever you need more.",
+  }
 ];
 
 export default function Faq() {
