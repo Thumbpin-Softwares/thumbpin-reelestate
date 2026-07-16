@@ -94,10 +94,9 @@ export default function Payment() {
 
             {/* Card */}
             <div
-              className={`relative flex flex-col w-full rounded-3xl bg-white border border-neutral-200 p-6
+              className={`relative flex flex-col w-full rounded-3xl bg-white p-6
         transition-all duration-300
         hover:-translate-y-2
-        shadow-[0_8px_20px_rgba(0,0,0,0.04),0_20px_50px_rgba(0,0,0,0.08)]
         hover:shadow-[0_20px_40px_rgba(0,0,0,0.08),0_40px_80px_rgba(0,0,0,0.12)]
         ${
           items.tag === "Recommended"

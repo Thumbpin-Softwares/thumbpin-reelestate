@@ -6,6 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { useUser } from "@/hooks/use-user";
 import { CreditCard } from "lucide-react";
 import Payment from "@/modules/pricing/payment";
+import { CreditTransactions } from "@/modules/dashboard/components/credit-transactions";
 
 export default function CreditsPage() {
   const { credits, profile, loading } = useUser();
@@ -62,6 +63,9 @@ export default function CreditsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Transaction history — thumbpin-backend's credits module */}
+      <CreditTransactions />
 
       {/* Pricing — same plans/cards as the public pricing page */}
       <Payment />
