@@ -10,7 +10,7 @@ const Plans = [
     tax: "(+GST Applicable)",
     paymentLink: "",
     buttonName: "Go Creator",
-    description: "6,000 Credits",
+    description: "100,000 Credits",
     points: [
       "No watermark",
       "Unlimited Auto Subtitles",
@@ -26,7 +26,7 @@ const Plans = [
     tax: "(+GST Applicable)",
     paymentLink: "",
     buttonName: "Go Pro",
-    description: "30,000 Credits",
+    description: "150,000 Credits",
     points: [
       "Everything in Creator +",
       "Multiple Brand Kits",
@@ -43,7 +43,7 @@ const Plans = [
     tax: "(+GST Applicable)",
     paymentLink: "",
     buttonName: "Go Studio",
-    description: "180,000 Credits",
+    description: "300,000 Credits",
     points: [
       "Everything in Pro +",
       "Custom Templates",
