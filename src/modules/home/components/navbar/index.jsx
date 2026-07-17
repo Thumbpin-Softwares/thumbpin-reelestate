@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 
 // Add entries here to populate the "Product" dropdown, e.g.
-// { title: "Home Tour", link: "/dashboard/home-tour", description: "..." }
+// { title: "Feature Name", link: "/dashboard/feature-slug", description: "..." }
 const PRODUCT_DROPDOWN_ITEMS = [
   {
     title: "Real Estate Ad Generator",
