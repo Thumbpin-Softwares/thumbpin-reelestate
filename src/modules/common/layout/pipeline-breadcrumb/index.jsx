@@ -8,18 +8,14 @@ import { ChevronRight, Home } from "lucide-react";
 // are utility pages and don't get a breadcrumb.
 const PIPELINE_LABELS = {
   "luxury-car-exit": "Luxury Car Exit",
-  "news-anchor": "News Anchor",
-  "home-tour": "Home Tour",
   "ugc-creator": "UGC Creator",
   "product-to-video": "Product Video",
   "site-view": "Site View",
-  "ai-walkthrough": "Real Estate Walkthrough",
   "interior-shots": "Interior Shots",
   "ken-burns": "Ken Burns",
   "veo-long-ad": "Veo Long Ad",
   "action-reel": "Action Reel",
   "comedy-reel": "Comedy Reel",
-  "prototype": "Prototype",
 };
 
 export default function PipelineBreadcrumb() {

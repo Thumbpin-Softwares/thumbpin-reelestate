@@ -30,6 +30,7 @@ export function AddAssetsStep({
   helpHref,
   prebuiltLabel,
   uploadEndpoint,
+  propertyUploadEndpoint,
   continueLabel = "Continue to Script",
   avatarGender,
   setAvatarGender,
@@ -39,7 +40,13 @@ export function AddAssetsStep({
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="grid md:grid-cols-2 gap-6">
-        <PropertyImages images={images} setImages={setImages} max={max} helpHref={helpHref} />
+        <PropertyImages
+          images={images}
+          setImages={setImages}
+          max={max}
+          helpHref={helpHref}
+          {...(propertyUploadEndpoint ? { uploadEndpoint: propertyUploadEndpoint } : {})}
+        />
         <div className="space-y-3">
           <ModelSelector avatarHook={avatarHook} prebuiltLabel={prebuiltLabel} uploadEndpoint={uploadEndpoint} />
           {setAvatarGender && avatarHook.selectedAvatars.length > 0 && (

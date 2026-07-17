@@ -13,17 +13,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+// Commercial/Plotted are temporarily disabled — only Residential is wired
+// to a working generation flow (omni-hometour-pipeline) right now; the
+// generic-pipeline flow behind Commercial/Plotted is being reworked.
 const CLASSIFICATIONS = [
-  { id: "commercial", label: "Commercial" },
+  { id: "commercial", label: "Commercial", disabled: true },
   { id: "residential", label: "Residential" },
-  { id: "plotted", label: "Plotted" },
+  { id: "plotted", label: "Plotted", disabled: true },
 ];
 
-const GLOBAL_REQUIRED = ["propertyClassification", "projectName", "projectType", "projectArea", "location", "tonality"];
+const GLOBAL_REQUIRED = ["propertyClassification", "projectName", "projectType", "projectArea", "location", "tonality", "language"];
 
-// Checks the fields required for the current classification. Residential
-// and Plotted only require Carpet Area beyond the global set; Commercial
-// additionally requires Shop Type + Shop Built-up Area.
+// Checks the fields required for the current classification. Language/Vibe
+// are global (every property type needs them, not just Residential).
+// Plotted only requires Carpet Area beyond the global set; Commercial
+// additionally requires Shop Type + Shop Built-up Area; Residential also
+// requires Carpet Area.
 export function isSiteFormValid(values = {}) {
   const filled = (key) => !!values[key]?.toString().trim();
   if (!GLOBAL_REQUIRED.every(filled)) return false;
@@ -41,6 +46,15 @@ const PROJECT_TYPES = [
   { id: "affordable", label: "Affordable" },
   { id: "luxury", label: "Luxury" },
   { id: "ultra-luxury", label: "Ultra Luxury" },
+];
+
+// Same language set as the shared SpeakerLanguage picker (used elsewhere as
+// a button group) — kept identical so "english"/"hindi"/"hinglish" values
+// stay consistent across the app regardless of which control renders them.
+const LANGUAGES = [
+  { id: "english", label: "English" },
+  { id: "hindi", label: "Hindi" },
+  { id: "hinglish", label: "Hinglish" },
 ];
 
 function FieldLabel({ children, required }) {
@@ -98,14 +112,18 @@ export function SiteForm({ values = {}, onChange }) {
               <button
                 key={c.id}
                 type="button"
-                onClick={() => setField("propertyClassification", c.id)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                  classification === c.id
-                    ? "bg-neutral-900 text-[#c7f038]"
-                    : "border border-border text-muted-foreground hover:border-neutral-400"
+                disabled={c.disabled}
+                onClick={() => !c.disabled && setField("propertyClassification", c.id)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  c.disabled
+                    ? "border border-border/50 text-muted-foreground/40 cursor-not-allowed"
+                    : classification === c.id
+                      ? "bg-neutral-900 text-[#c7f038] cursor-pointer"
+                      : "border border-border text-muted-foreground hover:border-neutral-400 cursor-pointer"
                 }`}
               >
                 {c.label}
+                {c.disabled && <span className="ml-1 text-[10px] opacity-70">(Soon)</span>}
               </button>
             ))}
           </div>
@@ -156,6 +174,32 @@ export function SiteForm({ values = {}, onChange }) {
         <div className="grid sm:grid-cols-2 gap-4">
           <TextField label="Landmarks" field="landmarks" values={values} setField={setField} />
           <TextField label="Connectivity" field="connectivity" values={values} setField={setField} />
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <FieldLabel required>Language</FieldLabel>
+            <Select value={values.language || ""} onValueChange={(v) => setField("language", v)}>
+              <SelectTrigger className="w-full text-sm">
+                <SelectValue placeholder="Select language" />
+              </SelectTrigger>
+              <SelectContent>
+                {LANGUAGES.map((l) => (
+                  <SelectItem key={l.id} value={l.id}>
+                    {l.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <TextField
+            label="Vibe"
+            field="vibe"
+            values={values}
+            setField={setField}
+            placeholder="e.g., calm, energetic, cinematic"
+            hint="Guides the video's visual mood"
+          />
         </div>
       </div>
 

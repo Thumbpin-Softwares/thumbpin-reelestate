@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAvatars } from "@/modules/ai-walkthrough/hooks/useAvatars";
 import { StepCapsule } from "@/modules/template/components/StepCapsule";
@@ -9,8 +9,24 @@ import { AddAssetsStep } from "@/modules/template/layout/AddAssetsStep";
 import { StepScript } from "@/modules/template/layout/StepScript";
 import { StepFinalize } from "@/modules/template/layout/StepFinalize";
 import { StepGeneration } from "@/modules/template/layout/StepGeneration";
+import { ModelTourGeneration } from "./components/ModelTourGeneration";
+import { ModelTourGenerations } from "./components/ModelTourGenerations";
+import { History } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const STEP_LABELS = ["Add Assets", "Script", "Finalize"];
+
+// Only Residential is wired to fal's omni-hometour-pipeline workflow (one
+// direct call, no storyboard). Commercial and Plotted keep using the
+// generic script -> images -> videos pipeline every other template uses.
+const MODEL_TOUR_CLASSIFICATION = "residential";
+
+// Persists the Add Assets / Script form (images already have permanent R2
+// URLs by the time they're in state, avatar selection, and scriptValues) so
+// a refresh doesn't lose progress. Only covers filling out the form —
+// cleared the moment generation actually starts, since the generation phase
+// has its own separate resume mechanism (jobId polling in ModelTourGeneration).
+const FORM_STATE_KEY = "model-tour-form-state";
 
 // Property Commercial's own runner — wires the shared template pieces
 // (StepCapsule, AddAssetsStep, StepScript, StepFinalize, StepGeneration) to
@@ -26,21 +42,71 @@ export default function PropertyCommercialRunner({ template }) {
   const [generatingScript, setGeneratingScript] = useState(false);
   const [storyboard, setStoryboard] = useState(null);
   const [renderedFrames, setRenderedFrames] = useState(null);
-  const [avatarGender, setAvatarGender] = useState(null);
+  const [modelTourGenerating, setModelTourGenerating] = useState(false);
+  const [showGenerations, setShowGenerations] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
   const avatarHook = useAvatars();
+
+  // Restore on mount: if a generation was already in flight, jump straight
+  // to the generation screen (it resumes the job itself via its own jobId
+  // polling). Otherwise restore whatever the user had filled in so far.
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem("model-tour-job-id")) {
+        setModelTourGenerating(true);
+        setHydrated(true);
+        return;
+      }
+
+      const raw = sessionStorage.getItem(FORM_STATE_KEY);
+      if (raw) {
+        const saved = JSON.parse(raw);
+        if (typeof saved.step === "number") setStep(saved.step);
+        if (Array.isArray(saved.images)) setImages(saved.images);
+        if (saved.scriptValues) setScriptValues(saved.scriptValues);
+        if (saved.avatarMode) avatarHook.setAvatarMode(saved.avatarMode);
+        if (Array.isArray(saved.selectedAvatars)) avatarHook.setSelectedAvatars(saved.selectedAvatars);
+        if (saved.selectedCollectionId) avatarHook.setSelectedCollectionId(saved.selectedCollectionId);
+      }
+    } catch (_) {}
+    setHydrated(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist on every change, only once hydration has run (otherwise the
+  // initial empty state would overwrite what was just restored) and only
+  // while the user is still filling out the form — not during generation.
+  useEffect(() => {
+    if (!hydrated || modelTourGenerating) return;
+    try {
+      sessionStorage.setItem(
+        FORM_STATE_KEY,
+        JSON.stringify({
+          step,
+          images,
+          scriptValues,
+          avatarMode: avatarHook.avatarMode,
+          selectedAvatars: avatarHook.selectedAvatars,
+          selectedCollectionId: avatarHook.selectedCollectionId,
+        })
+      );
+    } catch (_) {}
+  }, [hydrated, modelTourGenerating, step, images, scriptValues, avatarHook.avatarMode, avatarHook.selectedAvatars, avatarHook.selectedCollectionId]);
 
   // Only count photos once their R2 upload has actually finished — those
   // public URLs are what the script generator reads to ground its
   // image_prompts in the real property, so Continue shouldn't be reachable
-  // while any are still uploading (or failed). Asset-anchored architecture
-  // also requires a gender pick before moving on — Veo's native dialogue
-  // needs it and nothing downstream is allowed to guess it.
+  // while any are still uploading (or failed).
+  //
+  // No gender pick here anymore — Commercial/Plotted (the only classification
+  // that ever needed it, for Veo's native dialogue) are disabled in SiteForm
+  // until their pipeline is reworked, and Residential's omni-hometour-pipeline
+  // has no gender field at all.
   const uploadedImages = images.filter((img) => img.r2Url);
   const isValid =
     images.length >= 1 &&
     uploadedImages.length === images.length &&
-    avatarHook.selectedAvatars.length >= 1 &&
-    !!avatarGender;
+    avatarHook.selectedAvatars.length >= 1;
 
   // Derived at render time, not synced into state via an effect — always
   // reflects whatever's finished uploading so far, no cascading setState.
@@ -52,8 +118,12 @@ export default function PropertyCommercialRunner({ template }) {
 
   const handleClear = () => {
     setImages([]);
+    setScriptValues({});
+    setStep(0);
     avatarHook.clearSelectedAvatars();
-    setAvatarGender(null);
+    try {
+      sessionStorage.removeItem(FORM_STATE_KEY);
+    } catch (_) {}
   };
 
   // Extra lock on top of the disabled button — a rapid double-click can
@@ -84,13 +154,45 @@ export default function PropertyCommercialRunner({ template }) {
     }
   };
 
+  // Residential skips the generic storyboard pipeline entirely — the
+  // omni-hometour-pipeline workflow does scripting/TTS/video in one call.
+  const modelTourPayload = {
+    propertyName: scriptValues.projectName || "",
+    locationLandmarks: scriptValues.landmarks || "",
+    connectivity: scriptValues.connectivity || "",
+    language: scriptValues.language || "",
+    tierClass: scriptValues.projectType || "",
+    carpetArea: scriptValues.carpetArea || "",
+    amenities: scriptValues.amenities || "",
+    tonality: scriptValues.tonality || "",
+    vibe: scriptValues.vibe || "",
+    avatarImageUrls: avatarHook.selectedAvatars.map((a) => a.url).slice(0, 4),
+    propertyImageUrls: uploadedImages.map((img) => img.r2Url).slice(0, 4),
+  };
+
+  const handleContinueFromScript = () => {
+    if (scriptValues.propertyClassification === MODEL_TOUR_CLASSIFICATION) {
+      try {
+        sessionStorage.removeItem(FORM_STATE_KEY);
+      } catch (_) {}
+      setModelTourGenerating(true);
+    } else {
+      handleGenerateScript();
+    }
+  };
+
   return (
     <div className="h-full max-w-4xl mx-auto px-4 py-12 flex flex-col animate-fade-in">
-      <div className="shrink-0">
+      <div className="shrink-0 flex items-center justify-between gap-2">
         <Breadcrumbs template={template} />
+        <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowGenerations(true)}>
+          <History className="w-3.5 h-3.5" />
+          My Generations
+        </Button>
       </div>
+      <ModelTourGenerations open={showGenerations} onOpenChange={setShowGenerations} />
 
-      {step < 3 && (
+      {step < 3 && !modelTourGenerating && (
         <div className="shrink-0 flex justify-center py-3">
           <StepCapsule currentStep={step} steps={template.steps || STEP_LABELS} />
         </div>
@@ -98,6 +200,14 @@ export default function PropertyCommercialRunner({ template }) {
 
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide">
         <div className="min-h-full flex flex-col justify-center px-2 sm:px-6 lg:px-7 py-4 pb-20 md:pb-4">
+          {modelTourGenerating ? (
+            <ModelTourGeneration
+              payload={modelTourPayload}
+              onAbort={() => setModelTourGenerating(false)}
+              onBackToForm={() => setModelTourGenerating(false)}
+            />
+          ) : (
+            <>
           {step === 0 && (
             <AddAssetsStep
               images={images}
@@ -107,8 +217,8 @@ export default function PropertyCommercialRunner({ template }) {
               onNext={() => setStep(1)}
               onClear={handleClear}
               prebuiltLabel="RE Agents"
-              avatarGender={avatarGender}
-              setAvatarGender={setAvatarGender}
+              uploadEndpoint="/api/model-tour/upload/avatar"
+              propertyUploadEndpoint="/api/model-tour/upload/property"
             />
           )}
 
@@ -117,9 +227,13 @@ export default function PropertyCommercialRunner({ template }) {
               values={scriptValuesWithImages}
               onChange={({ propertyImages, avatarImage, ...rest }) => setScriptValues(rest)}
               onBack={() => setStep(0)}
-              onNext={handleGenerateScript}
+              onNext={handleContinueFromScript}
               loading={generatingScript}
-              continueLabel="Generate Storyboard"
+              continueLabel={
+                scriptValues.propertyClassification === MODEL_TOUR_CLASSIFICATION
+                  ? "Generate Video"
+                  : "Generate Storyboard"
+              }
             />
           )}
 
@@ -138,13 +252,16 @@ export default function PropertyCommercialRunner({ template }) {
             />
           )}
 
+          {/* Unreachable while Commercial/Plotted are disabled in SiteForm — kept
+              for when that pipeline is reworked and re-enabled. */}
           {step === 3 && (
             <StepGeneration
               template={template}
               renderedFrames={renderedFrames}
-              gender={avatarGender}
               onAbort={() => setStep(2)}
             />
+          )}
+            </>
           )}
         </div>
       </div>

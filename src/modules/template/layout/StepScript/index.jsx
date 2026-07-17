@@ -3,7 +3,6 @@
 import { ChevronRight, ChevronLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SiteForm, isSiteFormValid } from "@/modules/template/components/SiteForm";
-import { SpeakerLanguage } from "@/modules/template/components/SpeakerLanguage";
 
 // Step 1 for every template's pipeline: the site-details form + speaker
 // language. A template just supplies its own `values`/`onChange` state;
@@ -27,8 +26,6 @@ export function StepScript({
   return (
     <div className="space-y-5 animate-fade-in">
       <SiteForm values={values} onChange={onChange} />
-
-      <SpeakerLanguage value={values.language} onChange={(language) => onChange?.({ ...values, language })} />
 
       <div className="flex items-center justify-between pt-2">
         <Button variant="outline" onClick={onBack} disabled={loading} className="cursor-pointer">

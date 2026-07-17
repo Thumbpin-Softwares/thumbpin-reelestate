@@ -1,7 +1,5 @@
 import { Composition } from "remotion";
 import { SeedanceReelComposition, calcSeedanceReelDurationInFrames } from "./SeedanceReelComposition";
-import { NewsAnchorComposition } from "./NewsAnchorComposition";
-import { BrollComposition, calcBrollDurationInFrames } from "./BrollComposition";
 import { ActionReelComposition, calcActionReelDurationInFrames } from "./ActionReelComposition";
 import { calcDurationInFrames, calcActionReelBaseDurationInFrames } from "./duration";
 
@@ -33,51 +31,6 @@ export const RemotionRoot = () => {
             showIntro:      props.showIntro,
             showOutro:      props.showOutro,
             cutRanges:      props.cutRanges,
-          }),
-        })}
-      />
-      <Composition
-        id="NewsAnchor"
-        component={NewsAnchorComposition}
-        fps={30}
-        width={1080}
-        height={1920}
-        durationInFrames={calcDurationInFrames()}
-        defaultProps={{
-          avatarVideoUrl: "",
-          brollClips: [],
-          ctaVideoUrl: "",
-          part2AudioUrl: "",
-          avatarDuration: 15,
-          ctaDuration: 10,
-          ctaText: "",
-        }}
-        calculateMetadata={async ({ props }) => ({
-          durationInFrames: calcDurationInFrames({
-            avatarDuration: props.avatarDuration,
-            brollClips:     props.brollClips,
-            ctaDuration:    props.ctaDuration,
-            showIntro:      props.showIntro,
-            showOutro:      props.showOutro,
-          }),
-        })}
-      />
-      <Composition
-        id="NewsAnchorBroll"
-        component={BrollComposition}
-        fps={30}
-        width={1080}
-        height={1920}
-        durationInFrames={calcBrollDurationInFrames()}
-        defaultProps={{
-          mediaItems: [],
-          presetId: "cinematic",
-          musicUrl: "",
-        }}
-        calculateMetadata={async ({ props }) => ({
-          durationInFrames: calcBrollDurationInFrames({
-            mediaItems: props.mediaItems,
-            presetId:   props.presetId,
           }),
         })}
       />

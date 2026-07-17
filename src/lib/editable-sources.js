@@ -5,7 +5,9 @@
 // compositionType selects which Remotion component/duration-calc the Editor
 // (modules/edit/layout/editor) uses for preview + render props:
 //   "seedance"    — avatarVideoUrl + brollClips + ctaVideoUrl + part2AudioUrl
-//                   (SeedanceReelComposition) — news-anchor/home-tour
+//                   (SeedanceReelComposition) — no active producer since
+//                   news-anchor was purged; kept in case a future pipeline
+//                   needs this shape again, otherwise a purge candidate.
 //   "action-reel" — part1VideoUrl + part2VideoUrl, two flat baked-audio clips
 //                   (ActionReelComposition) — action-reel/comedy-reel/luxury-car-exit
 //
@@ -29,18 +31,6 @@ export const EDITABLE_SOURCES = {
     renderEndpoint: "/api/luxury-car-exit/render-remotion",
     generatorPath: "/dashboard/luxury-car-exit",
     downloadFilename: "seedance-reel.mp4",
-  },
-  "news-anchor": {
-    compositionType: "seedance",
-    renderEndpoint: "/api/news-anchor/render-remotion",
-    generatorPath: "/dashboard/news-anchor",
-    downloadFilename: "news-anchor.mp4",
-  },
-  "home-tour": {
-    compositionType: "seedance",
-    renderEndpoint: "/api/home-tour/render-remotion",
-    generatorPath: "/dashboard/home-tour",
-    downloadFilename: "home-tour.mp4",
   },
   "action-reel": {
     compositionType: "action-reel",
@@ -77,20 +67,6 @@ export const EDITABLE_SOURCES = {
     renderEndpoint: "/api/exports/render-remotion",
     generatorPath: "/dashboard/comedy-reel",
     downloadFilename: "comedy-reel.mp4",
-  },
-  "news-anchor-export": {
-    compositionType: "action-reel",
-    isFlatExport: true,
-    renderEndpoint: "/api/exports/render-remotion",
-    generatorPath: "/dashboard/news-anchor",
-    downloadFilename: "news-anchor.mp4",
-  },
-  "home-tour-export": {
-    compositionType: "action-reel",
-    isFlatExport: true,
-    renderEndpoint: "/api/exports/render-remotion",
-    generatorPath: "/dashboard/home-tour",
-    downloadFilename: "home-tour.mp4",
   },
   // What re-exporting any of the above (or re-exporting a re-export) gets
   // tagged as — still editable again the same way, so a user can keep

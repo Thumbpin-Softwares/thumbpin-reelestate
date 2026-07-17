@@ -4,14 +4,14 @@ import { useState, useCallback } from "react";
 import { Upload, X, CheckCircle2, ImagePlus, Info, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
-async function uploadToR2(file) {
+async function uploadToR2(file, uploadEndpoint) {
   const fd = new FormData();
   fd.append("file", file);
   fd.append("name", file.name || "Property Photo");
   fd.append("type", "background");
   fd.append("category", "property-photos");
 
-  const res = await fetch("/api/assets/upload", { method: "POST", body: fd });
+  const res = await fetch(uploadEndpoint, { method: "POST", body: fd });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Upload failed");
   return data.asset.url;
@@ -25,20 +25,26 @@ async function uploadToR2(file) {
 // preview. That `r2Url` is what downstream steps (e.g. the script generator,
 // which grounds its image_prompts in the real property photos) read —
 // blob URLs only exist in this browser tab and can't be sent to an API.
-export function PropertyImages({ images, setImages, max = 10, helpHref = "/dashboard/guide/upload-property" }) {
+export function PropertyImages({
+  images,
+  setImages,
+  max = 10,
+  helpHref = "/dashboard/guide/upload-property",
+  uploadEndpoint = "/api/assets/upload",
+}) {
   const [dragging, setDragging] = useState(false);
 
   const uploadOne = useCallback(
     async (id, file) => {
       try {
-        const r2Url = await uploadToR2(file);
+        const r2Url = await uploadToR2(file, uploadEndpoint);
         setImages((prev) => prev.map((img) => (img.id === id ? { ...img, r2Url, uploading: false } : img)));
       } catch (err) {
         setImages((prev) => prev.map((img) => (img.id === id ? { ...img, uploading: false, uploadError: true } : img)));
         toast.error("Photo upload failed", { description: err.message });
       }
     },
-    [setImages]
+    [setImages, uploadEndpoint]
   );
 
   const handleFiles = useCallback(
