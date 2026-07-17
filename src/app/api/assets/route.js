@@ -25,7 +25,7 @@ export async function GET(request) {
     await dbConnect();
 
     const query = { userId };
-    if (type) query.type = type;
+    if (type) query.type = type.includes(",") ? { $in: type.split(",") } : type;
 
     const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
     const limit = Math.min(Math.max(1, parseInt(searchParams.get("limit") || "24")), 50);

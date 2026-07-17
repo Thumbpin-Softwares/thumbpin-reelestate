@@ -101,7 +101,7 @@ function CollectionViewModal({ collection, onClose, onDelete, onThumbnailSet }) 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setThumbnailKey(fileKey);
-      onThumbnailSet?.(collection.id, fileKey);
+      onThumbnailSet?.(collection.id, fileKey, data.coverImage);
       toast.success("Thumbnail updated");
     } catch {
       toast.error("Failed to set thumbnail");
@@ -316,9 +316,9 @@ function UploadModal({ onClose, onUploaded }) {
     if (collectionName) fd.append("name", collectionName);
 
     try {
-      const res = await fetch("/api/admin/avatars/upload", { 
-        method: "POST", 
-        body: fd 
+      const res = await fetch("/api/admin/avatars", {
+        method: "POST",
+        body: fd
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -534,11 +534,11 @@ export default function AdminAvatarsPage() {
     setCollections(prev => prev.filter(c => c.id !== collectionId));
   }
 
-  function handleThumbnailSet(collectionId, thumbnailKey) {
+  function handleThumbnailSet(collectionId, thumbnailKey, coverImage) {
     setCollections(prev =>
       prev.map(c =>
         c.id === collectionId
-          ? { ...c, coverImage: `/api/admin/r2?key=${encodeURIComponent(thumbnailKey)}`, thumbnailKey }
+          ? { ...c, coverImage, thumbnailKey }
           : c
       )
     );

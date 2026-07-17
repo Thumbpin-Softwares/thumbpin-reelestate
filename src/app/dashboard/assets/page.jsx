@@ -36,7 +36,6 @@ const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 export default function AssetLibraryPage() {
   const {
     assets,
-    avatars,
     productImages,
     loading,
     loadingMore,
@@ -50,7 +49,21 @@ export default function AssetLibraryPage() {
     refetch,
   } = useAssets();
 
+  // "My Avatars" needs its own type-scoped fetch — deriving it from the
+  // generic `assets` page above would only surface avatars that happen to
+  // land within that page's most-recent 24 mixed-type items, hiding older
+  // avatars behind assets of other types.
+  const {
+    avatars,
+    loading: avatarsLoading,
+    loadingMore: avatarsLoadingMore,
+    hasMore: avatarsHasMore,
+    loadMore: loadMoreAvatars,
+    refetch: refetchAvatars,
+  } = useAssets("avatar,presenter");
+
   const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState("all");
   const [selectedAsset, setSelectedAsset] = useState(null);
   const [previewAsset, setPreviewAsset] = useState(null);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
@@ -188,7 +201,7 @@ export default function AssetLibraryPage() {
 
     if (result.success) {
       toast.success("Asset uploaded! 🎉");
-      await refetch();
+      await Promise.all([refetch(), refetchAvatars()]);
       closeUploadModal();
     } else {
       toast.error("Upload failed", { description: result.error });
@@ -210,7 +223,7 @@ export default function AssetLibraryPage() {
       body: JSON.stringify({ name: newName }),
     });
     if (!res.ok) throw new Error("Rename failed");
-    await refetch();
+    await Promise.all([refetch(), refetchAvatars()]);
   }
 
   async function setThumbnail(assetId, url) {
@@ -221,7 +234,7 @@ export default function AssetLibraryPage() {
         body: JSON.stringify({ thumbnailUrl: url }),
       });
       if (!res.ok) throw new Error("Failed to set thumbnail");
-      await refetch();
+      await Promise.all([refetch(), refetchAvatars()]);
       // Reflect the new order in the open carousel immediately.
       setPreviewCollection((prev) =>
         prev
@@ -251,6 +264,7 @@ export default function AssetLibraryPage() {
       });
       if (selectedAsset?.id === id) setSelectedAsset(null);
       if (previewAsset?.id === id) setPreviewAsset(null);
+      await refetchAvatars();
     } else {
       appNotify.error("Delete failed", { description: result.error });
     }
@@ -280,6 +294,7 @@ export default function AssetLibraryPage() {
       appNotify.success(`${ids.length} asset${ids.length !== 1 ? "s" : ""} deleted`, {
         description: "These assets were permanently deleted and cannot be recovered.",
       });
+      await refetchAvatars();
     } else {
       appNotify.error("Delete failed", { description: result.error });
     }
@@ -349,12 +364,12 @@ export default function AssetLibraryPage() {
         </div>
       )}
 
-      {loading ? (
+      {loading || avatarsLoading ? (
         <div className="flex items-center justify-center py-24">
           <Loader2 className="w-8 h-8 animate-spin text-[#c7f038]" />
         </div>
       ) : (
-        <Tabs defaultValue="all" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="p-1 max-w-full space-x-2 overflow-x-auto justify-start">
             <TabsTrigger value="all" className="cursor-pointer data-[state=active]:bg-[black] data-[state=active]:text-[#c7f038] px-4 rounded-full py-2 bg-[#c7f038] text-black shrink-0">
               All Assets (
@@ -519,7 +534,7 @@ export default function AssetLibraryPage() {
                 </Button>
               </div>
             </div>
-            {avatars.length === 0 && !search ? (
+            {avatars.length === 0 && !search && !avatarsLoading ? (
               <div className="flex flex-col items-center justify-center py-20 space-y-4">
                 <div className="w-16 h-16 rounded-2xl border-2 border-dashed border-border flex items-center justify-center">
                   <ImagePlus className="w-7 h-7 text-muted-foreground/40" />
@@ -622,24 +637,49 @@ export default function AssetLibraryPage() {
         </Tabs>
       )}
 
-      {hasMore && !loading && (
-        <div className="flex justify-center py-6">
-          <button
-            onClick={loadMore}
-            disabled={loadingMore}
-            className="cursor-pointer bg-linear-to-b from-black to-neutral-600 text-white px-4 py-2 rounded-full"
-          >
-            {loadingMore ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Loading...
-              </>
-            ) : (
-              "Load more assets"
-            )}
-          </button>
-        </div>
-      )}
+      {activeTab === "all" &&
+        hasMore &&
+        !loading &&
+        assets.filter((a) => a.type !== "video" && a.type !== "clip").length > 0 && (
+          <div className="flex justify-center py-6">
+            <button
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="cursor-pointer bg-linear-to-b from-black to-neutral-600 text-white px-4 py-2 rounded-full"
+            >
+              {loadingMore ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                "Load more assets"
+              )}
+            </button>
+          </div>
+        )}
+
+      {activeTab === "mine" &&
+        avatarsHasMore &&
+        !avatarsLoading &&
+        filteredAvatars.length > 0 && (
+          <div className="flex justify-center py-6">
+            <button
+              onClick={loadMoreAvatars}
+              disabled={avatarsLoadingMore}
+              className="cursor-pointer bg-linear-to-b from-black to-neutral-600 text-white px-4 py-2 rounded-full"
+            >
+              {avatarsLoadingMore ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                "Load more avatars"
+              )}
+            </button>
+          </div>
+        )}
 
       {/* Preview Modal */}
       <Dialog
