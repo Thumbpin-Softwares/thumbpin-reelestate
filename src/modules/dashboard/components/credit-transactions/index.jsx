@@ -116,7 +116,7 @@ export function CreditTransactions() {
                   className={
                     transaction.eventType.includes("debited")
                       ? "text-red-700 w-fit px-6 bg-red-200 py-2 text-xs text-center rounded-full"
-                      : transaction.eventType.includes("credited" && "refunded")
+                      : transaction.eventType.includes("credited") || transaction.eventType.includes("refunded")
                         ? "text-green-700 w-fit text-center text-xs bg-green-200 rounded-full px-6 py-2"
                         : "text-neutral-600 bg-neutral-200 text-center w-fit text-xs px-6 py-2 rounded-full"
                   }
