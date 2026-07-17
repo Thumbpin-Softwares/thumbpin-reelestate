@@ -1,157 +1,165 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { History, Loader2 } from "lucide-react";
-import { CREDIT_ACTIONS } from "@/lib/credit-costs";
-
+import { useEffect, useState } from "react";
+import { History } from "lucide-react";
 const PAGE_SIZE = 10;
-
-const EVENT_LABEL = {
-  free_quota_consumed: "Free usage",
-  credits_debited: "Spent",
-  credits_refunded: "Refunded",
-  credits_added: "Added",
-  credits_set: "Balance set",
-  subscription_recharge: "Subscription recharge",
-  admin_adjustment: "Adjusted by support",
-};
-
-function actionLabel(action) {
-  return CREDIT_ACTIONS[action]?.label || action.replace(/_/g, " ");
-}
-
-function formatDelta(tx) {
-  if (tx.mode === "free_quota") return "Free";
-  if (tx.creditsDelta > 0) return `+${tx.creditsDelta}`;
-  if (tx.creditsDelta < 0) return `${tx.creditsDelta}`;
-  return "0";
-}
-
-function deltaClass(tx) {
-  if (tx.mode === "free_quota") return "text-muted-foreground";
-  if (tx.creditsDelta > 0) return "text-emerald-600";
-  if (tx.creditsDelta < 0) return "text-red-600";
-  return "text-muted-foreground";
-}
 
 export function CreditTransactions() {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState("");
 
-  const load = useCallback(async (skip) => {
-    const res = await fetch(`/api/credits/transactions?limit=${PAGE_SIZE}&skip=${skip}`, {
-      cache: "no-store",
-    });
-    if (!res.ok) throw new Error("Failed to load transactions");
-    return res.json();
-  }, []);
+  const statusLabels = {
+    credits_debited: "Debited",
+    credit_debited: "Debited",
+
+    credits_credited: "Credited",
+    credit_credited: "Credited",
+
+    credits_refunded: "Refunded",
+    credit_refunded: "Refunded",
+
+    credits_set : "Refresh",
+    credit_set : "Refresh",
+
+    credits_added : "Added",
+    credit_added : "Added",
+  };
+
+  async function getTransactions(skip = 0) {
+    const response = await fetch(
+      `/api/credits/transactions?limit=${PAGE_SIZE}&skip=${skip}`,
+      { cache: "no-store" },
+    );
+
+    if (!response.ok) {
+      throw new Error("Could not load transactions");
+    }
+
+    return response.json();
+  }
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
+    async function loadTransactions() {
       try {
-        const data = await load(0);
-        if (cancelled) return;
+        const data = await getTransactions();
+
         setTransactions(data.transactions || []);
         setHasMore(Boolean(data.hasMore));
-      } catch {
-        if (!cancelled) setError(true);
+      } catch (err) {
+        setError(err.message);
       } finally {
-        if (!cancelled) setLoading(false);
+        setLoading(false);
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [load]);
+    }
 
-  async function handleLoadMore() {
+    loadTransactions();
+  }, []);
+
+  async function loadMore() {
     setLoadingMore(true);
+
     try {
-      const data = await load(transactions.length);
-      setTransactions((prev) => [...prev, ...(data.transactions || [])]);
+      const data = await getTransactions(transactions.length);
+
+      setTransactions((current) => [...current, ...(data.transactions || [])]);
       setHasMore(Boolean(data.hasMore));
-    } catch {
-      setError(true);
+    } catch (err) {
+      setError(err.message);
     } finally {
       setLoadingMore(false);
     }
   }
 
-  return (
-    <Card className="border-border/50">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <History className="w-4 h-4" />
-          Transaction History
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {loading ? (
-          <div className="space-y-2">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-12 w-full" />
-            ))}
-          </div>
-        ) : error ? (
-          <p className="text-sm text-muted-foreground py-4 text-center">
-            Couldn&apos;t load your transaction history. Try refreshing.
-          </p>
-        ) : transactions.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-4 text-center">
-            No transactions yet — your credit activity will show up here.
-          </p>
-        ) : (
-          <div className="space-y-1">
-            {transactions.map((tx) => (
-              <div
-                key={tx._id}
-                className="flex items-center justify-between py-2.5 border-b border-border/50 last:border-0"
-              >
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium truncate">{actionLabel(tx.action)}</span>
-                    <Badge variant="outline" className="text-[10px] font-normal">
-                      {EVENT_LABEL[tx.eventType] || tx.eventType}
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {new Date(tx.createdAt).toLocaleString("en-IN", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                      hour: "numeric",
-                      minute: "2-digit",
-                    })}
-                  </p>
-                </div>
-                <div className="text-right shrink-0 ml-3">
-                  <div className={`text-sm font-semibold ${deltaClass(tx)}`}>{formatDelta(tx)}</div>
-                  {tx.balanceAfter != null && (
-                    <div className="text-[11px] text-muted-foreground">balance: {tx.balanceAfter}</div>
-                  )}
-                </div>
-              </div>
-            ))}
+  if (loading) {
+    return (
+      <main className="flex h-full w-full items-center justify-center gap-2 flex-col">
+        <div className="h-8 w-8 rounded-full animate-spin border-t-4 bg-none border-b-4 border-[#c7f03a]"></div>
+        <span>Loading, Please Wait</span>
+      </main>
+    );
+  }
 
-            {hasMore && (
-              <div className="pt-3 flex justify-center">
-                <Button variant="outline" size="sm" onClick={handleLoadMore} disabled={loadingMore}>
-                  {loadingMore ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : null}
-                  Load more
-                </Button>
+  if (error) {
+    return <div>{error}</div>;
+  }
+
+  return (
+    <div className="max-w-4xl bg-white rounded-3xl border border-neutral-200 p-6">
+      <h1 className="text-lg flex items-center tracking-tight pb-4 gap-2">
+        <History size={18} />
+        Transaction History
+      </h1>
+
+      {transactions.length === 0 ? (
+        <p>No transactions yet.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <div className="min-w-175">
+            <div className="grid grid-cols-5 gap-4 border-b border-neutral-200 px-3 py-3 text-sm font-medium text-neutral-500">
+              <span>Transaction Name</span>
+              <span>Status</span>
+              <span>Amount</span>
+              <span>Closing Balance</span>
+              <span>Date & Time</span>
+            </div>
+
+            {transactions.map((transaction) => (
+              <div
+                key={transaction._id}
+                className="grid grid-cols-5 gap-4 border-b border-neutral-200 px-3 py-4 text-sm items-center"
+              >
+                <p className="capitalize">{transaction.action ?? "—"}</p>
+                <p
+                  className={
+                    transaction.eventType.includes("debited")
+                      ? "text-red-700 w-fit px-6 bg-red-200 py-2 text-xs text-center rounded-full"
+                      : transaction.eventType.includes("credited" && "refunded")
+                        ? "text-green-700 w-fit text-center text-xs bg-green-200 rounded-full px-6 py-2"
+                        : "text-neutral-600 bg-neutral-200 text-center w-fit text-xs px-6 py-2 rounded-full"
+                  }
+                >
+                  {statusLabels[transaction.eventType] ??
+                    transaction.eventType ??
+                    "—"}
+                </p>
+                <p
+                  className={
+                    transaction.creditsDelta >= 0
+                      ? "font-medium text-green-500"
+                      : "font-medium text-red-500"
+                  }
+                >
+                  {transaction.creditsDelta >= 0 ? "+" : ""}
+                  {transaction.creditsDelta ?? 0}
+                </p>
+
+                <p>{transaction.balanceAfter ?? 0}</p>
+
+                <p className="text-neutral-500">
+                  {transaction.createdAt
+                    ? new Date(transaction.createdAt).toLocaleString("en-IN", {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })
+                    : "—"}
+                </p>
               </div>
-            )}
+            ))}
           </div>
-        )}
-      </CardContent>
-    </Card>
+        </div>
+      )}
+
+
+      <div className="flex items-center justify-center pt-6">
+        {hasMore && (
+        <button className="text-black bg-[#c7ef44] px-6 py-2 text-sm tracking-tight rounded-md shadow-md" onClick={loadMore} disabled={loadingMore}>
+          {loadingMore ? "Loading..." : "Load more"}
+        </button>
+      )}
+      </div>
+    </div>
   );
 }
