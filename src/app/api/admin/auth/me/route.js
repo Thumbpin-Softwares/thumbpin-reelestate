@@ -1,30 +1,12 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { verifyAdminSession } from "@/lib/admin-backend-session";
 
-const ADMIN_SESSION_TOKEN = "admin_session";
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@adoraai.com";
-
-export async function verifyAdminSession() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get(ADMIN_SESSION_TOKEN)?.value;
-  if (!token) return null;
-
-  try {
-    const sessionData = JSON.parse(Buffer.from(token, "base64").toString("utf8"));
-    if (
-      sessionData.role === "admin" &&
-      sessionData.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()
-    ) {
-      // Max session age: 8 hours
-      if (Date.now() - sessionData.iat < 8 * 60 * 60 * 1000) {
-        return sessionData;
-      }
-    }
-  } catch {
-    // invalid token
-  }
-  return null;
-}
+// Re-exported so the ~9 other admin/* routes that already do
+// `import { verifyAdminSession } from "@/app/api/admin/auth/me/route"`
+// don't need touching individually — the real implementation now lives in
+// lib/admin-backend-session.js and validates against the backend's signed
+// admin_token JWT instead of trusting an unsigned local cookie.
+export { verifyAdminSession };
 
 export async function GET() {
   const session = await verifyAdminSession();

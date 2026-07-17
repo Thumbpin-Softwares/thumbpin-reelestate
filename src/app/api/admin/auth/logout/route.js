@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-
-const ADMIN_SESSION_TOKEN = "admin_session";
+import { proxyToBackend, withForwardedCookies } from "@/lib/backend-proxy";
 
 export async function POST() {
-  const cookieStore = await cookies();
-  cookieStore.delete(ADMIN_SESSION_TOKEN);
-  return NextResponse.json({ success: true });
+  const { setCookies } = await proxyToBackend("/admin/auth/logout", { method: "POST" });
+  return withForwardedCookies(NextResponse.json({ success: true }), setCookies);
 }
