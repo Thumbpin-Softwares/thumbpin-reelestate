@@ -24,6 +24,14 @@ export async function POST(request) {
       return NextResponse.json({ error: "key and url are required" }, { status: 400 });
     }
 
+    // The presigned PUT URL from /api/assets/upload-url only ever issues
+    // keys under this exact prefix — reject anything else so a client can't
+    // register someone else's key/url (or an arbitrary external URL) as its
+    // own asset.
+    if (!key.startsWith(`users/${userId}/`)) {
+      return NextResponse.json({ error: "Invalid asset key" }, { status: 403 });
+    }
+
     await dbConnect();
     const asset = await Asset.create({
       userId,
