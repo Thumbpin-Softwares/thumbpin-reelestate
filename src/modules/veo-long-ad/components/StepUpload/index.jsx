@@ -52,7 +52,7 @@ export function StepUpload({
     if (avatarHook.avatarMode !== "my-assets") return;
     if (myAssets.length > 0) return; // already loaded
     setMyAssetsLoading(true);
-    fetch("/api/assets")
+    fetch("/api/assets", { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
         const all = (data.assets || []).filter(

@@ -45,7 +45,7 @@ export function useAssets(typeFilter = null) {
     setLoading(true);
     pageRef.current = 1;
     try {
-      const res = await fetch(buildUrl(1));
+      const res = await fetch(buildUrl(1), { cache: "no-store" });
       const data = await res.json();
 
       if (!res.ok) {
@@ -69,7 +69,7 @@ export function useAssets(typeFilter = null) {
     const nextPage = pageRef.current + 1;
     pageRef.current = nextPage;
     try {
-      const res = await fetch(buildUrl(nextPage));
+      const res = await fetch(buildUrl(nextPage), { cache: "no-store" });
       const data = await res.json();
 
       if (!res.ok) {

@@ -76,7 +76,7 @@ export function ModelSelector({ avatarHook, prebuiltLabel = "RE Agents", uploadE
     if (avatarHook.avatarMode !== "my-assets") return;
     if (myAssets.length > 0) return;
     setMyAssetsLoading(true);
-    fetch("/api/assets")
+    fetch("/api/assets", { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
         const all = (data.assets || []).filter((a) => a.type === "avatar" || a.type === "presenter");

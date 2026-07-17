@@ -2,19 +2,28 @@ import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import Asset from "@/models/Asset";
 
+// Belt-and-suspenders against any CDN/edge/browser layer caching this
+// per-user response by URL alone (query params like `?page=1&limit=24` are
+// identical across every user, so a cache that ignores the Cookie header
+// would serve user A's asset list to user B). `force-dynamic` only affects
+// Next's own route cache — it does NOT add this header to the outgoing
+// response, so it has to be set explicitly.
+export const dynamic = "force-dynamic";
+const NO_STORE_HEADERS = { "Cache-Control": "private, no-store, no-cache, must-revalidate" };
+
 export async function GET(request) {
   try {
     const { getResolvedUserId } = await import("@/lib/user-resolver");
     const userId = await getResolvedUserId(request);
     if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: NO_STORE_HEADERS });
     }
 
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type");
 
     await dbConnect();
-    
+
     const query = { userId };
     if (type) query.type = type;
 
@@ -27,15 +36,18 @@ export async function GET(request) {
       Asset.countDocuments(query),
     ]);
 
-    return NextResponse.json({
-      assets,
-      total,
-      page,
-      hasMore: skip + assets.length < total,
-    });
+    return NextResponse.json(
+      {
+        assets,
+        total,
+        page,
+        hasMore: skip + assets.length < total,
+      },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (error) {
     console.error("[GET /api/assets] Error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500, headers: NO_STORE_HEADERS });
   }
 }
 
