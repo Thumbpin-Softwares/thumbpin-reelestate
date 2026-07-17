@@ -44,10 +44,8 @@ export const TEMPLATES = [
     slug: "property-commercial",
     title: "Property Commercial",
     category: "real-estate",
-    tag: "Soon",
     description: "A polished commercial-style walkthrough for listings.",
     steps: ["Add Assets", "Script", "Finalize"],
-    comingSoon: true,
   },
 ];
 
