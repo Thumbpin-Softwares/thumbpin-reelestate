@@ -11,6 +11,7 @@ import { StepFinalize } from "@/modules/template/layout/StepFinalize";
 import { StepGeneration } from "@/modules/template/layout/StepGeneration";
 import { ModelTourGeneration } from "./components/ModelTourGeneration";
 import { ModelTourGenerations } from "./components/ModelTourGenerations";
+import { ModelTourFinalize } from "./components/ModelTourFinalize";
 import { History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -172,13 +173,17 @@ export default function PropertyCommercialRunner({ template }) {
 
   const handleContinueFromScript = () => {
     if (scriptValues.propertyClassification === MODEL_TOUR_CLASSIFICATION) {
-      try {
-        sessionStorage.removeItem(FORM_STATE_KEY);
-      } catch (_) {}
-      setModelTourGenerating(true);
+      setStep(2);
     } else {
       handleGenerateScript();
     }
+  };
+
+  const handleConfirmGenerate = () => {
+    try {
+      sessionStorage.removeItem(FORM_STATE_KEY);
+    } catch (_) {}
+    setModelTourGenerating(true);
   };
 
   return (
@@ -231,13 +236,23 @@ export default function PropertyCommercialRunner({ template }) {
               loading={generatingScript}
               continueLabel={
                 scriptValues.propertyClassification === MODEL_TOUR_CLASSIFICATION
-                  ? "Generate Video"
+                  ? "Review & Finalize"
                   : "Generate Storyboard"
               }
             />
           )}
 
-          {step === 2 && (
+          {step === 2 && scriptValues.propertyClassification === MODEL_TOUR_CLASSIFICATION && (
+            <ModelTourFinalize
+              images={images}
+              selectedAvatars={avatarHook.selectedAvatars}
+              scriptValues={scriptValues}
+              onBack={() => setStep(1)}
+              onGenerate={handleConfirmGenerate}
+            />
+          )}
+
+          {step === 2 && scriptValues.propertyClassification !== MODEL_TOUR_CLASSIFICATION && (
             <StepFinalize
               template={template}
               storyboard={storyboard}
