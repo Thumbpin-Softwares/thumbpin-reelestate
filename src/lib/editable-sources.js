@@ -68,6 +68,17 @@ export const EDITABLE_SOURCES = {
     generatorPath: "/dashboard/comedy-reel",
     downloadFilename: "comedy-reel.mp4",
   },
+  // model-tour (the property-commercial template's Residential flow) is a
+  // single flat video straight out of fal's omni-hometour-pipeline — no
+  // part1/part2 split, so it reopens the same way a flattened export does:
+  // a single-clip "action-reel" composition (part1 only).
+  "model-tour": {
+    compositionType: "action-reel",
+    isFlatExport: true,
+    renderEndpoint: "/api/exports/render-remotion",
+    generatorPath: "/dashboard/template/property-commercial",
+    downloadFilename: "home-tour.mp4",
+  },
   // What re-exporting any of the above (or re-exporting a re-export) gets
   // tagged as — still editable again the same way, so a user can keep
   // trimming/re-cutting/re-captioning an export indefinitely.

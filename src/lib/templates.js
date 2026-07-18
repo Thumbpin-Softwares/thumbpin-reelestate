@@ -19,6 +19,7 @@ export const TEMPLATES = [
     tag: "Popular",
     steps: ["Add Assets", "Script", "Finalize"],
     href: "/dashboard/luxury-car-exit",
+    hidden: true,
   },
   {
     slug: "comedy-reel",
@@ -29,6 +30,7 @@ export const TEMPLATES = [
     tag: "Popular",
     steps: ["Add Assets", "Script", "Finalize"],
     href: "/dashboard/comedy-reel",
+    hidden: true,
   },
   {
     slug: "action-reel",
@@ -39,18 +41,23 @@ export const TEMPLATES = [
     tag: "New",
     steps: ["Add Assets", "Script", "Finalize"],
     href: "/dashboard/action-reel",
+    hidden: true,
   },
   {
     slug: "property-commercial",
-    title: "Property Commercial",
+    title: "Model doing a property commerical",
     category: "real-estate",
-    description: "A polished commercial-style walkthrough for listings.",
+    video: "https://content.thumbpin.in/templates/property-commercial.mp4",
+    tag: "Popular",
     steps: ["Add Assets", "Script", "Finalize"],
   },
 ];
 
+// Templates shown in the catalog. Set `hidden: true` on a template above to
+// keep it out of the listing without deleting its entry — it stays reachable
+// by direct link via getTemplateBySlug.
 export function getAllTemplates() {
-  return TEMPLATES;
+  return TEMPLATES.filter((t) => !t.hidden);
 }
 
 export function getTemplateBySlug(slug) {
