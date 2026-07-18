@@ -1,28 +1,9 @@
 import { NextResponse } from "next/server";
-import dbConnect from "@/lib/mongodb";
-import SeedanceJob from "@/models/SeedanceJob";
+import { authedBackendGet } from "@/lib/backend-session";
 
-/**
- * GET /api/comedy-reel/jobs/:jobId
- *
- * Lets a refreshed/reattached tab resume an in-flight (or finished) pipeline
- * job instead of re-POSTing to /generate-pipeline, which would double-bill
- * credits and double-fire the fal/Seedance calls.
- */
+// Thin proxy to thumbpin-backend's GET /comedy-reel/jobs/:jobId.
 export async function GET(request, { params }) {
-  const { resolveUserFromSession } = await import("@/lib/user-resolver");
-  const user = await resolveUserFromSession(request);
-  if (!user) {
-    return NextResponse.json({ error: "User not found." }, { status: 404 });
-  }
-
   const { jobId } = await params;
-
-  await dbConnect();
-  const job = await SeedanceJob.findOne({ jobId, userId: user._id.toString() }).lean();
-  if (!job) {
-    return NextResponse.json({ error: "Job not found" }, { status: 404 });
-  }
-
-  return NextResponse.json({ job });
+  const { status, data } = await authedBackendGet(`/comedy-reel/jobs/${jobId}`);
+  return NextResponse.json(data, { status });
 }

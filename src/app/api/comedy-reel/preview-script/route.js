@@ -1,65 +1,42 @@
-import { NextResponse } from "next/server";
-import { fal } from "@fal-ai/client";
-import { synthesizeVoice } from "@/lib/voice-tts";
-import { hasSufficientCreditsForAction } from "@/lib/credit-system";
+import { cookies } from "next/headers";
 
-if (process.env.FAL_KEY) {
-  fal.config({ credentials: process.env.FAL_KEY });
-}
+const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:5000";
+const AUTH_COOKIE_NAME = "auth_token";
 
-const MAX_PREVIEW_CHARS = 600;
-
-/**
- * POST /api/comedy-reel/preview-script
- *
- * Previews the user's ACTUAL typed script text — fully ephemeral, no R2
- * upload, no DB writes — but DOES require the user to be able to afford a
- * Comedy Reel generation (read-only check, no deduction here) so a 0-credit
- * user can't burn real ElevenLabs/Sarvam TTS calls on previews they could
- * never actually render.
- */
+// Thin proxy to thumbpin-backend's POST /comedy-reel/preview-script.
+// Response body is raw audio bytes (audio/mpeg or audio/wav), not JSON —
+// passed through as-is rather than parsed.
 export async function POST(request) {
-  const { resolveUserFromSession } = await import("@/lib/user-resolver");
-  const user = await resolveUserFromSession(request);
-  if (!user) {
-    return NextResponse.json({ error: "User not found." }, { status: 404 });
+  const cookieStore = await cookies();
+  const token = cookieStore.get(AUTH_COOKIE_NAME)?.value;
+  if (!token) {
+    return new Response(JSON.stringify({ error: "Not authenticated" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
-  const affordability = await hasSufficientCreditsForAction({
-    userId: user._id.toString(),
-    action: "action_reel_video",
+  const body = await request.text();
+  const backendRes = await fetch(`${BACKEND_URL}/api/v1/comedy-reel/preview-script`, {
+    method: "POST",
+    headers: { Cookie: `${AUTH_COOKIE_NAME}=${token}`, "Content-Type": "application/json" },
+    body,
+    cache: "no-store",
   });
-  if (!affordability.ok) {
-    return NextResponse.json(affordability.payload, { status: affordability.status });
-  }
 
-  const { text, voiceId, language } = await request.json();
-  if (!text || !text.trim()) {
-    return NextResponse.json({ error: "text is required" }, { status: 400 });
-  }
-  if (!voiceId) {
-    return NextResponse.json({ error: "voiceId is required" }, { status: 400 });
-  }
-
-  const previewText = text.trim().slice(0, MAX_PREVIEW_CHARS);
-
-  try {
-    const { buffer, contentType } = await synthesizeVoice({
-      text: previewText,
-      voiceId,
-      language,
+  if (!backendRes.ok) {
+    const data = await backendRes.json().catch(() => ({}));
+    return new Response(JSON.stringify(data), {
+      status: backendRes.status,
+      headers: { "Content-Type": "application/json" },
     });
-
-    return new Response(buffer, {
-      status: 200,
-      headers: {
-        "Content-Type": contentType,
-        "Content-Length": String(buffer.length),
-        "Cache-Control": "no-store",
-      },
-    });
-  } catch (err) {
-    console.error("[ComedyReel] preview-script failed:", err.message);
-    return NextResponse.json({ error: err.message || "Preview failed" }, { status: 500 });
   }
+
+  return new Response(backendRes.body, {
+    status: 200,
+    headers: {
+      "Content-Type": backendRes.headers.get("Content-Type") || "audio/mpeg",
+      "Cache-Control": "no-store",
+    },
+  });
 }
