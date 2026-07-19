@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { dataUrlToFile } from '../../helpers/fileHelpers';
 
 export const useAvatars = () => {
   const [avatarMode, setAvatarMode] = useState("prebuilt");
@@ -10,10 +9,6 @@ export const useAvatars = () => {
   const [selectedCollectionId, setSelectedCollectionId] = useState(null);
   const [uploadedAvatarFile, setUploadedAvatarFile] = useState(null); // Keep for compatibility
   const [uploadedAvatarFiles, setUploadedAvatarFiles] = useState([]);
-  const [avatarPrompt, setAvatarPrompt] = useState("");
-  const [avatarVariantCount, setAvatarVariantCount] = useState(3);
-  const [generatedAvatars, setGeneratedAvatars] = useState([]);
-  const [generatingAvatar, setGeneratingAvatar] = useState(false);
   // reAvatars now stores collections: [{id, name, coverImage, images: [...]}]
   const [reAvatars, setReAvatars] = useState([]);
   const [reAvatarsLoading, setReAvatarsLoading] = useState(false);
@@ -291,42 +286,6 @@ export const useAvatars = () => {
     return (selectedAvatars || []).some(a => a?.url === avatar?.url || a?.key === avatar?.key);
   };
 
-  const handleGenerateAvatars = async () => {
-    if (!avatarPrompt.trim() || avatarPrompt.trim().length < 10) return;
-    setGeneratingAvatar(true);
-    setGeneratedAvatars([]);
-    
-    try {
-      const res = await fetch("/api/product-video/generate-avatar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: avatarPrompt.trim(), variants: avatarVariantCount }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed");
-      
-      // Convert generated images to avatar objects
-      const generatedAvatarObjects = (data.images || []).map((img, index) => ({
-        url: img.url,
-        file: dataUrlToFile(img.url, `avatar-generated-${index}.png`),
-        name: `Generated ${index + 1}`,
-        angle: img.angle,
-        variant: img.variant
-      }));
-      
-      setGeneratedAvatars(generatedAvatarObjects);
-      toast.success(`Generated ${data.images.length} avatar(s)!`);
-    } catch (err) {
-      toast.error("Avatar generation failed", { description: err.message });
-    } finally {
-      setGeneratingAvatar(false);
-    }
-  };
-
-  const selectAvatarFromGeneration = (av, index) => {
-    toggleAvatarSelection(av);
-  };
-
   return {
     avatarMode,
     setAvatarMode,
@@ -341,19 +300,11 @@ export const useAvatars = () => {
     isAvatarSelected,
     uploadedAvatarFile,
     setUploadedAvatarFile,
-    avatarPrompt,
-    setAvatarPrompt,
-    avatarVariantCount,
-    setAvatarVariantCount,
-    generatedAvatars,
-    generatingAvatar,
     reAvatars,
     reAvatarsLoading,
     reAvatarsError,
     lightboxUrl,
     setLightboxUrl,
-    handleGenerateAvatars,
-    selectAvatarFromGeneration,
     uploadedAvatarFiles,
     setUploadedAvatarFiles,
     handleUploadFile,

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { FileText } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -93,6 +94,16 @@ function TextField({ label, field, values, setField, required, placeholder, hint
 export function SiteForm({ values = {}, onChange }) {
   const setField = (key, val) => onChange?.({ ...values, [key]: val });
   const classification = values.propertyClassification;
+
+  // Residential is the only selectable classification while Commercial/
+  // Plotted are disabled, so default to it rather than making the user
+  // click the one enabled option every time. Only fires once on mount and
+  // only if nothing's set yet, so a session-restored classification (or a
+  // future re-enabled Commercial/Plotted default) isn't clobbered.
+  useEffect(() => {
+    if (!classification) setField("propertyClassification", "residential");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="space-y-5">

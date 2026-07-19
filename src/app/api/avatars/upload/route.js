@@ -3,7 +3,8 @@ import { cookies } from "next/headers";
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:5000";
 const AUTH_COOKIE_NAME = "auth_token";
 
-// Thin proxy to thumbpin-backend's POST /model-tour/upload/avatar.
+// Thin proxy to thumbpin-backend's POST /avatars/upload — the common avatar
+// collection upload endpoint every template's ModelSelector posts to.
 export async function POST(request) {
   const cookieStore = await cookies();
   const token = cookieStore.get(AUTH_COOKIE_NAME)?.value;
@@ -15,7 +16,7 @@ export async function POST(request) {
   }
 
   const formData = await request.formData();
-  const backendRes = await fetch(`${BACKEND_URL}/api/v1/model-tour/upload/avatar`, {
+  const backendRes = await fetch(`${BACKEND_URL}/api/v1/avatars/upload`, {
     method: "POST",
     headers: { Cookie: `${AUTH_COOKIE_NAME}=${token}` },
     body: formData,

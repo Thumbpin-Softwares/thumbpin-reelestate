@@ -2,7 +2,6 @@ import UserNav from "@/modules/common/layout/navbar";
 import Aside from "@/modules/common/layout/aside";
 import MobileBottomNav from "@/modules/common/layout/mobile-bottom-nav";
 import PipelineBreadcrumb from "@/modules/common/layout/pipeline-breadcrumb";
-import { AdminModal } from "@/components/dashboard/admin-modal";
 
 export default function DashboardLayout({ children }) {
   return (

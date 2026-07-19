@@ -1,7 +1,7 @@
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider } from "@/components/auth-provider";
+import { AuthProvider } from "@/modules/common/components/auth-provider";
 import { NetworkStatus } from "@/modules/common/components/network-status";
 import SmoothScroll from "@/modules/common/smooth-scroll";
 
