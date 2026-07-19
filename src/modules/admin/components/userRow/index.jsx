@@ -1,6 +1,6 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import { toast } from "sonner";
+import { adminNotify } from "@/modules/admin/components/notification";
 import { CreditCard, Trash2, Crown, Loader2, MoreVertical } from "lucide-react";
 
 // Function to generate consistent color based on user ID or email
@@ -40,27 +40,38 @@ export default function UserRow({ user, onCreditClick, onUpdate, onDelete }) {
 
   const initialsColor = getInitialsColor(user._id, user.email);
 
-  // Calculate dropdown position when menu opens
+  // Calculate dropdown position when menu opens. The dropdown is `fixed`,
+  // which is already viewport-relative — getBoundingClientRect() is too, so
+  // no scroll-offset math is needed here (adding it double-counted scroll
+  // and pushed the dropdown out of view whenever the page had scrolled).
   useEffect(() => {
-    if (menuOpen && buttonRef.current) {
+    if (!menuOpen || !buttonRef.current) return;
+
+    function updatePosition() {
       const rect = buttonRef.current.getBoundingClientRect();
-      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-      const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
-      
-      // Check if there's enough space below
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const dropdownHeight = 200; // Approximate dropdown height
-      
-      let top = rect.bottom + scrollTop;
-      let left = rect.right + scrollLeft - 192; // 192px is dropdown width (w-48)
-      
-      // If not enough space below, show above
-      if (spaceBelow < dropdownHeight) {
-        top = rect.top + scrollTop - dropdownHeight;
+      const dropdownWidth = 192; // w-48
+      const dropdownHeight = 200; // approximate
+
+      let top = rect.bottom;
+      if (window.innerHeight - rect.bottom < dropdownHeight) {
+        top = rect.top - dropdownHeight;
       }
-      
+
+      let left = rect.right - dropdownWidth;
+      left = Math.max(8, Math.min(left, window.innerWidth - dropdownWidth - 8));
+
       setDropdownPosition({ top, left });
     }
+
+    updatePosition();
+    // Capture phase so scroll on any ancestor (e.g. the scrollable <main>)
+    // is caught too, since plain scroll listeners don't bubble to window.
+    window.addEventListener("scroll", updatePosition, true);
+    window.addEventListener("resize", updatePosition);
+    return () => {
+      window.removeEventListener("scroll", updatePosition, true);
+      window.removeEventListener("resize", updatePosition);
+    };
   }, [menuOpen]);
 
   async function togglePlan() {
@@ -74,10 +85,14 @@ export default function UserRow({ user, onCreditClick, onUpdate, onDelete }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      toast.success(`Plan updated to ${newPlan}`);
+      const action = newPlan === "pro" ? "promoted" : "demoted";
+      const displayName = user.name || user.email.split("@")[0];
+      adminNotify.success(`${displayName} has been ${action}`, {
+        description: `${user.email} is ${action} to ${newPlan} plan`,
+      });
       onUpdate(data.user);
     } catch (err) {
-      toast.error(err.message || "Failed to update plan");
+      adminNotify.error(err.message || "Failed to update plan");
     } finally {
       setUpdatingPlan(false);
       setMenuOpen(false);
@@ -94,10 +109,10 @@ export default function UserRow({ user, onCreditClick, onUpdate, onDelete }) {
     try {
       const res = await fetch(`/api/admin/users/${user._id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Delete failed");
-      toast.success("User deleted");
+      adminNotify.success("User deleted");
       onDelete(user._id);
     } catch {
-      toast.error("Failed to delete user");
+      adminNotify.error("Failed to delete user");
     } finally {
       setDeleting(false);
       setConfirmDel(false);

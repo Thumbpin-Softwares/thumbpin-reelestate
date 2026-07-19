@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Eye } from "lucide-react";
 
 // Collection Card Component — matches the client-side prebuilt avatar
@@ -11,10 +12,13 @@ export function CollectionCard({ collection, onClick }) {
       className="group relative cursor-pointer rounded-2xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-all"
     >
       <div className="relative aspect-9/16 overflow-hidden bg-gray-100">
-        <img
+        <Image
           src={collection.coverImage}
           alt={collection.name}
-          className="w-full h-full object-cover"
+          fill
+          unoptimized
+          sizes="(max-width: 640px) 50vw, 25vw"
+          className="object-cover"
           onError={(e) => {
             e.target.src = "https://placehold.co/400x700?text=No+Image";
           }}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { adminNotify } from "@/modules/admin/components/notification";
 import { Ticket as TicketIcon } from "lucide-react";
 
 const STATUSES = ["all", "open", "in_progress", "resolved", "closed"];
@@ -33,7 +33,7 @@ export function AdminTickets() {
       setTickets(data.tickets);
     } catch (err) {
       console.error("[AdminTickets] Failed to load tickets:", err);
-      toast.error("Failed to load tickets");
+      adminNotify.error("Failed to load tickets");
       setTickets([]);
     }
   }
@@ -56,9 +56,9 @@ export function AdminTickets() {
       if (!res.ok) throw new Error(data.error || "Update failed");
 
       setTickets((prev) => prev.map((t) => (t.id === id ? { ...t, status } : t)));
-      toast.success("Ticket updated");
+      adminNotify.success("Ticket updated");
     } catch (err) {
-      toast.error("Update failed", { description: err.message });
+      adminNotify.error("Update failed", { description: err.message });
     } finally {
       setUpdatingId(null);
     }

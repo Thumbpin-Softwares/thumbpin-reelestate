@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
+import { adminNotify } from "@/modules/admin/components/notification";
 import { Loader2, MessageCircle, Send } from "lucide-react";
 
 const LIST_POLL_MS = 6000;
@@ -108,7 +108,7 @@ export function AdminChats() {
       lastTimestampRef.current = data.message.createdAt;
       loadConversations();
     } catch (err) {
-      toast.error("Reply failed", { description: err.message });
+      adminNotify.error("Reply failed", { description: err.message });
       setInput(body);
     } finally {
       setSending(false);

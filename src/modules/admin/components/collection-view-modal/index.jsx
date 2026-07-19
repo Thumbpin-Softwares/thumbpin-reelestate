@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "sonner";
+import Image from "next/image";
+import { adminNotify } from "@/modules/admin/components/notification";
 import {
   Trash2,
   Loader2,
@@ -54,9 +55,9 @@ export function CollectionViewModal({ collection, onClose, onDelete, onThumbnail
       if (!res.ok) throw new Error(data.error);
       setThumbnailKey(fileKey);
       onThumbnailSet?.(collection.id, fileKey, data.coverImage);
-      toast.success("Thumbnail updated");
+      adminNotify.success("Thumbnail updated");
     } catch {
-      toast.error("Failed to set thumbnail");
+      adminNotify.error("Failed to set thumbnail");
     } finally {
       setSettingThumbnail(false);
     }
@@ -77,11 +78,11 @@ export function CollectionViewModal({ collection, onClose, onDelete, onThumbnail
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      toast.success(`Deleted collection "${collection.name}"`);
+      adminNotify.success(`Deleted collection "${collection.name}"`);
       onDelete(collection.id);
       onClose();
     } catch (err) {
-      toast.error("Failed to delete collection");
+      adminNotify.error("Failed to delete collection");
     } finally {
       setDeleting(false);
     }
@@ -98,7 +99,7 @@ export function CollectionViewModal({ collection, onClose, onDelete, onThumbnail
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden shadow-2xl">
+      <div className="relative bg-white rounded-xl w-full max-w-sm max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <div>
@@ -126,7 +127,7 @@ export function CollectionViewModal({ collection, onClose, onDelete, onThumbnail
         </div>
 
         {/* Image Gallery */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
+        <div className="p-6 overflow-y-auto max-h-[90vh]">
           {/* Main Image with Navigation */}
           <div className="relative mb-6">
             {collection.files.length > 1 && (
@@ -147,14 +148,19 @@ export function CollectionViewModal({ collection, onClose, onDelete, onThumbnail
               </>
             )}
 
-            <img
-              src={collection.files[currentIndex]?.url}
-              alt={`Image ${currentIndex + 1}`}
-              className="w-full h-auto max-h-[60vh] object-contain rounded-lg bg-gray-100"
-              onError={(e) => {
-                e.target.src = "https://placehold.co/800x600?text=Image+Not+Found";
-              }}
-            />
+            <div className="relative w-full h-[60vh] rounded-lg bg-gray-100 overflow-hidden">
+              <Image
+                src={collection.files[currentIndex]?.url}
+                alt={`Image ${currentIndex + 1}`}
+                fill
+                unoptimized
+                sizes="(max-width: 640px) 100vw, 640px"
+                className="object-contain"
+                onError={(e) => {
+                  e.target.src = "https://placehold.co/800x600?text=Image+Not+Found";
+                }}
+              />
+            </div>
 
             {/* Image Counter */}
             {collection.files.length > 1 && (
@@ -169,7 +175,7 @@ export function CollectionViewModal({ collection, onClose, onDelete, onThumbnail
             <button
               onClick={() => handleSetThumbnail(collection.files[currentIndex]?.key)}
               disabled={settingThumbnail || thumbnailKey === collection.files[currentIndex]?.key || (!thumbnailKey && currentIndex === 0)}
-              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition-all disabled:opacity-40 disabled:cursor-not-allowed border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
+              className="flex items-center gap-2 text-xs font-medium px-4 py-2 rounded-lg border transition-all disabled:opacity-75 disabled:cursor-not-allowed bg-[#c7f038] text-black"
             >
               {settingThumbnail ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -181,45 +187,6 @@ export function CollectionViewModal({ collection, onClose, onDelete, onThumbnail
                 : "Set as thumbnail"}
             </button>
           </div>
-
-          {/* Thumbnails */}
-          {collection.files.length > 1 && (
-            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
-              {collection.files.map((file, idx) => {
-                const isThumb = thumbnailKey ? thumbnailKey === file.key : idx === 0;
-                return (
-                  <div key={file.id || idx} className="relative group">
-                    <button
-                      onClick={() => setCurrentIndex(idx)}
-                      className={`relative w-full aspect-square rounded-lg overflow-hidden border-2 transition-all ${
-                        currentIndex === idx
-                          ? "border-gray-900 ring-2 ring-gray-900/20"
-                          : "border-gray-200 hover:border-gray-400"
-                      }`}
-                    >
-                      <img
-                        src={file.url}
-                        alt={`Thumbnail ${idx + 1}`}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.target.src = "https://placehold.co/100x100?text=Error";
-                        }}
-                      />
-                    </button>
-                    {/* Star badge — filled if this is the thumbnail */}
-                    <button
-                      onClick={() => handleSetThumbnail(file.key)}
-                      disabled={settingThumbnail || isThumb}
-                      title={isThumb ? "Collection thumbnail" : "Set as thumbnail"}
-                      className="absolute top-1 right-1 p-0.5 rounded-full bg-black/50 hover:bg-black/80 transition-all disabled:cursor-default opacity-0 group-hover:opacity-100 disabled:opacity-100"
-                    >
-                      <Star className={`w-3 h-3 ${isThumb ? "fill-amber-400 text-amber-400" : "text-white"}`} />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </div>
       </div>
     </div>
