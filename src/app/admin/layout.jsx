@@ -1,5 +1,4 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
@@ -11,9 +10,9 @@ import {
   LogOut,
   Menu,
   X,
-  ChevronRight,
-  LayoutGrid,
   MessageCircle,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 
 export default function AdminLayout({ children }) {
@@ -21,24 +20,30 @@ export default function AdminLayout({ children }) {
   const pathname = usePathname();
   const [checking, setChecking] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
-    // Skip auth check on login page
-    if (pathname === "/admin/login") {
-      setChecking(false);
-      return;
-    }
+    // Login page renders unconditionally below, before any auth check runs.
+    if (pathname === "/admin/login") return;
+
+    let cancelled = false;
     fetch("/api/admin/auth/me")
       .then((r) => {
+        if (cancelled) return;
         if (!r.ok) router.replace("/admin/login");
         else setChecking(false);
       })
-      .catch(() => router.replace("/admin/login"));
+      .catch(() => {
+        if (!cancelled) router.replace("/admin/login");
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [pathname, router]);
 
   async function handleLogout() {
     await fetch("/api/admin/auth/logout", { method: "POST" });
-    router.replace("/admin/login");
+    router.replace("/dashboard");
   }
 
   if (pathname === "/admin/login") {
@@ -52,7 +57,9 @@ export default function AdminLayout({ children }) {
           <div className="w-10 h-10 rounded-xl bg-gray-900 border border-gray-300 flex items-center justify-center animate-pulse">
             <Shield className="w-5 h-5 text-white" />
           </div>
-          <p className="text-gray-500 text-sm font-medium">Verifying admin session...</p>
+          <p className="text-gray-500 text-sm font-medium">
+            Verifying admin session...
+          </p>
         </div>
       </div>
     );
@@ -77,19 +84,30 @@ export default function AdminLayout({ children }) {
 
       {/* Sidebar */}
       <aside
-        className={`fixed md:sticky top-0 left-0 h-screen w-58 bg-[#f5efe8] border-r border-gray-200 flex flex-col z-50 transition-transform duration-300 ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
-        }`}
+        className={`fixed md:sticky top-0 left-0 h-screen bg-white border-r border-gray-200 flex flex-col z-50 transition-all duration-300 ${
+          collapsed ? "md:w-20" : "md:w-54"
+        } w-54 ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
       >
         {/* Brand */}
-        <div className="p-5 border-b border-gray-100">
-          <div className="flex items-center gap-3">
-            <div>
-              <p className="text-black font-semibold font-heading leading-none">
-                Admin Panel
-              </p>
-            </div>
-          </div>
+        <div
+          className={`p-5 border-b border-gray-100 flex items-center ${collapsed ? "md:justify-center md:px-3" : "justify-between"}`}
+        >
+          <p
+            className={`text-black font-semibold font-heading leading-none ${collapsed ? "md:hidden" : ""}`}
+          >
+            Admin
+          </p>
+          <button
+            onClick={() => setCollapsed((v) => !v)}
+            className="hidden md:flex p-1.5 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {collapsed ? (
+              <PanelLeftOpen className="w-4 h-4" />
+            ) : (
+              <PanelLeftClose className="w-4 h-4" />
+            )}
+          </button>
         </div>
 
         {/* Nav */}
@@ -104,17 +122,19 @@ export default function AdminLayout({ children }) {
                 key={item.href}
                 href={item.href}
                 onClick={() => setSidebarOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 group ${
+                title={collapsed ? item.label : undefined}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-all duration-150 group ${
+                  collapsed ? "md:justify-center" : ""
+                } ${
                   isActive
-                    ? "bg-gray-900 text-white shadow-sm"
-                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                    ? "bg-[#c7f038] text-black"
+                    : "text-black hover:bg-gray-100"
                 }`}
               >
-                <item.icon className="w-4 h-4 flex-shrink-0" />
-                {item.label}
-                {isActive && (
-                  <ChevronRight className="w-3.5 h-3.5 ml-auto opacity-80" />
-                )}
+                <item.icon className="w-4 h-4 shrink-0" />
+                <span className={collapsed ? "md:hidden" : ""}>
+                  {item.label}
+                </span>
               </Link>
             );
           })}
@@ -122,20 +142,16 @@ export default function AdminLayout({ children }) {
 
         {/* Divider + Return to app */}
         <div className="p-4 space-y-2 border-t border-gray-100">
-          <Link
-            href="/dashboard"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-all"
-          >
-            <LayoutGrid className="w-4 h-4" />
-            Back to App
-          </Link>
           <button
             onClick={handleLogout}
             id="admin-logout"
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all border border-transparent hover:border-red-100"
+            title={collapsed ? "Logout" : undefined}
+            className={`w-full flex items-center gap-3 px-3 py-2 text-white bg-red-500 rounded-md ${
+              collapsed ? "md:justify-center" : ""
+            }`}
           >
-            <LogOut className="w-4 h-4" />
-            Logout
+            <LogOut className="w-4 h-4 shrink-0" />
+            <span className={collapsed ? "md:hidden" : ""}>Logout</span>
           </button>
         </div>
       </aside>
@@ -152,7 +168,11 @@ export default function AdminLayout({ children }) {
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
           >
-            {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            {sidebarOpen ? (
+              <X className="w-5 h-5" />
+            ) : (
+              <Menu className="w-5 h-5" />
+            )}
           </button>
         </header>
 
