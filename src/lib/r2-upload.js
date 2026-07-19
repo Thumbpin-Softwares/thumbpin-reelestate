@@ -9,31 +9,14 @@ import crypto from "crypto";
  * @param {Buffer}  buffer      - File bytes
  * @param {string}  key         - R2 object key, e.g. "users/abc123/videos/clip.mp4"
  * @param {string}  contentType - MIME type, e.g. "video/mp4"
- * @param {object}  [options]
- * @param {boolean} [options.normalizeKeyframes] - Re-encode with a short
- *   keyframe interval before upload (see video-normalize.js). Opt-in and
- *   only worth the extra encode time for clips that will be reopened in the
- *   /dashboard/edit editor (avatar/broll/CTA/part1/part2 sources) — not
- *   final flattened exports, which are never seeked into again.
  * @returns {string} The internal proxy URL: /api/r2/user?key=<encoded_key>
  */
-export async function uploadToR2(buffer, key, contentType = "application/octet-stream", options = {}) {
-  let body = buffer;
-  if (options.normalizeKeyframes) {
-    try {
-      const { normalizeKeyframesForSeeking } = await import("./video-normalize");
-      body = await normalizeKeyframesForSeeking(buffer);
-    } catch (err) {
-      console.error("[uploadToR2] Keyframe normalization failed, uploading original:", err.message);
-      body = buffer;
-    }
-  }
-
+export async function uploadToR2(buffer, key, contentType = "application/octet-stream") {
   await s3.send(
     new PutObjectCommand({
       Bucket: BUCKET,
       Key: key,
-      Body: body,
+      Body: buffer,
       ContentType: contentType,
     })
   );
