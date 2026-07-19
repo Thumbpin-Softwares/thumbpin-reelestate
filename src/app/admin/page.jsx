@@ -5,8 +5,6 @@ import Link from "next/link";
 import {
   Users,
   Image as ImageIcon,
-  CreditCard,
-  TrendingUp,
   Crown,
   UserCheck,
   Clock,
