@@ -17,15 +17,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
-// Shared "Add Assets" tile — presenter/avatar selection (prebuilt / upload /
-// my-assets). Used by every template's Add Assets step, driven by the same
-// `useAvatars` hook each template already instantiates. Only the label for
-// the "prebuilt" tab is template-specific (e.g. "RE Agents").
-export function ModelSelector({ avatarHook, prebuiltLabel = "RE Agents", uploadEndpoint = "/api/veo-long-ad/presenter/upload" }) {
+// Shared "Add Assets" tile — presenter/avatar selection. Two top-level tabs:
+// "Agent Library" (browse — prebuilt agents and the user's own uploaded
+// collections, as two categories inside one "Browse Agents" dialog) and
+// "Upload Presenter" (upload a fresh collection). Used by every template's
+// Add Assets step, driven by the same `useAvatars` hook each template
+// already instantiates. Only the label for the prebuilt category is
+// template-specific (e.g. "RE Agents").
+export function ModelSelector({ avatarHook, prebuiltLabel = "RE Agents", uploadEndpoint = "/api/avatars/upload" }) {
   const [previewCollection, setPreviewCollection] = useState(null);
   const [previewIndex, setPreviewIndex] = useState(0);
   const [loadedPreviewUrls, setLoadedPreviewUrls] = useState(() => new Set());
   const [showAgentBrowser, setShowAgentBrowser] = useState(false);
+  const [browserCategory, setBrowserCategory] = useState("prebuilt");
   const touchStartXRef = useRef(null);
 
   const [uploadItems, setUploadItems] = useState([]);
@@ -45,7 +49,16 @@ export function ModelSelector({ avatarHook, prebuiltLabel = "RE Agents", uploadE
     isCollectionSelected,
   } = avatarHook;
 
-  const selectedCollectionAvatarData = reAvatars.find((col) => isCollectionSelected(col.id));
+  // Selection can come from either category, so both need checking to
+  // render the right preview card regardless of which one the user picked.
+  const selectedCollectionAvatarData =
+    reAvatars.find((col) => isCollectionSelected(col.id)) || myAssets.find((col) => isCollectionSelected(col.id));
+
+  // "library" covers both browse categories under one tab; "upload" is the
+  // only other top-level tab. Also normalizes any session-restored
+  // avatarMode from before this tab merge ("prebuilt"/"my-assets") into
+  // "library" automatically, since those values no longer have a distinct tab.
+  const activeTabId = avatarHook.avatarMode === "upload" ? "upload" : "library";
 
   // Preload every photo in the collection as soon as the preview opens so
   // swiping/clicking through them doesn't wait on a fresh network fetch.
@@ -72,15 +85,16 @@ export function ModelSelector({ avatarHook, prebuiltLabel = "RE Agents", uploadE
     };
   }, [previewCollection]);
 
-  useEffect(() => {
-    if (avatarHook.avatarMode !== "my-assets") return;
-    if (myAssets.length > 0) return;
+  // Fetched unconditionally on mount (like reAvatars) rather than gated to a
+  // tab being open — the top-level preview card needs to resolve a selection
+  // against `myAssets` even when the browse dialog was never opened this
+  // session (e.g. a session-restored selection).
+  const fetchMyAssets = () => {
     setMyAssetsLoading(true);
-    fetch("/api/assets", { cache: "no-store" })
+    fetch("/api/assets?type=avatar,presenter&limit=50", { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
-        const all = (data.assets || []).filter((a) => a.type === "avatar" || a.type === "presenter");
-        const normalised = all.map((a) => {
+        const normalised = (data.assets || []).map((a) => {
           const urls = a.metadata?.urls || [a.url];
           return {
             id: a._id,
@@ -93,7 +107,12 @@ export function ModelSelector({ avatarHook, prebuiltLabel = "RE Agents", uploadE
       })
       .catch(() => {})
       .finally(() => setMyAssetsLoading(false));
-  }, [avatarHook.avatarMode]);
+  };
+
+  useEffect(() => {
+    fetchMyAssets();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount only
+  }, []);
 
   const handlePreviewTouchStart = (e) => {
     touchStartXRef.current = e.touches[0].clientX;
@@ -124,15 +143,14 @@ export function ModelSelector({ avatarHook, prebuiltLabel = "RE Agents", uploadE
 
       <div className="flex gap-2 flex-wrap">
         {[
-          { id: "prebuilt", label: prebuiltLabel },
+          { id: "library", label: "Agent Library" },
           { id: "upload", label: "Upload Presenter" },
-          { id: "my-assets", label: "My Assets" },
         ].map(({ id, label }) => (
           <button
             key={id}
             onClick={() => avatarHook.setAvatarMode(id)}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-              avatarHook.avatarMode === id
+              activeTabId === id
                 ? "bg-primary text-white shadow"
                 : "border border-border/50 text-muted-foreground hover:text-foreground"
             }`}
@@ -142,19 +160,12 @@ export function ModelSelector({ avatarHook, prebuiltLabel = "RE Agents", uploadE
         ))}
       </div>
 
-      {/* Prebuilt avatars */}
-      {avatarHook.avatarMode === "prebuilt" && (
+      {/* Agent Library — a selection preview + "Browse Agents", which opens
+          a dialog with two categories: the user's own uploaded collections
+          and the template's prebuilt agents. */}
+      {activeTabId === "library" && (
         <div className="space-y-2">
-          {reAvatarsLoading ? (
-            <div className="flex items-center gap-2 py-6 justify-center text-muted-foreground text-sm">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Loading {prebuiltLabel}...
-            </div>
-          ) : reAvatars.length === 0 ? (
-            <div className="text-center py-6 text-sm text-muted-foreground">
-              No {prebuiltLabel} found. Upload your own presenter.
-            </div>
-          ) : selectedCollectionAvatarData ? (
+          {selectedCollectionAvatarData ? (
             <div className="relative mx-auto max-w-45 aspect-2/3 rounded-3xl overflow-hidden border-2 border-[#c7f038]">
               {selectedCollectionAvatarData.coverImage || selectedCollectionAvatarData.images?.[0]?.url ? (
                 <img
@@ -201,7 +212,7 @@ export function ModelSelector({ avatarHook, prebuiltLabel = "RE Agents", uploadE
       )}
 
       {/* Upload avatars */}
-      {avatarHook.avatarMode === "upload" && (
+      {activeTabId === "upload" && (
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-2">
             {uploadItems.map((item, idx) => (
@@ -286,6 +297,7 @@ export function ModelSelector({ avatarHook, prebuiltLabel = "RE Agents", uploadE
                     });
                     setUploadItems([]);
                     setCollectionName("");
+                    fetchMyAssets();
                   } catch (err) {
                     toast.error("Upload failed", { description: err.message });
                   } finally {
@@ -304,78 +316,6 @@ export function ModelSelector({ avatarHook, prebuiltLabel = "RE Agents", uploadE
                 )}
               </Button>
             </>
-          )}
-        </div>
-      )}
-
-      {/* My Assets */}
-      {avatarHook.avatarMode === "my-assets" && (
-        <div className="space-y-2">
-          {myAssetsLoading ? (
-            <div className="flex items-center gap-2 py-6 justify-center text-muted-foreground text-sm">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Loading your assets...
-            </div>
-          ) : myAssets.length === 0 ? (
-            <div className="text-center py-6 space-y-1">
-              <p className="text-sm text-muted-foreground">No avatars uploaded yet.</p>
-              <p className="text-xs text-muted-foreground">Upload avatar photos in your Asset Library first.</p>
-            </div>
-          ) : (
-            <div className="max-h-72 overflow-y-auto no-scrollbar overscroll-contain pr-1" onWheel={(e) => e.stopPropagation()}>
-              <div className="grid grid-cols-2 gap-2">
-                {myAssets.map((col) => {
-                  const selected = avatarHook.isCollectionSelected(col.id);
-                  const thumb = col.coverImage || col.images?.[0]?.url;
-                  return (
-                    <div
-                      key={col.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => avatarHook.selectCollection(col)}
-                      onKeyDown={(e) => e.key === "Enter" && avatarHook.selectCollection(col)}
-                      className={`group relative rounded-3xl overflow-hidden border-2 transition-all text-left cursor-pointer ${
-                        selected ? "border-[#c7f038] ring-2 ring-[#c7f038] scale-[1.02]" : "border-border/40 hover:border-[#c7f038]"
-                      }`}
-                    >
-                      {thumb ? (
-                        <img src={thumb} alt={col.name} className="w-full h-64 object-cover" />
-                      ) : (
-                        <div className="w-full h-64 bg-muted/30 flex items-center justify-center">
-                          <User2 className="w-8 h-8 text-muted-foreground" />
-                        </div>
-                      )}
-                      <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent" />
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setPreviewCollection(col);
-                            setPreviewIndex(0);
-                          }}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white text-black text-xs font-medium shadow-lg hover:bg-[#c7f038] transition-colors"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          View
-                        </button>
-                      </div>
-                      {col.images?.length > 1 && (
-                        <div className="absolute top-2 left-2 rounded-full bg-black/70 px-2 py-1 text-[10px] text-white">
-                          {col.images.length} photos
-                        </div>
-                      )}
-                      {selected && (
-                        <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-neutral-900 flex items-center justify-center">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-[#c7f038]" />
-                        </div>
-                      )}
-                      <p className="absolute bottom-2 left-2 right-2 text-[11px] text-white font-medium truncate">{col.name}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
           )}
         </div>
       )}
@@ -481,68 +421,116 @@ export function ModelSelector({ avatarHook, prebuiltLabel = "RE Agents", uploadE
         </DialogContent>
       </Dialog>
 
-      {/* Browse prebuilt avatars */}
+      {/* Browse Agents — two categories: the user's own uploaded collections
+          and the template's prebuilt agents. */}
       <Dialog open={showAgentBrowser} onOpenChange={setShowAgentBrowser}>
         <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col min-h-0">
           <DialogHeader>
-            <DialogTitle>Browse {prebuiltLabel}</DialogTitle>
+            <DialogTitle>Browse Agents</DialogTitle>
           </DialogHeader>
+
+          <div className="flex gap-2 shrink-0">
+            {[
+              { id: "my-agents", label: "My Agents" },
+              { id: "prebuilt", label: prebuiltLabel },
+            ].map(({ id, label }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setBrowserCategory(id)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  browserCategory === id
+                    ? "bg-primary text-white shadow"
+                    : "border border-border/50 text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
           <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-hide -mx-1 px-1" onWheel={(e) => e.stopPropagation()}>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {reAvatars.map((col) => {
-                const selected = isCollectionSelected(col.id);
-                const thumb = col.coverImage || col.images?.[0]?.url;
-                return (
-                  <div
-                    key={col.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => {
-                      selectCollection(col);
-                      setShowAgentBrowser(false);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
+            {browserCategory === "my-agents" && myAssetsLoading ? (
+              <div className="flex items-center gap-2 py-10 justify-center text-muted-foreground text-sm">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Loading your agents...
+              </div>
+            ) : browserCategory === "my-agents" && myAssets.length === 0 ? (
+              <div className="text-center py-10 space-y-1">
+                <p className="text-sm text-muted-foreground">No agents uploaded yet.</p>
+                <p className="text-xs text-muted-foreground">Upload one from the &quot;Upload Presenter&quot; tab.</p>
+              </div>
+            ) : browserCategory === "prebuilt" && reAvatarsLoading ? (
+              <div className="flex items-center gap-2 py-10 justify-center text-muted-foreground text-sm">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Loading {prebuiltLabel}...
+              </div>
+            ) : browserCategory === "prebuilt" && reAvatars.length === 0 ? (
+              <div className="text-center py-10 text-sm text-muted-foreground">
+                No {prebuiltLabel} found. Upload your own presenter.
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {(browserCategory === "my-agents" ? myAssets : reAvatars).map((col) => {
+                  const selected = isCollectionSelected(col.id);
+                  const thumb = col.coverImage || col.images?.[0]?.url;
+                  return (
+                    <div
+                      key={col.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => {
                         selectCollection(col);
                         setShowAgentBrowser(false);
-                      }
-                    }}
-                    className={`group relative rounded-2xl overflow-hidden border-2 transition-all text-left cursor-pointer ${
-                      selected ? "border-[#c7f038] ring-2 ring-[#c7f038] scale-[1.02]" : "border-border/40 hover:border-[#c7f038]"
-                    }`}
-                  >
-                    {thumb ? (
-                      <img src={thumb} alt={col.name} className="w-full h-75 sm:h-40 object-cover" />
-                    ) : (
-                      <div className="w-full h-40 bg-muted/30 flex items-center justify-center">
-                        <User2 className="w-8 h-8 text-muted-foreground" />
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          selectCollection(col);
+                          setShowAgentBrowser(false);
+                        }
+                      }}
+                      className={`group relative rounded-2xl overflow-hidden border-2 transition-all text-left cursor-pointer ${
+                        selected ? "border-[#c7f038] ring-2 ring-[#c7f038] scale-[1.02]" : "border-border/40 hover:border-[#c7f038]"
+                      }`}
+                    >
+                      {thumb ? (
+                        <img src={thumb} alt={col.name} className="w-full h-75 sm:h-40 object-cover" />
+                      ) : (
+                        <div className="w-full h-40 bg-muted/30 flex items-center justify-center">
+                          <User2 className="w-8 h-8 text-muted-foreground" />
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent" />
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPreviewCollection(col);
+                            setPreviewIndex(0);
+                          }}
+                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white text-black text-[11px] font-medium shadow-lg hover:bg-[#c7f038] transition-colors"
+                        >
+                          <Eye className="w-3 h-3" />
+                          View
+                        </button>
                       </div>
-                    )}
-                    <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent" />
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPreviewCollection(col);
-                          setPreviewIndex(0);
-                        }}
-                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white text-black text-[11px] font-medium shadow-lg hover:bg-[#c7f038] transition-colors"
-                      >
-                        <Eye className="w-3 h-3" />
-                        View
-                      </button>
+                      {col.images?.length > 1 && (
+                        <div className="absolute top-1.5 left-1.5 rounded-full bg-black/70 px-2 py-1 text-[10px] text-white">
+                          {col.images.length} photos
+                        </div>
+                      )}
+                      {selected && (
+                        <div className="absolute top-1.5 right-1.5 w-4.5 h-4.5 rounded-full bg-neutral-900 flex items-center justify-center">
+                          <CheckCircle2 className="w-3 h-3 text-[#c7f038]" />
+                        </div>
+                      )}
+                      <p className="absolute bottom-1.5 left-1.5 right-1.5 text-[10px] text-white font-medium truncate">{col.name}</p>
                     </div>
-                    {selected && (
-                      <div className="absolute top-1.5 right-1.5 w-4.5 h-4.5 rounded-full bg-neutral-900 flex items-center justify-center">
-                        <CheckCircle2 className="w-3 h-3 text-[#c7f038]" />
-                      </div>
-                    )}
-                    <p className="absolute bottom-1.5 left-1.5 right-1.5 text-[10px] text-white font-medium truncate">{col.name}</p>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

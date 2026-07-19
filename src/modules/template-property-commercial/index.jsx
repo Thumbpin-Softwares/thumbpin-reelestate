@@ -222,7 +222,6 @@ export default function PropertyCommercialRunner({ template }) {
               onNext={() => setStep(1)}
               onClear={handleClear}
               prebuiltLabel="RE Agents"
-              uploadEndpoint="/api/model-tour/upload/avatar"
               propertyUploadEndpoint="/api/model-tour/upload/property"
             />
           )}

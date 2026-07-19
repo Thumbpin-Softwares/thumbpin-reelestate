@@ -1,6 +1,6 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider } from "@/components/auth-provider";
+import { AuthProvider } from "@/modules/common/components/auth-provider";
 import SmoothScroll from "@/modules/common/smooth-scroll";
 
 export default function DashboardLayout({ children }) {
