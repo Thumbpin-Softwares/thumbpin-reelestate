@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { adminNotify } from "@/modules/admin/components/notification";
 import { ImageIcon, Plus, Search } from "lucide-react";
 import { UploadModal } from "@/modules/admin/components/upload-modal";
 import { CollectionViewModal } from "@/modules/admin/components/collection-view-modal";
@@ -25,7 +25,7 @@ export default function AdminAvatarsPage() {
       setCollections(await fetchCollections());
     } catch (err) {
       console.error("Failed to load collections:", err);
-      toast.error("Failed to load collections");
+      adminNotify.error("Failed to load collections");
     } finally {
       setLoading(false);
     }
@@ -40,7 +40,7 @@ export default function AdminAvatarsPage() {
       .catch((err) => {
         if (cancelled) return;
         console.error("Failed to load collections:", err);
-        toast.error("Failed to load collections");
+        adminNotify.error("Failed to load collections");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -55,7 +55,7 @@ export default function AdminAvatarsPage() {
     if (collection) {
       setSelectedCollection(collection);
     } else {
-      toast.error("Failed to load collection details");
+      adminNotify.error("Failed to load collection details");
     }
   }
 
@@ -98,7 +98,7 @@ export default function AdminAvatarsPage() {
       <div className="flex items-center justify-between flex-row-reverse">
         <button
           onClick={() => setShowUpload(true)}
-          className="flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-all shadow-sm"
+          className="flex items-center gap-2 bg-[#c7f038] text-black text-sm px-4 py-2 rounded-md transition-all shadow-sm"
         >
           <Plus className="w-4 h-4" />
           New Collection
@@ -110,7 +110,7 @@ export default function AdminAvatarsPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search collections..."
-            className="bg-white border border-gray-200 rounded-xl pl-9 pr-4 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900 transition-all w-56 shadow-sm"
+            className="bg-white border border-gray-200 rounded-md pl-9 pr-4 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#c7f038] focus:border-2 transition-all w-84"
           />
         </div>
       </div>

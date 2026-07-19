@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { adminNotify } from "@/modules/admin/components/notification";
 import { Plus, Minus, RefreshCw, Loader2, Clock, X } from "lucide-react";
 
 export default function CreditModal({ user, onClose, onUpdated }) {
@@ -21,8 +21,8 @@ export default function CreditModal({ user, onClose, onUpdated }) {
   async function handleSubmit(e) {
     e.preventDefault();
     const n = parseFloat(amount);
-    if (isNaN(n) || n < 0) return toast.error("Enter a valid positive number");
-    if (!Number.isInteger(n)) return toast.error("Credits must be a whole number");
+    if (isNaN(n) || n < 0) return adminNotify.error("Enter a valid positive number");
+    if (!Number.isInteger(n)) return adminNotify.error("Credits must be a whole number");
 
     setLoading(true);
     try {
@@ -33,7 +33,7 @@ export default function CreditModal({ user, onClose, onUpdated }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      toast.success(
+      adminNotify.success(
         action === "set"
           ? `Credits set to ${data.user.credits}`
           : action === "add"
@@ -43,7 +43,7 @@ export default function CreditModal({ user, onClose, onUpdated }) {
       onUpdated(data.user);
       onClose();
     } catch (err) {
-      toast.error(err.message || "Failed to update credits");
+      adminNotify.error(err.message || "Failed to update credits");
     } finally {
       setLoading(false);
     }
