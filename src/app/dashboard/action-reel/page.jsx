@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { Loader2 } from "lucide-react";
-import { useAvatars } from "@/modules/ai-walkthrough/hooks/useAvatars";
+import { useAvatars } from "@/modules/common/hooks/useAvatars";
 import { StepUpload } from "@/modules/luxury-car-exit/components/StepUpload";
 import { StepScript } from "@/modules/action-reel/components/StepScript";
 import { GenerationProgress } from "@/modules/action-reel/components/GenerationProgress";
