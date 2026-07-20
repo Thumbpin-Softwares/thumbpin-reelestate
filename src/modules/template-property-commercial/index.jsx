@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { useAvatars } from "@/modules/ai-walkthrough/hooks/useAvatars";
+import { useAvatars } from "@/modules/common/hooks/useAvatars";
 import { StepCapsule } from "@/modules/template/components/StepCapsule";
 import { Breadcrumbs } from "@/modules/template/components/Breadcrumbs";
 import { AddAssetsStep } from "@/modules/template/layout/AddAssetsStep";

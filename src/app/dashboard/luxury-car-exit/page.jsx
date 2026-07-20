@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef, Suspense } from "react";
 import { Loader2 } from "lucide-react";
-import { useAvatars } from "@/modules/ai-walkthrough/hooks/useAvatars";
-import { dataUrlToFile } from "@/modules/ai-walkthrough/helpers/fileHelpers";
+import { useAvatars } from "@/modules/common/hooks/useAvatars";
+import { dataUrlToFile } from "@/modules/common/helpers/fileHelpers";
 import { compressImage } from "@/utils/compress-image";
 import { StepUpload } from "@/modules/luxury-car-exit/components/StepUpload";
 import { StepScript, SCRIPT_DRAFT_KEY } from "@/modules/luxury-car-exit/components/StepScript";
