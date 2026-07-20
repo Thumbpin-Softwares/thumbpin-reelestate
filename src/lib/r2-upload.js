@@ -1,5 +1,4 @@
 import { PutObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { s3, BUCKET, R2_PUBLIC_URL } from "./r2";
 import crypto from "crypto";
 
@@ -24,29 +23,6 @@ export async function uploadToR2(buffer, key, contentType = "application/octet-s
     return `${R2_PUBLIC_URL}/${key}`;
   }
   return `/api/r2?key=${encodeURIComponent(key)}`;
-}
-
-/**
- * Mint a short-lived presigned PUT URL so the browser can upload a file
- * directly to R2, bypassing the Next.js route handler's request body entirely.
- * Needed on Vercel specifically — its serverless functions hard-cap request
- * bodies at 4.5MB, well under what a real photo/avatar upload needs, and that
- * limit isn't raiseable from app code (unlike the "20mb" configured for
- * Server Actions in next.config.mjs, which doesn't apply to file uploads
- * going through a route handler's formData()).
- *
- * @param {string} key         - R2 object key to upload to
- * @param {string} contentType - MIME type the client will send
- * @param {number} expiresIn   - URL validity in seconds (default 5 min)
- * @returns {Promise<string>} presigned PUT URL
- */
-export async function getPresignedUploadUrl(key, contentType, expiresIn = 300) {
-  const command = new PutObjectCommand({
-    Bucket: BUCKET,
-    Key: key,
-    ContentType: contentType,
-  });
-  return getSignedUrl(s3, command, { expiresIn });
 }
 
 /**
