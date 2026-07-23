@@ -1,33 +1,9 @@
 "use client";
 
-import { CheckCircle2, ChevronLeft, ChevronRight, ImagePlus, User2 } from "lucide-react";
+import { useState } from "react";
+import { AlertTriangle, ChevronLeft, ChevronRight, ImagePlus, User2, FileJson } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-const FIELD_LABELS = {
-  propertyClassification: "Classification",
-  projectName: "Project Name",
-  projectType: "Project Type",
-  projectArea: "Project Area",
-  location: "Location",
-  tonality: "Tonality",
-  landmarks: "Landmarks",
-  connectivity: "Connectivity",
-  carpetArea: "Carpet Area",
-  amenities: "Amenities",
-  features: "Features",
-  gatedCommunity: "Gated Community",
-  waterSupplyAreaType: "Water Supply & Area Type",
-  nearbySettlements: "Nearby Settlements",
-  language: "Speaker Language",
-  vibe: "Vibe",
-};
-
-const FIELD_ORDER = [
-  "propertyClassification", "projectName", "projectType", "projectArea", "location",
-  "tonality", "landmarks", "connectivity",
-  "carpetArea", "amenities", "features", "gatedCommunity", "waterSupplyAreaType", "nearbySettlements",
-  "language", "vibe",
-];
+import { Textarea } from "@/components/ui/textarea";
 
 function Section({ icon: Icon, title, children }) {
   return (
@@ -43,21 +19,36 @@ function Section({ icon: Icon, title, children }) {
   );
 }
 
-// Review step for the residential (omni-hometour-pipeline) flow — recaps
-// what the user picked in Add Assets (photos + presenter) and Script (site
-// details form) before the "Generate" click actually fires the workflow.
-// Unlike the generic pipeline's StepFinalize, there's nothing async to run
-// here (no storyboard/image rendering) — it's a pure summary + confirm.
-export function ModelTourFinalize({ images = [], selectedAvatars = [], scriptValues = {}, onBack, onGenerate }) {
+// Review step for the residential (n8n model-tour) flow. n8n's /model-tour/script
+// call already merged the form inputs, predicted avatar gender, and built the
+// master prompt into one JSON blob — we just let the user read/edit that raw
+// JSON here before it's sent back to n8n to actually render the video. We never
+// interpret its shape (it's n8n's to define), so this is a plain JSON editor
+// rather than a field-by-field form.
+export function ModelTourFinalize({ images = [], selectedAvatars = [], script, onChange, onBack, onGenerate }) {
   const propertyPhotos = images.filter((img) => img.r2Url || img.url);
-  const scriptFields = FIELD_ORDER
-    .filter((key) => scriptValues[key] !== undefined && scriptValues[key] !== "" && scriptValues[key] !== null)
-    .map((key) => ({ key, label: FIELD_LABELS[key] || key, value: scriptValues[key] }));
-  Object.keys(scriptValues).forEach((key) => {
-    if (key === "propertyImages" || key === "avatarImage" || FIELD_ORDER.includes(key)) return;
-    if (scriptValues[key] === undefined || scriptValues[key] === "" || scriptValues[key] === null) return;
-    scriptFields.push({ key, label: FIELD_LABELS[key] || key, value: scriptValues[key] });
-  });
+  const [text, setText] = useState(() => JSON.stringify(script ?? {}, null, 2));
+  const [parseError, setParseError] = useState(null);
+
+  // Re-sync the editor text when a new script arrives (e.g. re-running the
+  // script step after Back), without the cascading-render effect pattern —
+  // this is React's documented "adjust state during render" approach.
+  const [syncedScript, setSyncedScript] = useState(script);
+  if (script !== syncedScript) {
+    setSyncedScript(script);
+    setText(JSON.stringify(script ?? {}, null, 2));
+  }
+
+  const handleTextChange = (value) => {
+    setText(value);
+    try {
+      const parsed = JSON.parse(value);
+      setParseError(null);
+      onChange?.(parsed);
+    } catch (err) {
+      setParseError("Invalid JSON — fix it before generating.");
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -93,18 +84,20 @@ export function ModelTourFinalize({ images = [], selectedAvatars = [], scriptVal
         )}
       </Section>
 
-      <Section icon={CheckCircle2} title="Site Details">
-        {scriptFields.length === 0 ? (
-          <p className="text-xs text-neutral-400">No details submitted.</p>
-        ) : (
-          <div className="grid sm:grid-cols-2 gap-x-6 gap-y-2 rounded-xl border border-border/50 p-3 bg-card/50">
-            {scriptFields.map((f) => (
-              <div key={f.key} className="text-xs">
-                <span className="text-neutral-400">{f.label}: </span>
-                <span className="text-neutral-800 font-medium">{String(f.value)}</span>
-              </div>
-            ))}
-          </div>
+      <Section icon={FileJson} title="Script">
+        <p className="text-xs text-neutral-400 -mt-1">
+          Generated from your inputs. Edit any field below before generating — it&apos;s sent back exactly as written.
+        </p>
+        <Textarea
+          value={text}
+          onChange={(e) => handleTextChange(e.target.value)}
+          spellCheck={false}
+          className="font-mono text-xs min-h-80 resize-y bg-card/50"
+        />
+        {parseError && (
+          <p className="text-xs text-red-500 flex items-center gap-1.5">
+            <AlertTriangle className="w-3.5 h-3.5" /> {parseError}
+          </p>
         )}
       </Section>
 
@@ -115,7 +108,8 @@ export function ModelTourFinalize({ images = [], selectedAvatars = [], scriptVal
 
         <Button
           onClick={onGenerate}
-          className="bg-neutral-900 text-[#c7f038] hover:opacity-90 hover:bg-neutral-900 shadow-lg gap-2 px-6"
+          disabled={!!parseError}
+          className="bg-neutral-900 text-[#c7f038] hover:opacity-90 hover:bg-neutral-900 shadow-lg gap-2 px-6 disabled:opacity-50"
         >
           Generate Video
           <ChevronRight className="w-4 h-4" />

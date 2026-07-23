@@ -43,6 +43,8 @@ export default function PropertyCommercialRunner({ template }) {
   const [generatingScript, setGeneratingScript] = useState(false);
   const [storyboard, setStoryboard] = useState(null);
   const [renderedFrames, setRenderedFrames] = useState(null);
+  const [modelTourScript, setModelTourScript] = useState(null);
+  const [generatingModelTourScript, setGeneratingModelTourScript] = useState(false);
   const [modelTourGenerating, setModelTourGenerating] = useState(false);
   const [showGenerations, setShowGenerations] = useState(false);
   const [hydrated, setHydrated] = useState(false);
@@ -65,6 +67,7 @@ export default function PropertyCommercialRunner({ template }) {
         if (typeof saved.step === "number") setStep(saved.step);
         if (Array.isArray(saved.images)) setImages(saved.images);
         if (saved.scriptValues) setScriptValues(saved.scriptValues);
+        if (saved.modelTourScript) setModelTourScript(saved.modelTourScript);
         if (saved.avatarMode) avatarHook.setAvatarMode(saved.avatarMode);
         if (Array.isArray(saved.selectedAvatars)) avatarHook.setSelectedAvatars(saved.selectedAvatars);
         if (saved.selectedCollectionId) avatarHook.setSelectedCollectionId(saved.selectedCollectionId);
@@ -86,13 +89,14 @@ export default function PropertyCommercialRunner({ template }) {
           step,
           images,
           scriptValues,
+          modelTourScript,
           avatarMode: avatarHook.avatarMode,
           selectedAvatars: avatarHook.selectedAvatars,
           selectedCollectionId: avatarHook.selectedCollectionId,
         })
       );
     } catch (_) {}
-  }, [hydrated, modelTourGenerating, step, images, scriptValues, avatarHook.avatarMode, avatarHook.selectedAvatars, avatarHook.selectedCollectionId]);
+  }, [hydrated, modelTourGenerating, step, images, scriptValues, modelTourScript, avatarHook.avatarMode, avatarHook.selectedAvatars, avatarHook.selectedCollectionId]);
 
   // Only count photos once their R2 upload has actually finished — those
   // public URLs are what the script generator reads to ground its
@@ -120,6 +124,7 @@ export default function PropertyCommercialRunner({ template }) {
   const handleClear = () => {
     setImages([]);
     setScriptValues({});
+    setModelTourScript(null);
     setStep(0);
     avatarHook.clearSelectedAvatars();
     try {
@@ -155,10 +160,13 @@ export default function PropertyCommercialRunner({ template }) {
     }
   };
 
-  // Residential skips the generic storyboard pipeline entirely — the
-  // omni-hometour-pipeline workflow does scripting/TTS/video in one call.
-  const modelTourPayload = {
+  // Residential skips the generic storyboard pipeline entirely — n8n's
+  // model-tour workflow does gender-detection/scripting/TTS/video, split
+  // across two calls: /model-tour/script (checkpoint, synchronous, returns
+  // editable JSON) and /model-tour/generate (fires the actual render).
+  const modelTourScriptRequest = {
     propertyName: scriptValues.projectName || "",
+    type: scriptValues.propertyClassification || undefined,
     locationLandmarks: scriptValues.landmarks || "",
     connectivity: scriptValues.connectivity || "",
     language: scriptValues.language || "",
@@ -171,9 +179,28 @@ export default function PropertyCommercialRunner({ template }) {
     propertyImageUrls: uploadedImages.map((img) => img.r2Url).slice(0, 4),
   };
 
+  const handleGenerateModelTourScript = async () => {
+    setGeneratingModelTourScript(true);
+    try {
+      const res = await fetch("/api/model-tour/script", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(modelTourScriptRequest),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Script generation failed");
+      setModelTourScript(data.script);
+      setStep(2);
+    } catch (err) {
+      toast.error("Script generation failed", { description: err.message });
+    } finally {
+      setGeneratingModelTourScript(false);
+    }
+  };
+
   const handleContinueFromScript = () => {
     if (scriptValues.propertyClassification === MODEL_TOUR_CLASSIFICATION) {
-      setStep(2);
+      handleGenerateModelTourScript();
     } else {
       handleGenerateScript();
     }
@@ -207,7 +234,7 @@ export default function PropertyCommercialRunner({ template }) {
         <div className="min-h-full flex flex-col justify-center px-2 sm:px-6 lg:px-7 py-4 pb-20 md:pb-4">
           {modelTourGenerating ? (
             <ModelTourGeneration
-              payload={modelTourPayload}
+              script={modelTourScript}
               onAbort={() => setModelTourGenerating(false)}
               onBackToForm={() => setModelTourGenerating(false)}
             />
@@ -232,7 +259,7 @@ export default function PropertyCommercialRunner({ template }) {
               onChange={({ propertyImages, avatarImage, ...rest }) => setScriptValues(rest)}
               onBack={() => setStep(0)}
               onNext={handleContinueFromScript}
-              loading={generatingScript}
+              loading={generatingScript || generatingModelTourScript}
               continueLabel={
                 scriptValues.propertyClassification === MODEL_TOUR_CLASSIFICATION
                   ? "Review & Finalize"
@@ -245,7 +272,8 @@ export default function PropertyCommercialRunner({ template }) {
             <ModelTourFinalize
               images={images}
               selectedAvatars={avatarHook.selectedAvatars}
-              scriptValues={scriptValues}
+              script={modelTourScript}
+              onChange={setModelTourScript}
               onBack={() => setStep(1)}
               onGenerate={handleConfirmGenerate}
             />

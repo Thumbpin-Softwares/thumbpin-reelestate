@@ -6,12 +6,12 @@ import { GenerationProgressShell } from "@/modules/common/components/generation-
 
 const JOB_ID_KEY = "model-tour-job-id";
 
-// Residential-only generation screen — the omni-hometour-pipeline workflow
-// does scripting/TTS/video internally in one call, so unlike the generic
-// pipeline's splitting/voices/combining stages, this is just
-// generating -> done/error. Same resume-on-refresh contract as every other
-// pipeline: a jobId in sessionStorage + GET /jobs/:jobId to reattach.
-export function ModelTourGeneration({ payload, onAbort, onBackToForm }) {
+// Residential-only generation screen — n8n's model-tour workflow renders the
+// video from the (possibly user-edited) script JSON produced by the finalize
+// step, so unlike the generic pipeline's splitting/voices/combining stages,
+// this is just generating -> done/error. Same resume-on-refresh contract as
+// every other pipeline: a jobId in sessionStorage + GET /jobs/:jobId to reattach.
+export function ModelTourGeneration({ script, onAbort, onBackToForm }) {
   const [phase, setPhase] = useState("loading"); // loading | error | done
   const [error, setError] = useState(null);
   const [resultUrl, setResultUrl] = useState(null);
@@ -77,7 +77,7 @@ export function ModelTourGeneration({ payload, onAbort, onBackToForm }) {
       const res = await fetch("/api/model-tour/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...payload, jobId }),
+        body: JSON.stringify({ jobId, script }),
         signal: controller.signal,
       });
       if (!res.ok) {
